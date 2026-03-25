@@ -128,6 +128,12 @@ h1, h2, h3, h4 {
   transform: scale(0.98);
 }
 
+/* Focus ring — accessible and on-brand */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
@@ -137,4 +143,22 @@ html {
 ::selection {
   background-color: var(--trad-red-500);
   color: var(--sabbia-50);
+}
+
+/* Link underline animations */
+.link-underline {
+  position: relative;
+}
+.link-underline::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background-color: var(--accent);
+  transition: width 0.3s ease;
+}
+.link-underline:hover::after {
+  width: 100%;
 }

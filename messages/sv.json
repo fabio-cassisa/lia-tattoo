@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "Lia Giorgi — Traditionell tatuerare",
-    "description": "Boka din tatueringssession med Lia Giorgi. Traditionell & Old School tatueringskonst i Malmö och Köpenhamn."
+    "title": "liagiorgi.one.ttt — ❋ Traditional Tattoo Artist ❋",
+    "description": "Boka din tatueringssession med liagiorgi.one.ttt. Traditionella & Old School tatueringar i Malmö och Köpenhamn."
   },
   "nav": {
     "portfolio": "Portfolio",
@@ -10,8 +10,8 @@
     "aftercare": "Eftervård"
   },
   "hero": {
-    "title": "Lia Giorgi",
-    "subtitle": "Traditionell tatueringskonst",
+    "title": "liagiorgi.one.ttt",
+    "subtitle": "❋ Traditional Tattoo Artist ❋",
     "cta": "Boka din tatuering",
     "viewWork": "Se portfolio"
   },
@@ -62,13 +62,15 @@
       "copenhagen": "Köpenhamn — Good Morning Tattoo"
     },
     "contact": {
+      "title": "Kontakt",
       "name": "Ditt namn",
       "email": "E-postadress",
       "phone": "Telefonnummer (valfritt)"
     },
     "reference": {
       "label": "Referensbilder",
-      "hint": "Ladda upp bilder som inspirerar din tatueringsidé"
+      "hint": "Ladda upp bilder som inspirerar din tatueringsidé",
+      "upload": "Ladda upp"
     },
     "submit": "Skicka förfrågan",
     "success": "Förfrågan skickad! Jag granskar den och återkommer snart.",
@@ -78,17 +80,59 @@
       "large": "Deposition: 500 SEK (för tatueringar över 3 000 SEK)"
     }
   },
+  "portfolio": {
+    "title": "Portfolio",
+    "subtitle": "Ett urval av traditionellt tatueringsarbete",
+    "flashTitle": "Flash-designer",
+    "flashDescription": "Färdiga design från min flash-bok. Välj en och kör.",
+    "completedTitle": "Utfört arbete",
+    "completedDescription": "Senaste tatueringsarbete på riktig hud.",
+    "comingSoon": "Portfolio kommer snart — följ @liagiorgi.one.ttt på Instagram för att se mitt senaste arbete.",
+    "instagram": "Se mer på Instagram"
+  },
   "about": {
-    "title": "Om Lia",
-    "bio": "Traditionell tatuerare baserad i Malmö, Sverige. Specialiserad på Old School tatueringskonst — djärva linjer, rika färger, tidlösa mönster.",
-    "studios": "Arbetar för närvarande på Studio Diamant i Malmö och Good Morning Tattoo i Köpenhamn."
+    "title": "Om",
+    "bio": "Traditionell tatuerare baserad i Malmö, Sverige. Specialiserad på Old School tatueringar — djärva linjer, rika färger, tidlösa mönster.",
+    "studios": "Arbetar för närvarande på Studio Diamant i Malmö och Good Morning Tattoo i Köpenhamn.",
+    "approach": "Mitt tillvägagångssätt",
+    "approachText": "Varje tatuering börjar med ett samtal. Oavsett om du kommer med en flash-design eller en egen idé ser jag till att designen passar din kropp och håller över tid. Traditionell tatuering handlar om hantverk — rena linjer, solid färgpackning och design som åldras väl.",
+    "style": "Stilen",
+    "styleText": "Traditionell / Old School tatuering har rötter som sträcker sig över ett sekel. Tänk djärva konturer, en begränsad men slående färgpalett och ikoniska motiv — örnar, rosor, dolkar, pantrar, skepp, hjärtan. Det är tatueringskonst i sin renaste form.",
+    "findMe": "Hitta mig på",
+    "travelingNote": "Jag är en resande tatuerare — kolla mitt Instagram för gästspelsmeddelanden."
   },
   "aftercare": {
     "title": "Eftervård",
     "subtitle": "Hur du tar hand om din nya tatuering",
-    "intro": "Korrekt eftervård är avgörande för att din tatuering ska läka vackert. Följ dessa instruktioner noggrant."
+    "intro": "Korrekt eftervård är avgörande för att din tatuering ska läka vackert. Följ dessa instruktioner noggrant.",
+    "step1Title": "Första 2-3 timmarna",
+    "step1Text": "Behåll bandaget i 2-3 timmar efter sessionen. Din tatuerare berättar exakt när du ska ta bort det.",
+    "step2Title": "Tvätt",
+    "step2Text": "Tvätta försiktigt tatueringen med ljummet vatten och en mild, parfymfri tvål. Klappa torrt med en ren pappershandduk — gnid aldrig.",
+    "step3Title": "Återfuktning",
+    "step3Text": "Applicera ett tunt lager oparfymerad fuktkräm eller tatueringsbalsam 2-3 gånger dagligen. Lägg inte på för mycket — ett tunt lager räcker.",
+    "step4Title": "Första 2 veckorna",
+    "step4Text": "Ingen simning, ingen bastu, inget direkt solljus. Klia eller pilla inte på tatueringen — den flagnar naturligt. Bär lösa kläder över området.",
+    "step5Title": "Långtidsvård",
+    "step5Text": "När den har läkt, applicera alltid solskyddskräm på din tatuering vid solexponering. Det håller färgerna livfulla i åratal.",
+    "doTitle": "Gör",
+    "do1": "Håll den ren och fuktad",
+    "do2": "Bär lösa, andningsbara kläder",
+    "do3": "Låt den flagna naturligt",
+    "do4": "Använd SPF när den läkt",
+    "dontTitle": "Gör inte",
+    "dont1": "Klia, pilla eller dra inte",
+    "dont2": "Inga simbassänger, hav eller bubbelpooler",
+    "dont3": "Inget direkt solljus eller solarium",
+    "dont4": "Lägg inte på för mycket kräm",
+    "contactNote": "Om du har frågor under läkningen, tveka inte att höra av dig."
+  },
+  "home": {
+    "quote": "Djärva linjer, rika färger,",
+    "quoteHighlight": "tidlösa mönster."
   },
   "footer": {
+    "navigate": "Navigera",
     "follow": "Följ på Instagram",
     "rights": "Alla rättigheter förbehållna.",
     "madeWith": "Byggd med omsorg"

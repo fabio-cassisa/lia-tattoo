@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "Lia Giorgi — Traditional Tattoo Artist",
-    "description": "Book your tattoo session with Lia Giorgi. Traditional & Old School tattoo art in Malmö and Copenhagen."
+    "title": "liagiorgi.one.ttt — ❋ Traditional Tattoo Artist ❋",
+    "description": "Book your tattoo session with liagiorgi.one.ttt. Traditional & Old School tattoos in Malmö and Copenhagen."
   },
   "nav": {
     "portfolio": "Portfolio",
@@ -10,8 +10,8 @@
     "aftercare": "Aftercare"
   },
   "hero": {
-    "title": "Lia Giorgi",
-    "subtitle": "Traditional Tattoo Art",
+    "title": "liagiorgi.one.ttt",
+    "subtitle": "❋ Traditional Tattoo Artist ❋",
     "cta": "Book Your Tattoo",
     "viewWork": "View Portfolio"
   },
@@ -62,13 +62,15 @@
       "copenhagen": "Copenhagen — Good Morning Tattoo"
     },
     "contact": {
+      "title": "Contact",
       "name": "Your name",
       "email": "Email address",
       "phone": "Phone number (optional)"
     },
     "reference": {
       "label": "Reference images",
-      "hint": "Upload images that inspire your tattoo idea"
+      "hint": "Upload images that inspire your tattoo idea",
+      "upload": "Upload"
     },
     "submit": "Send Request",
     "success": "Request sent! I'll review it and get back to you soon.",
@@ -78,17 +80,59 @@
       "large": "Deposit: 500 SEK / 50 EUR (for tattoos over 3,000 SEK / 300 EUR)"
     }
   },
+  "portfolio": {
+    "title": "Portfolio",
+    "subtitle": "A selection of traditional tattoo work",
+    "flashTitle": "Flash Designs",
+    "flashDescription": "Ready-to-tattoo designs from my flash book. Pick one and let's go.",
+    "completedTitle": "Completed Work",
+    "completedDescription": "Recent tattoo work on real skin.",
+    "comingSoon": "Portfolio coming soon — follow @liagiorgi.one.ttt on Instagram to see my latest work.",
+    "instagram": "See more on Instagram"
+  },
   "about": {
-    "title": "About Lia",
-    "bio": "Traditional tattoo artist based in Malmö, Sweden. Specializing in Old School tattoo art — bold lines, rich colors, timeless designs.",
-    "studios": "Currently working at Studio Diamant in Malmö and Good Morning Tattoo in Copenhagen."
+    "title": "About",
+    "bio": "Traditional tattoo artist based in Malmö, Sweden. Specializing in Old School tattoos — bold lines, rich colors, timeless designs.",
+    "studios": "Currently working at Studio Diamant in Malmö and Good Morning Tattoo in Copenhagen.",
+    "approach": "My approach",
+    "approachText": "Every tattoo starts with a conversation. Whether you come in with a flash pick or a custom idea, I make sure the design fits your body and stands the test of time. Traditional tattooing is about craftsmanship — clean lines, solid color packing, and designs that age well.",
+    "style": "The style",
+    "styleText": "Traditional / Old School tattooing has roots going back over a century. Think bold outlines, a limited but striking color palette, and iconic imagery — eagles, roses, daggers, panthers, ships, hearts. It's tattoo art in its purest form.",
+    "findMe": "Find me at",
+    "travelingNote": "I'm a traveling artist — check my Instagram for guest spot announcements."
   },
   "aftercare": {
     "title": "Aftercare",
     "subtitle": "How to take care of your new tattoo",
-    "intro": "Proper aftercare is essential for your tattoo to heal beautifully. Follow these instructions carefully."
+    "intro": "Proper aftercare is essential for your tattoo to heal beautifully. Follow these instructions carefully.",
+    "step1Title": "First 2-3 hours",
+    "step1Text": "Keep the bandage on for 2-3 hours after your session. Your artist will tell you exactly when to remove it.",
+    "step2Title": "Washing",
+    "step2Text": "Gently wash the tattoo with lukewarm water and a mild, fragrance-free soap. Pat dry with a clean paper towel — never rub.",
+    "step3Title": "Moisturizing",
+    "step3Text": "Apply a thin layer of unscented moisturizer or tattoo aftercare balm 2-3 times daily. Don't over-apply — a thin layer is enough.",
+    "step4Title": "First 2 weeks",
+    "step4Text": "No swimming, no sauna, no direct sunlight. Don't scratch or pick at the tattoo — it will peel naturally. Wear loose clothing over the area.",
+    "step5Title": "Long-term care",
+    "step5Text": "Once healed, always apply sunscreen on your tattoo when exposed to the sun. This keeps the colors vibrant for years.",
+    "doTitle": "Do",
+    "do1": "Keep it clean and moisturized",
+    "do2": "Wear loose, breathable clothing",
+    "do3": "Let it peel naturally",
+    "do4": "Use SPF once healed",
+    "dontTitle": "Don't",
+    "dont1": "Don't scratch, pick, or peel",
+    "dont2": "No swimming pools, ocean, or hot tubs",
+    "dont3": "No direct sunlight or tanning beds",
+    "dont4": "Don't apply too much cream",
+    "contactNote": "If you have any concerns during healing, don't hesitate to reach out."
+  },
+  "home": {
+    "quote": "Bold lines, rich colors,",
+    "quoteHighlight": "timeless designs."
   },
   "footer": {
+    "navigate": "Navigate",
     "follow": "Follow on Instagram",
     "rights": "All rights reserved.",
     "madeWith": "Built with care"

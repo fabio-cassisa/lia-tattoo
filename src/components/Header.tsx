@@ -38,8 +38,8 @@ export default function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo / Brand */}
           <Link href="/" className="flex items-center gap-2">
-            <span className="font-display text-xl font-bold tracking-tight text-ink-900">
-              LIA GIORGI
+            <span className="font-display text-lg sm:text-xl font-bold tracking-tight text-ink-900">
+              liagiorgi.one.ttt
             </span>
           </Link>
 
@@ -79,9 +79,11 @@ export default function Header() {
 
           {/* Mobile menu button */}
           <button
-            className="md:hidden p-2"
+            type="button"
+            className="md:hidden relative z-10 p-2 -mr-2"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Toggle menu"
+            aria-expanded={mobileOpen}
           >
             <div className="w-6 flex flex-col gap-1.5">
               <span
@@ -105,7 +107,7 @@ export default function Header() {
 
         {/* Mobile Nav */}
         {mobileOpen && (
-          <div className="md:hidden pb-4 border-t border-ink-900/10">
+          <div className="md:hidden pb-4 border-t border-ink-900/10 relative z-50 bg-sabbia-50">
             <div className="flex flex-col gap-2 pt-4">
               {navItems.map((item) => (
                 <Link
