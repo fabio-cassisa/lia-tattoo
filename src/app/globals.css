@@ -1,26 +1,140 @@
 @import "tailwindcss";
 
+/* ============================================
+   Lia Giorgi — Design System
+   Traditional / Old School Tattoo Aesthetic
+   ============================================ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Sand / Sabbia — the primary background */
+  --sabbia-50: #faf6ef;
+  --sabbia-100: #f0e0c8;
+  --sabbia-200: #e8d5b5;
+  --sabbia-300: #d4be97;
+  --sabbia-400: #c0a87a;
+
+  /* Traditional Red — primary accent */
+  --trad-red-500: #a02020;
+  --trad-red-600: #8b1a1a;
+  --trad-red-700: #701515;
+
+  /* Ink Black — text and structure */
+  --ink-900: #1a1a1a;
+  --ink-800: #2a2a2a;
+  --ink-700: #3a3a3a;
+
+  /* Warm Grey — secondary / shading */
+  --warm-grey-400: #7a7a7a;
+  --warm-grey-500: #5a5a5a;
+  --warm-grey-600: #4a4a4a;
+
+  /* Blush — subtle accent */
+  --blush-300: #d4a0a0;
+  --blush-200: #e0b8b8;
+
+  /* Semantic tokens */
+  --background: var(--sabbia-50);
+  --background-paper: var(--sabbia-100);
+  --foreground: var(--ink-900);
+  --foreground-muted: var(--warm-grey-500);
+  --accent: var(--trad-red-500);
+  --accent-hover: var(--trad-red-600);
+  --accent-active: var(--trad-red-700);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-background-paper: var(--background-paper);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-active: var(--accent-active);
+  --color-sabbia-50: var(--sabbia-50);
+  --color-sabbia-100: var(--sabbia-100);
+  --color-sabbia-200: var(--sabbia-200);
+  --color-sabbia-300: var(--sabbia-300);
+  --color-sabbia-400: var(--sabbia-400);
+  --color-trad-red-500: var(--trad-red-500);
+  --color-trad-red-600: var(--trad-red-600);
+  --color-trad-red-700: var(--trad-red-700);
+  --color-ink-900: var(--ink-900);
+  --color-ink-800: var(--ink-800);
+  --color-ink-700: var(--ink-700);
+  --color-warm-grey-400: var(--warm-grey-400);
+  --color-warm-grey-500: var(--warm-grey-500);
+  --color-warm-grey-600: var(--warm-grey-600);
+  --color-blush-300: var(--blush-300);
+  --color-blush-200: var(--blush-200);
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-body: "Inter", system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* Paper texture overlay via subtle noise */
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
+}
+
+/* Subtle paper grain effect */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Typography — bold, confident, like tattoo shop signage */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+}
+
+/* Traditional-style divider */
+.divider-trad {
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--ink-900) 20%,
+    var(--ink-900) 80%,
+    transparent
+  );
+  opacity: 0.2;
+}
+
+/* Button styles */
+.btn-primary {
+  background-color: var(--accent);
+  color: var(--sabbia-50);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-hover);
+}
+
+.btn-primary:active {
+  background-color: var(--accent-active);
+  transform: scale(0.98);
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Selection color */
+::selection {
+  background-color: var(--trad-red-500);
+  color: var(--sabbia-50);
 }

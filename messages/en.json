@@ -1,0 +1,96 @@
+{
+  "meta": {
+    "title": "Lia Giorgi — Traditional Tattoo Artist",
+    "description": "Book your tattoo session with Lia Giorgi. Traditional & Old School tattoo art in Malmö and Copenhagen."
+  },
+  "nav": {
+    "portfolio": "Portfolio",
+    "booking": "Book a Tattoo",
+    "about": "About",
+    "aftercare": "Aftercare"
+  },
+  "hero": {
+    "title": "Lia Giorgi",
+    "subtitle": "Traditional Tattoo Art",
+    "cta": "Book Your Tattoo",
+    "viewWork": "View Portfolio"
+  },
+  "locations": {
+    "title": "Studios",
+    "malmo": "Malmö — Studio Diamant",
+    "copenhagen": "Copenhagen — Good Morning Tattoo"
+  },
+  "booking": {
+    "title": "Book a Tattoo",
+    "subtitle": "Fill out the form and I'll get back to you soon.",
+    "type": {
+      "label": "Type of request",
+      "flash": "Flash design",
+      "custom": "Custom design",
+      "consultation": "Consultation",
+      "coverup": "Cover-up",
+      "rework": "Rework"
+    },
+    "description": {
+      "label": "Tell me about your idea",
+      "placeholder": "Describe your tattoo idea, share references, style preferences..."
+    },
+    "placement": {
+      "label": "Body placement",
+      "placeholder": "e.g. inner forearm, upper back..."
+    },
+    "size": {
+      "label": "Approximate size",
+      "small": "Small (coin – card)",
+      "medium": "Medium (palm – hand)",
+      "large": "Large (A5 – A4)",
+      "xlarge": "Extra large (half sleeve+)"
+    },
+    "color": {
+      "label": "Color preference",
+      "blackgrey": "Black & Grey",
+      "color": "Color",
+      "both": "Both / Open to suggestions"
+    },
+    "allergies": {
+      "label": "Allergies or skin conditions",
+      "placeholder": "Leave blank if none"
+    },
+    "location": {
+      "label": "Preferred location",
+      "malmo": "Malmö — Studio Diamant",
+      "copenhagen": "Copenhagen — Good Morning Tattoo"
+    },
+    "contact": {
+      "name": "Your name",
+      "email": "Email address",
+      "phone": "Phone number (optional)"
+    },
+    "reference": {
+      "label": "Reference images",
+      "hint": "Upload images that inspire your tattoo idea"
+    },
+    "submit": "Send Request",
+    "success": "Request sent! I'll review it and get back to you soon.",
+    "deposit": {
+      "info": "A deposit is required to confirm your booking.",
+      "small": "Deposit: 300 SEK / 30 EUR (for tattoos up to 3,000 SEK / 300 EUR)",
+      "large": "Deposit: 500 SEK / 50 EUR (for tattoos over 3,000 SEK / 300 EUR)"
+    }
+  },
+  "about": {
+    "title": "About Lia",
+    "bio": "Traditional tattoo artist based in Malmö, Sweden. Specializing in Old School tattoo art — bold lines, rich colors, timeless designs.",
+    "studios": "Currently working at Studio Diamant in Malmö and Good Morning Tattoo in Copenhagen."
+  },
+  "aftercare": {
+    "title": "Aftercare",
+    "subtitle": "How to take care of your new tattoo",
+    "intro": "Proper aftercare is essential for your tattoo to heal beautifully. Follow these instructions carefully."
+  },
+  "footer": {
+    "follow": "Follow on Instagram",
+    "rights": "All rights reserved.",
+    "madeWith": "Built with care"
+  }
+}

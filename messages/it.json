@@ -1,0 +1,96 @@
+{
+  "meta": {
+    "title": "Lia Giorgi — Tatuatrice tradizionale",
+    "description": "Prenota la tua sessione di tatuaggio con Lia Giorgi. Arte del tatuaggio tradizionale & Old School a Malmö e Copenaghen."
+  },
+  "nav": {
+    "portfolio": "Portfolio",
+    "booking": "Prenota un tatuaggio",
+    "about": "Chi sono",
+    "aftercare": "Cura post-tatuaggio"
+  },
+  "hero": {
+    "title": "Lia Giorgi",
+    "subtitle": "Arte del tatuaggio tradizionale",
+    "cta": "Prenota il tuo tatuaggio",
+    "viewWork": "Guarda il portfolio"
+  },
+  "locations": {
+    "title": "Studi",
+    "malmo": "Malmö — Studio Diamant",
+    "copenhagen": "Copenaghen — Good Morning Tattoo"
+  },
+  "booking": {
+    "title": "Prenota un tatuaggio",
+    "subtitle": "Compila il modulo e ti risponderò presto.",
+    "type": {
+      "label": "Tipo di richiesta",
+      "flash": "Design flash",
+      "custom": "Design personalizzato",
+      "consultation": "Consulenza",
+      "coverup": "Copertura",
+      "rework": "Rielaborazione"
+    },
+    "description": {
+      "label": "Raccontami la tua idea",
+      "placeholder": "Descrivi la tua idea di tatuaggio, condividi riferimenti, preferenze di stile..."
+    },
+    "placement": {
+      "label": "Posizione sul corpo",
+      "placeholder": "es. avambraccio interno, parte alta della schiena..."
+    },
+    "size": {
+      "label": "Dimensione approssimativa",
+      "small": "Piccolo (moneta – carta)",
+      "medium": "Medio (palmo – mano)",
+      "large": "Grande (A5 – A4)",
+      "xlarge": "Extra grande (mezzo braccio+)"
+    },
+    "color": {
+      "label": "Preferenza colore",
+      "blackgrey": "Bianco e nero",
+      "color": "Colore",
+      "both": "Entrambi / Aperta a suggerimenti"
+    },
+    "allergies": {
+      "label": "Allergie o condizioni della pelle",
+      "placeholder": "Lascia vuoto se nessuna"
+    },
+    "location": {
+      "label": "Sede preferita",
+      "malmo": "Malmö — Studio Diamant",
+      "copenhagen": "Copenaghen — Good Morning Tattoo"
+    },
+    "contact": {
+      "name": "Il tuo nome",
+      "email": "Indirizzo email",
+      "phone": "Numero di telefono (opzionale)"
+    },
+    "reference": {
+      "label": "Immagini di riferimento",
+      "hint": "Carica immagini che ispirano la tua idea di tatuaggio"
+    },
+    "submit": "Invia richiesta",
+    "success": "Richiesta inviata! La esaminerò e ti risponderò presto.",
+    "deposit": {
+      "info": "È richiesto un deposito per confermare la prenotazione.",
+      "small": "Deposito: 30 EUR (per tatuaggi fino a 300 EUR)",
+      "large": "Deposito: 50 EUR (per tatuaggi oltre 300 EUR)"
+    }
+  },
+  "about": {
+    "title": "Chi è Lia",
+    "bio": "Tatuatrice tradizionale con base a Malmö, Svezia. Specializzata nell'arte del tatuaggio Old School — linee decise, colori ricchi, design senza tempo.",
+    "studios": "Attualmente lavora presso Studio Diamant a Malmö e Good Morning Tattoo a Copenaghen."
+  },
+  "aftercare": {
+    "title": "Cura post-tatuaggio",
+    "subtitle": "Come prenderti cura del tuo nuovo tatuaggio",
+    "intro": "Una corretta cura post-tatuaggio è essenziale affinché il tuo tatuaggio guarisca in modo bello. Segui attentamente queste istruzioni."
+  },
+  "footer": {
+    "follow": "Segui su Instagram",
+    "rights": "Tutti i diritti riservati.",
+    "madeWith": "Realizzato con cura"
+  }
+}

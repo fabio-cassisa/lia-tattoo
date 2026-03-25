@@ -1,0 +1,96 @@
+{
+  "meta": {
+    "title": "Lia Giorgi — Traditionel tatovør",
+    "description": "Book din tatoveringssession med Lia Giorgi. Traditionel & Old School tatoveringskunst i Malmö og København."
+  },
+  "nav": {
+    "portfolio": "Portfolio",
+    "booking": "Book en tatovering",
+    "about": "Om mig",
+    "aftercare": "Efterpleje"
+  },
+  "hero": {
+    "title": "Lia Giorgi",
+    "subtitle": "Traditionel tatoveringskunst",
+    "cta": "Book din tatovering",
+    "viewWork": "Se portfolio"
+  },
+  "locations": {
+    "title": "Studier",
+    "malmo": "Malmö — Studio Diamant",
+    "copenhagen": "København — Good Morning Tattoo"
+  },
+  "booking": {
+    "title": "Book en tatovering",
+    "subtitle": "Udfyld formularen, så vender jeg tilbage snart.",
+    "type": {
+      "label": "Type forespørgsel",
+      "flash": "Flash-design",
+      "custom": "Brugerdefineret design",
+      "consultation": "Konsultation",
+      "coverup": "Cover-up",
+      "rework": "Omarbejdning"
+    },
+    "description": {
+      "label": "Fortæl mig om din idé",
+      "placeholder": "Beskriv din tatoveringsidé, del referencer, stilpræferencer..."
+    },
+    "placement": {
+      "label": "Placering på kroppen",
+      "placeholder": "f.eks. indre underarm, øvre ryg..."
+    },
+    "size": {
+      "label": "Omtrentlig størrelse",
+      "small": "Lille (mønt – kort)",
+      "medium": "Medium (håndflade – hånd)",
+      "large": "Stor (A5 – A4)",
+      "xlarge": "Ekstra stor (halværme+)"
+    },
+    "color": {
+      "label": "Farvepræference",
+      "blackgrey": "Sort & grå",
+      "color": "Farve",
+      "both": "Begge / Åben for forslag"
+    },
+    "allergies": {
+      "label": "Allergier eller hudlidelser",
+      "placeholder": "Efterlad tomt hvis ingen"
+    },
+    "location": {
+      "label": "Foretrukket sted",
+      "malmo": "Malmö — Studio Diamant",
+      "copenhagen": "København — Good Morning Tattoo"
+    },
+    "contact": {
+      "name": "Dit navn",
+      "email": "E-mailadresse",
+      "phone": "Telefonnummer (valgfrit)"
+    },
+    "reference": {
+      "label": "Referencebilleder",
+      "hint": "Upload billeder der inspirerer din tatoveringsidé"
+    },
+    "submit": "Send forespørgsel",
+    "success": "Forespørgsel sendt! Jeg gennemgår den og vender tilbage snart.",
+    "deposit": {
+      "info": "Et depositum er påkrævet for at bekræfte din booking.",
+      "small": "Depositum: 300 SEK / 30 EUR (for tatoveringer op til 3.000 SEK / 300 EUR)",
+      "large": "Depositum: 500 SEK / 50 EUR (for tatoveringer over 3.000 SEK / 300 EUR)"
+    }
+  },
+  "about": {
+    "title": "Om Lia",
+    "bio": "Traditionel tatovør baseret i Malmö, Sverige. Specialiseret i Old School tatoveringskunst — dristige linjer, rige farver, tidløse designs.",
+    "studios": "Arbejder i øjeblikket på Studio Diamant i Malmö og Good Morning Tattoo i København."
+  },
+  "aftercare": {
+    "title": "Efterpleje",
+    "subtitle": "Sådan passer du på din nye tatovering",
+    "intro": "Korrekt efterpleje er afgørende for at din tatovering heler smukt. Følg disse instruktioner omhyggeligt."
+  },
+  "footer": {
+    "follow": "Følg på Instagram",
+    "rights": "Alle rettigheder forbeholdt.",
+    "madeWith": "Bygget med omhu"
+  }
+}
