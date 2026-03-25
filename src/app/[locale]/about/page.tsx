@@ -23,7 +23,7 @@ function AboutContent() {
   return (
     <div className="flex flex-col">
       {/* Page header */}
-      <section className="pt-16 pb-12 px-4 text-center">
+      <section className="pt-10 sm:pt-16 pb-8 sm:pb-12 px-4 text-center">
         <p className="text-xs uppercase tracking-[0.4em] text-foreground-muted mb-4">
           liagiorgi.one.ttt
         </p>
@@ -70,10 +70,10 @@ function AboutContent() {
       </section>
 
       {/* Approach */}
-      <section className="py-16 px-4 bg-sabbia-100/40">
-        <LineDivider className="max-w-xs mx-auto mb-12" />
+      <section className="py-10 sm:py-16 px-4 bg-sabbia-100/40">
+        <LineDivider className="max-w-xs mx-auto mb-8 sm:mb-12" />
         <div className="max-w-3xl mx-auto">
-          <div className="grid sm:grid-cols-2 gap-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-12">
             <div>
               <h2 className="font-display text-2xl font-bold text-ink-900 mb-4">
                 {t("approach")}
@@ -95,13 +95,13 @@ function AboutContent() {
       </section>
 
       {/* Studios / Find me */}
-      <section className="py-16 px-4">
+      <section className="py-10 sm:py-16 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="font-display text-2xl font-bold text-ink-900 mb-8">
             {t("findMe")}
           </h2>
 
-          <div className="grid sm:grid-cols-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-8">
             <div className="p-6 border border-ink-900/8 bg-sabbia-50">
               <h3 className="font-display text-xl font-bold text-ink-900 mb-1">
                 Studio Diamant

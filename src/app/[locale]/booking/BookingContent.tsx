@@ -54,7 +54,7 @@ export default function BookingContent() {
   return (
     <div className="flex flex-col">
       {/* Page header */}
-      <section className="pt-16 pb-8 px-4 text-center">
+      <section className="pt-10 sm:pt-16 pb-6 sm:pb-8 px-4 text-center">
         <p className="text-xs uppercase tracking-[0.4em] text-foreground-muted mb-4">
           liagiorgi.one.ttt
         </p>
@@ -68,10 +68,10 @@ export default function BookingContent() {
       </section>
 
       {/* Booking Form */}
-      <section className="py-12 px-4">
+      <section className="py-8 sm:py-12 px-4">
         <form
           onSubmit={handleSubmit}
-          className="max-w-2xl mx-auto flex flex-col gap-8"
+          className="max-w-2xl mx-auto flex flex-col gap-6 sm:gap-8"
         >
           {/* Location */}
           <fieldset className="flex flex-col gap-2">

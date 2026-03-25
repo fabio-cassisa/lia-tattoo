@@ -33,7 +33,7 @@ function AftercareContent() {
   return (
     <div className="flex flex-col">
       {/* Page header */}
-      <section className="pt-16 pb-12 px-4 text-center">
+      <section className="pt-10 sm:pt-16 pb-8 sm:pb-12 px-4 text-center">
         <p className="text-xs uppercase tracking-[0.4em] text-foreground-muted mb-4">
           liagiorgi.one.ttt
         </p>
@@ -85,9 +85,9 @@ function AftercareContent() {
       </section>
 
       {/* Do's and Don'ts */}
-      <section className="py-16 px-4 bg-sabbia-100/40">
+      <section className="py-10 sm:py-16 px-4 bg-sabbia-100/40">
         <LineDivider className="max-w-xs mx-auto mb-12" />
-        <div className="max-w-3xl mx-auto grid sm:grid-cols-2 gap-8">
+        <div className="max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
           {/* Do's */}
           <div className="p-6 sm:p-8 border border-ink-900/8 bg-sabbia-50">
             <h2 className="font-display text-xl font-bold text-ink-900 mb-4 flex items-center gap-2">
@@ -157,7 +157,7 @@ function AftercareContent() {
       </section>
 
       {/* Contact note */}
-      <section className="py-16 px-4 text-center">
+      <section className="py-10 sm:py-16 px-4 text-center">
         <TradDivider className="w-32 mx-auto mb-8" />
         <p className="text-sm text-foreground-muted max-w-md mx-auto italic">
           {t("contactNote")}

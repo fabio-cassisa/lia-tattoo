@@ -65,7 +65,7 @@ function HomeContent() {
           </h1>
 
           {/* Subtitle */}
-          <p className="text-base sm:text-lg text-foreground-muted uppercase tracking-[0.35em] font-medium">
+          <p className="text-base sm:text-lg text-foreground-muted uppercase tracking-[0.2em] sm:tracking-[0.35em] font-medium">
             {t("subtitle")}
           </p>
 
@@ -112,7 +112,7 @@ function HomeContent() {
       {/* ═══════════════════════════════════════
           FLASH PREVIEW STRIP
           ═══════════════════════════════════════ */}
-      <section className="py-20 px-4">
+      <section className="py-12 sm:py-20 px-4">
         <div className="max-w-5xl mx-auto">
           {/* Section header */}
           <div className="text-center mb-12">
@@ -188,7 +188,7 @@ function HomeContent() {
       {/* ═══════════════════════════════════════
           ABOUT TEASER
           ═══════════════════════════════════════ */}
-      <section className="relative py-24 px-4 bg-sabbia-100/40">
+      <section className="relative py-14 sm:py-24 px-4 bg-sabbia-100/40">
         <LineDivider className="absolute top-0 left-0 right-0" />
 
         <div className="max-w-3xl mx-auto text-center">
@@ -232,7 +232,7 @@ function HomeContent() {
       {/* ═══════════════════════════════════════
           BOOKING CTA — bottom of page
           ═══════════════════════════════════════ */}
-      <section className="relative py-28 px-4 text-center bg-ink-900 text-sabbia-50 overflow-hidden">
+      <section className="relative py-16 sm:py-28 px-4 text-center bg-ink-900 text-sabbia-50 overflow-hidden">
         {/* Subtle texture inversion */}
         <div className="absolute inset-0 opacity-[0.02]" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,

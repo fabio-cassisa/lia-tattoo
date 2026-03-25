@@ -37,7 +37,7 @@ function PortfolioContent() {
   return (
     <div className="flex flex-col">
       {/* Page header */}
-      <section className="pt-16 pb-12 px-4 text-center">
+      <section className="pt-10 sm:pt-16 pb-8 sm:pb-12 px-4 text-center">
         <p className="text-xs uppercase tracking-[0.4em] text-foreground-muted mb-4">
           liagiorgi.one.ttt
         </p>
@@ -51,9 +51,9 @@ function PortfolioContent() {
       </section>
 
       {/* Flash Designs Section */}
-      <section className="py-16 px-4">
+      <section className="py-10 sm:py-16 px-4">
         <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
+          <div className="text-center mb-8 sm:mb-12">
             <h2 className="font-display text-2xl sm:text-3xl font-bold text-ink-900 mb-2">
               {t("flashTitle")}
             </h2>
@@ -94,8 +94,8 @@ function PortfolioContent() {
       </section>
 
       {/* Completed Work Section */}
-      <section className="py-16 px-4 bg-sabbia-100/40">
-        <LineDivider className="max-w-xs mx-auto mb-12" />
+      <section className="py-10 sm:py-16 px-4 bg-sabbia-100/40">
+        <LineDivider className="max-w-xs mx-auto mb-8 sm:mb-12" />
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="font-display text-2xl sm:text-3xl font-bold text-ink-900 mb-2">

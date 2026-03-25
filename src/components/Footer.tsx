@@ -9,8 +9,8 @@ export default function Footer() {
 
   return (
     <footer className="bg-sabbia-100/60 border-t border-ink-900/10">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-12 sm:gap-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16">
+        <div className="flex flex-col sm:grid sm:grid-cols-2 gap-8 items-center sm:items-start">
           {/* Brand */}
           <div className="flex flex-col items-center sm:items-start gap-3">
             <Link href="/" className="font-display text-lg sm:text-xl font-bold tracking-tight text-ink-900">
@@ -43,7 +43,7 @@ export default function Footer() {
           </div>
 
           {/* Navigation */}
-          <div className="flex flex-col items-center sm:items-end gap-3">
+          <div className="flex flex-col items-center sm:items-end gap-2 sm:gap-3">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-ink-900/40 mb-1">
               {t("navigate")}
             </p>

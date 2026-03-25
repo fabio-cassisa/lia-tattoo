@@ -114,7 +114,7 @@ export default function Header() {
                   key={item.href}
                   href={item.href}
                   onClick={() => setMobileOpen(false)}
-                  className={`text-sm font-medium uppercase tracking-widest py-2 transition-colors ${
+                  className={`text-sm font-medium uppercase tracking-widest py-3 transition-colors ${
                     pathname === item.href
                       ? "text-accent"
                       : "text-ink-900/70"
@@ -123,7 +123,7 @@ export default function Header() {
                   {item.label}
                 </Link>
               ))}
-              <div className="flex items-center gap-1 pt-2 border-t border-ink-900/10 mt-2">
+              <div className="flex items-center gap-2 pt-3 border-t border-ink-900/10 mt-2">
                 {routing.locales.map((loc) => (
                   <button
                     key={loc}
@@ -131,7 +131,7 @@ export default function Header() {
                       switchLocale(loc);
                       setMobileOpen(false);
                     }}
-                    className={`text-xs font-medium px-2 py-1 rounded transition-colors ${
+                    className={`text-xs font-medium px-3 py-2 min-h-[44px] min-w-[44px] rounded transition-colors ${
                       locale === loc
                         ? "bg-ink-900 text-sabbia-50"
                         : "text-ink-900/50 hover:text-ink-900"

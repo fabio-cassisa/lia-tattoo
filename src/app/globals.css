@@ -70,11 +70,22 @@
   --font-body: "Inter", system-ui, sans-serif;
 }
 
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+  /* Prevent iOS tap highlight */
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* Paper texture overlay via subtle noise */
 body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-body);
+  /* Safe area padding for notched phones */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* Subtle paper grain effect */
@@ -134,11 +145,6 @@ h1, h2, h3, h4 {
   outline-offset: 2px;
 }
 
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
-}
-
 /* Selection color */
 ::selection {
   background-color: var(--trad-red-500);
@@ -161,4 +167,32 @@ html {
 }
 .link-underline:hover::after {
   width: 100%;
+}
+
+/* ═══════════════════════════════════════
+   Mobile-first optimizations
+   ═══════════════════════════════════════ */
+
+/* Prevent 300ms tap delay on all interactive elements */
+a,
+button,
+input,
+select,
+textarea,
+label,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+/* Force 16px font-size on form inputs to prevent iOS Safari auto-zoom on focus */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="number"],
+input[type="search"],
+input[type="url"],
+input[type="password"],
+textarea,
+select {
+  font-size: 16px;
 }
