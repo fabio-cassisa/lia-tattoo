@@ -1,4 +1,4 @@
-import { getResend, FROM_EMAIL, getLiaEmail } from "./resend";
+import { sendEmail, getFromEmail, getLiaEmail } from "./gmail";
 import {
   emailWrapper,
   sectionHeading,
@@ -50,7 +50,7 @@ function bookingDetailsHtml(booking: BookingRow): string {
 
 // ── 1. Booking Received (to client) ──────────────────────
 export async function sendBookingReceivedEmail(booking: BookingRow) {
-  const resend = getResend();
+  const from = getFromEmail();
 
   const html = emailWrapper(`
     ${sectionHeading("Booking request received")}
@@ -69,8 +69,8 @@ export async function sendBookingReceivedEmail(booking: BookingRow) {
     </p>
   `);
 
-  return resend.emails.send({
-    from: FROM_EMAIL,
+  return sendEmail({
+    from,
     to: booking.client_email,
     subject: "Booking request received — liagiorgi.one.ttt",
     html,
@@ -79,7 +79,7 @@ export async function sendBookingReceivedEmail(booking: BookingRow) {
 
 // ── 2. New Booking Notification (to Lia) ─────────────────
 export async function sendNewBookingNotificationEmail(booking: BookingRow) {
-  const resend = getResend();
+  const from = getFromEmail();
   const liaEmail = getLiaEmail();
 
   const html = emailWrapper(`
@@ -99,8 +99,8 @@ export async function sendNewBookingNotificationEmail(booking: BookingRow) {
     </p>
   `);
 
-  return resend.emails.send({
-    from: FROM_EMAIL,
+  return sendEmail({
+    from,
     to: liaEmail,
     subject: `New booking request from ${booking.client_name}`,
     html,
@@ -112,7 +112,7 @@ export async function sendBookingApprovedEmail(
   booking: BookingRow,
   adminNote?: string
 ) {
-  const resend = getResend();
+  const from = getFromEmail();
 
   // Determine deposit amount based on tiers
   const depositText = booking.deposit_amount
@@ -161,8 +161,8 @@ export async function sendBookingApprovedEmail(
     </p>
   `);
 
-  return resend.emails.send({
-    from: FROM_EMAIL,
+  return sendEmail({
+    from,
     to: booking.client_email,
     subject: "Your booking is approved! — liagiorgi.one.ttt",
     html,
@@ -174,7 +174,7 @@ export async function sendBookingDeclinedEmail(
   booking: BookingRow,
   adminNote?: string
 ) {
-  const resend = getResend();
+  const from = getFromEmail();
 
   const html = emailWrapper(`
     ${sectionHeading("About your booking request")}
@@ -197,8 +197,8 @@ export async function sendBookingDeclinedEmail(
     </p>
   `);
 
-  return resend.emails.send({
-    from: FROM_EMAIL,
+  return sendEmail({
+    from,
     to: booking.client_email,
     subject: "Update on your booking request — liagiorgi.one.ttt",
     html,
@@ -207,7 +207,7 @@ export async function sendBookingDeclinedEmail(
 
 // ── 5. Aftercare (to client after session) ───────────────
 export async function sendAftercareEmail(booking: BookingRow) {
-  const resend = getResend();
+  const from = getFromEmail();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://lia-tattoo.vercel.app";
 
   const html = emailWrapper(`
@@ -246,8 +246,8 @@ export async function sendAftercareEmail(booking: BookingRow) {
     </p>
   `);
 
-  return resend.emails.send({
-    from: FROM_EMAIL,
+  return sendEmail({
+    from,
     to: booking.client_email,
     subject: "Aftercare for your new tattoo — liagiorgi.one.ttt",
     html,

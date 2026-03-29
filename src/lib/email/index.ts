@@ -1,4 +1,4 @@
-export { getResend, FROM_EMAIL, getLiaEmail } from "./resend";
+export { sendEmail, getFromEmail, getLiaEmail } from "./gmail";
 export {
   sendBookingReceivedEmail,
   sendNewBookingNotificationEmail,
