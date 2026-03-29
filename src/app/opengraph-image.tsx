@@ -1,6 +1,5 @@
 import { ImageResponse } from "next/og";
 
-export const runtime = "edge";
 export const alt = "liagiorgi.one.ttt — Traditional Tattoo Artist";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -96,14 +95,28 @@ export default function OGImage() {
         {/* Descriptor */}
         <div
           style={{
-            fontSize: 18,
-            color: "#5a5a5a",
-            letterSpacing: "0.25em",
-            textTransform: "uppercase",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
             marginTop: 20,
           }}
         >
-          &#10043; Traditional Tattoo Artist &#10043;
+          <svg width="14" height="14" viewBox="0 0 12 12">
+            <path d="M6 0L7.5 4.5L12 6L7.5 7.5L6 12L4.5 7.5L0 6L4.5 4.5Z" fill="#a02020" />
+          </svg>
+          <div
+            style={{
+              fontSize: 18,
+              color: "#5a5a5a",
+              letterSpacing: "0.25em",
+              textTransform: "uppercase",
+            }}
+          >
+            Traditional Tattoo Artist
+          </div>
+          <svg width="14" height="14" viewBox="0 0 12 12">
+            <path d="M6 0L7.5 4.5L12 6L7.5 7.5L6 12L4.5 7.5L0 6L4.5 4.5Z" fill="#a02020" />
+          </svg>
         </div>
 
         {/* Location line */}
@@ -130,7 +143,7 @@ export default function OGImage() {
               textTransform: "uppercase",
             }}
           >
-            Malmö &middot; Copenhagen
+            Malmö · Copenhagen
           </div>
           <div
             style={{
