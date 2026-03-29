@@ -1,5 +1,9 @@
 import { NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
+import {
+  sendBookingReceivedEmail,
+  sendNewBookingNotificationEmail,
+} from "@/lib/email";
 import type {
   BookingType,
   BookingSize,
@@ -75,8 +79,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // TODO: Send confirmation email to client via Resend
-    // TODO: Send notification email to Lia
+    // Send emails in parallel (non-blocking — don't fail the request if email fails)
+    Promise.allSettled([
+      sendBookingReceivedEmail(data),
+      sendNewBookingNotificationEmail(data),
+    ]).then((results) => {
+      results.forEach((result, i) => {
+        if (result.status === "rejected") {
+          console.error(`Email ${i} failed:`, result.reason);
+        }
+      });
+    });
 
     return Response.json(
       { message: "Booking created", booking: { id: data.id, status: data.status } },
