@@ -166,20 +166,20 @@ export default function AdminDashboard() {
   const pendingCount = bookings.filter((b) => b.status === "pending").length;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
+    <div className="max-w-6xl mx-auto px-4 py-4 sm:py-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
         <div>
-          <h1 className="text-lg tracking-wider text-foreground">
+          <h1 className="text-base sm:text-lg tracking-wider text-foreground">
             liagiorgi.one.ttt
           </h1>
-          <p className="text-xs text-foreground-muted tracking-wider uppercase">
+          <p className="text-[10px] sm:text-xs text-foreground-muted tracking-wider uppercase">
             Booking Dashboard
           </p>
         </div>
         <button
           onClick={handleLogout}
-          className="text-sm text-foreground-muted hover:text-foreground transition-colors"
+          className="text-sm text-foreground-muted hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-end"
         >
           Sign out
         </button>
@@ -211,8 +211,8 @@ export default function AdminDashboard() {
         </button>
       </div>
 
-      {/* Status filter tabs */}
-      <div className="flex flex-wrap gap-2 mb-6">
+      {/* Status filter tabs — horizontally scrollable on mobile */}
+      <div className="flex gap-2 mb-4 sm:mb-6 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:overflow-visible">
         {(
           ["all", "pending", "approved", "deposit_paid", "completed", "declined", "cancelled"] as const
         ).map((s) => (
@@ -222,7 +222,7 @@ export default function AdminDashboard() {
               setStatusFilter(s);
               setSelectedBooking(null);
             }}
-            className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
+            className={`shrink-0 px-3 py-1.5 text-xs rounded-full transition-colors min-h-[36px] ${
               statusFilter === s
                 ? "bg-[var(--ink-900)] text-[var(--sabbia-50)]"
                 : "bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)]"
@@ -287,10 +287,26 @@ export default function AdminDashboard() {
           )}
         </div>
 
-        {/* Detail panel */}
+        {/* Detail panel — overlay on mobile, sidebar on desktop */}
         {selectedBooking && (
-          <div className="lg:w-[400px] shrink-0">
-            <div className="bg-white border border-[var(--sabbia-200)] rounded p-5 sticky top-6">
+          <>
+            {/* Mobile overlay backdrop */}
+            <div
+              className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+              onClick={() => setSelectedBooking(null)}
+            />
+            <div className="fixed inset-x-0 bottom-0 top-12 z-50 overflow-y-auto bg-[var(--sabbia-50)] lg:static lg:inset-auto lg:z-auto lg:w-[400px] shrink-0">
+              <div className="bg-white border border-[var(--sabbia-200)] rounded-t-xl lg:rounded p-5 lg:sticky lg:top-6 min-h-full lg:min-h-0">
+                {/* Close button — mobile only */}
+                <button
+                  onClick={() => setSelectedBooking(null)}
+                  className="lg:hidden absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-foreground-muted hover:text-foreground rounded-full bg-[var(--sabbia-100)]"
+                  aria-label="Close"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M1 1l12 12M13 1L1 13" />
+                  </svg>
+                </button>
               {/* Client info */}
               <div className="mb-4">
                 <h2 className="text-base font-medium text-foreground">
@@ -550,6 +566,7 @@ export default function AdminDashboard() {
               </p>
             </div>
           </div>
+          </>
         )}
       </div>
     </div>
