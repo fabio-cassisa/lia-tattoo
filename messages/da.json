@@ -70,7 +70,12 @@
     "reference": {
       "label": "Referencebilleder",
       "hint": "Upload billeder der inspirerer din tatoveringsidé",
-      "upload": "Upload"
+      "upload": "Upload billeder",
+      "drop": "eller træk & slip her",
+      "maxInfo": "Max 5 billeder, 10MB hver",
+      "remove": "Fjern",
+      "tooMany": "Maks 5 billeder tilladt",
+      "tooLarge": "overskrider grænsen på 10MB"
     },
     "submit": "Send forespørgsel",
     "success": "Forespørgsel sendt! Jeg gennemgår den og vender tilbage snart.",

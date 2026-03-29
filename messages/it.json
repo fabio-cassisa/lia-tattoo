@@ -70,7 +70,12 @@
     "reference": {
       "label": "Immagini di riferimento",
       "hint": "Carica immagini che ispirano la tua idea di tatuaggio",
-      "upload": "Carica"
+      "upload": "Carica immagini",
+      "drop": "o trascina qui",
+      "maxInfo": "Max 5 immagini, 10MB ciascuna",
+      "remove": "Rimuovi",
+      "tooMany": "Massimo 5 immagini consentite",
+      "tooLarge": "supera il limite di 10MB"
     },
     "submit": "Invia richiesta",
     "success": "Richiesta inviata! La esaminerò e ti risponderò presto.",

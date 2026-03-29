@@ -1,11 +1,17 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   TradDivider,
   LineDivider,
 } from "@/components/decorative/TradDivider";
+
+type SubmitState = "idle" | "submitting" | "success" | "error";
+
+const MAX_FILES = 5;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
 
 export default function BookingContent() {
   const t = useTranslations("booking");
@@ -21,7 +27,12 @@ export default function BookingContent() {
     email: "",
     phone: "",
   });
-  const [submitted, setSubmitted] = useState(false);
+  const [submitState, setSubmitState] = useState<SubmitState>("idle");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [fileError, setFileError] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleChange(
     e: React.ChangeEvent<
@@ -31,13 +42,146 @@ export default function BookingContent() {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    // TODO: wire to API route
-    setSubmitted(true);
+  const validateAndAddFiles = useCallback(
+    (incoming: File[]) => {
+      setFileError("");
+      const currentCount = selectedFiles.length;
+      const available = MAX_FILES - currentCount;
+
+      if (available <= 0) {
+        setFileError(t("reference.tooMany"));
+        return;
+      }
+
+      const toAdd: File[] = [];
+      for (const file of incoming.slice(0, available)) {
+        if (file.size > MAX_FILE_SIZE) {
+          setFileError(`${file.name} ${t("reference.tooLarge")}`);
+          continue;
+        }
+        // Accept HEIC even if browser reports empty type (common on iOS)
+        if (
+          file.type &&
+          !ALLOWED_TYPES.includes(file.type) &&
+          !file.name.toLowerCase().endsWith(".heic")
+        ) {
+          continue; // silently skip unsupported types
+        }
+        toAdd.push(file);
+      }
+
+      if (incoming.length > available) {
+        setFileError(t("reference.tooMany"));
+      }
+
+      if (toAdd.length > 0) {
+        setSelectedFiles((prev) => [...prev, ...toAdd]);
+      }
+
+      // Reset file input so re-selecting the same file works
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    },
+    [selectedFiles.length, t]
+  );
+
+  function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.files) {
+      validateAndAddFiles(Array.from(e.target.files));
+    }
   }
 
-  if (submitted) {
+  function removeFile(index: number) {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    setFileError("");
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files) {
+      validateAndAddFiles(Array.from(e.dataTransfer.files));
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitState("submitting");
+    setErrorMessage("");
+
+    try {
+      // Step 1: Create the booking
+      const res = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          location: formData.location,
+          type: formData.type,
+          description: formData.description,
+          placement: formData.placement,
+          size: formData.size,
+          color: formData.color,
+          allergies: formData.allergies,
+          client_name: formData.name,
+          client_email: formData.email,
+          client_phone: formData.phone,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(
+          data.details?.join(", ") || data.error || "Something went wrong"
+        );
+      }
+
+      const bookingData = await res.json();
+
+      // Step 2: Upload reference images (if any)
+      if (selectedFiles.length > 0 && bookingData.booking?.id) {
+        const uploadForm = new FormData();
+        uploadForm.append("booking_id", bookingData.booking.id);
+        for (const file of selectedFiles) {
+          uploadForm.append("files", file);
+        }
+
+        // Fire and don't block success — images are nice-to-have,
+        // the booking itself is what matters
+        try {
+          await fetch("/api/bookings/images", {
+            method: "POST",
+            body: uploadForm,
+          });
+        } catch {
+          // Image upload failed silently — booking is already saved
+          console.error("Image upload failed, but booking was created");
+        }
+      }
+
+      setSubmitState("success");
+    } catch (err) {
+      setSubmitState("error");
+      setErrorMessage(
+        err instanceof Error ? err.message : "Something went wrong"
+      );
+    }
+  }
+
+  if (submitState === "success") {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center">
         <TradDivider className="w-32 mb-8" />
@@ -73,6 +217,13 @@ export default function BookingContent() {
           onSubmit={handleSubmit}
           className="max-w-2xl mx-auto flex flex-col gap-6 sm:gap-8"
         >
+          {/* Error banner */}
+          {submitState === "error" && (
+            <div className="p-4 border border-accent/30 bg-accent/5 text-sm text-accent">
+              {errorMessage}
+            </div>
+          )}
+
           {/* Location */}
           <fieldset className="flex flex-col gap-2">
             <label className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/60">
@@ -181,7 +332,31 @@ export default function BookingContent() {
             <p className="text-xs text-foreground-muted mb-1">
               {t("reference.hint")}
             </p>
-            <div className="flex items-center justify-center w-full h-32 border-2 border-dashed border-ink-900/10 hover:border-ink-900/20 transition-colors cursor-pointer">
+
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/jpeg,image/png,image/webp,image/heic,.heic"
+              onChange={handleFileInputChange}
+              className="sr-only"
+              aria-label={t("reference.upload")}
+            />
+
+            {/* Drop zone */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`flex items-center justify-center w-full h-32 border-2 border-dashed transition-colors cursor-pointer ${
+                isDragging
+                  ? "border-accent bg-accent/5"
+                  : "border-ink-900/10 hover:border-ink-900/20"
+              } ${selectedFiles.length >= MAX_FILES ? "opacity-40 pointer-events-none" : ""}`}
+            >
               <div className="flex flex-col items-center gap-2 text-ink-900/30">
                 <svg
                   width="24"
@@ -196,8 +371,64 @@ export default function BookingContent() {
                 <span className="text-xs uppercase tracking-wider">
                   {t("reference.upload")}
                 </span>
+                <span className="text-[10px] text-ink-900/20 normal-case tracking-normal hidden sm:block">
+                  {t("reference.drop")}
+                </span>
               </div>
-            </div>
+            </button>
+
+            {/* Max info */}
+            <p className="text-[10px] text-ink-900/25">
+              {t("reference.maxInfo")}
+            </p>
+
+            {/* File error */}
+            {fileError && (
+              <p className="text-xs text-accent">{fileError}</p>
+            )}
+
+            {/* File previews */}
+            {selectedFiles.length > 0 && (
+              <div className="flex flex-wrap gap-3 mt-1">
+                {selectedFiles.map((file, index) => (
+                  <div
+                    key={`${file.name}-${file.size}-${index}`}
+                    className="relative group w-20 h-20 border border-ink-900/10 bg-sabbia-50 overflow-hidden"
+                  >
+                    {/* Thumbnail — HEIC won't preview, show filename instead */}
+                    {file.type && file.type !== "image/heic" ? (
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={file.name}
+                        className="w-full h-full object-cover"
+                        onLoad={(e) => {
+                          // Revoke object URL after image loads to free memory
+                          URL.revokeObjectURL(
+                            (e.target as HTMLImageElement).src
+                          );
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center w-full h-full p-1">
+                        <span className="text-[9px] text-ink-900/40 text-center leading-tight break-all">
+                          {file.name}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Remove button — always visible on mobile, hover on desktop */}
+                    <button
+                      type="button"
+                      onClick={() => removeFile(index)}
+                      className="absolute top-0.5 right-0.5 w-5 h-5 flex items-center justify-center bg-ink-900/70 text-white text-xs leading-none opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                      aria-label={t("reference.remove")}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </fieldset>
 
           {/* Placement & Size row */}
@@ -372,9 +603,10 @@ export default function BookingContent() {
           {/* Submit */}
           <button
             type="submit"
-            className="btn-primary px-10 py-4 text-sm tracking-wider self-center"
+            disabled={submitState === "submitting"}
+            className="btn-primary px-10 py-4 text-sm tracking-wider self-center disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {t("submit")}
+            {submitState === "submitting" ? "..." : t("submit")}
           </button>
         </form>
       </section>

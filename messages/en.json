@@ -70,7 +70,12 @@
     "reference": {
       "label": "Reference images",
       "hint": "Upload images that inspire your tattoo idea",
-      "upload": "Upload"
+      "upload": "Upload images",
+      "drop": "or drag & drop here",
+      "maxInfo": "Max 5 images, 10MB each",
+      "remove": "Remove",
+      "tooMany": "Maximum 5 images allowed",
+      "tooLarge": "exceeds the 10MB limit"
     },
     "submit": "Send Request",
     "success": "Request sent! I'll review it and get back to you soon.",

@@ -70,7 +70,12 @@
     "reference": {
       "label": "Referensbilder",
       "hint": "Ladda upp bilder som inspirerar din tatueringsidé",
-      "upload": "Ladda upp"
+      "upload": "Ladda upp bilder",
+      "drop": "eller dra & släpp här",
+      "maxInfo": "Max 5 bilder, 10MB vardera",
+      "remove": "Ta bort",
+      "tooMany": "Max 5 bilder tillåtna",
+      "tooLarge": "överskrider gränsen på 10MB"
     },
     "submit": "Skicka förfrågan",
     "success": "Förfrågan skickad! Jag granskar den och återkommer snart.",
