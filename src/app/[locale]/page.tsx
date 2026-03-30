@@ -1,12 +1,51 @@
 import { useTranslations } from "next-intl";
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
+import Image from "next/image";
 import {
   TradDivider,
   LineDivider,
   CornerOrnament,
 } from "@/components/decorative/TradDivider";
 import { getAlternates, getWebSiteJsonLd, getLocalBusinessJsonLd } from "@/lib/seo";
+import { createAdminClient } from "@/lib/supabase/server";
+
+export const revalidate = 60; // ISR — revalidate every 60 seconds
+
+type FlashPreviewImage = {
+  id: string;
+  url: string;
+  title: string | null;
+};
+
+async function getFlashPreviewImages(): Promise<FlashPreviewImage[]> {
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("portfolio_images")
+      .select("id, title, storage_path")
+      .eq("is_visible", true)
+      .eq("category", "flash")
+      .order("display_order", { ascending: true })
+      .order("created_at", { ascending: false })
+      .limit(8);
+
+    if (error) {
+      console.error("Flash preview fetch error:", error);
+      return [];
+    }
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    return (data ?? []).map((img) => ({
+      id: img.id,
+      title: img.title,
+      url: `${supabaseUrl}/storage/v1/object/public/portfolio/${img.storage_path}`,
+    }));
+  } catch (err) {
+    console.error("Flash preview fetch failed:", err);
+    return [];
+  }
+}
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -27,10 +66,12 @@ export default async function HomePage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
 
-  return <HomeContent />;
+  const flashImages = await getFlashPreviewImages();
+
+  return <HomeContent flashImages={flashImages} />;
 }
 
-function HomeContent() {
+function HomeContent({ flashImages }: { flashImages: FlashPreviewImage[] }) {
   const t = useTranslations("hero");
   const tHome = useTranslations("home");
   const tAbout = useTranslations("about");
@@ -146,45 +187,67 @@ function HomeContent() {
             <LineDivider className="max-w-xs mx-auto" />
           </div>
 
-          {/* Flash grid — placeholder cards styled as polaroid-esque frames */}
+          {/* Flash grid — real portfolio images or placeholder cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-            {[
-              "Eagle",
-              "Rose",
-              "Panther",
-              "Snake",
-              "Anchor",
-              "Swallow",
-              "Dagger",
-              "Heart",
-            ].map((name) => (
-              <div
-                key={name}
-                className="group relative aspect-square bg-sabbia-100 border border-ink-900/8 overflow-hidden transition-all hover:border-ink-900/15 hover:shadow-md"
-              >
-                {/* Placeholder pattern */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="flex flex-col items-center gap-2 text-ink-900/15">
-                    <svg
-                      width="32"
-                      height="32"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1"
-                    >
-                      <path d="M12 2L14.5 8.5L21 12L14.5 15.5L12 22L9.5 15.5L3 12L9.5 8.5L12 2Z" />
-                    </svg>
-                    <span className="text-xs font-medium uppercase tracking-widest">
-                      {name}
-                    </span>
+            {flashImages.length > 0
+              ? flashImages.map((image) => (
+                  <Link
+                    key={image.id}
+                    href="/portfolio"
+                    className="group relative aspect-square bg-sabbia-100 border border-ink-900/8 overflow-hidden transition-all hover:border-ink-900/15 hover:shadow-md"
+                  >
+                    <Image
+                      src={image.url}
+                      alt={image.title || "Flash tattoo design"}
+                      fill
+                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      unoptimized
+                    />
+                    {image.title && (
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-900/60 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <p className="text-xs font-medium text-sabbia-50 uppercase tracking-widest">
+                          {image.title}
+                        </p>
+                      </div>
+                    )}
+                  </Link>
+                ))
+              : /* Placeholder cards when portfolio is empty */
+                [
+                  "Eagle",
+                  "Rose",
+                  "Panther",
+                  "Snake",
+                  "Anchor",
+                  "Swallow",
+                  "Dagger",
+                  "Heart",
+                ].map((name) => (
+                  <div
+                    key={name}
+                    className="group relative aspect-square bg-sabbia-100 border border-ink-900/8 overflow-hidden transition-all hover:border-ink-900/15 hover:shadow-md"
+                  >
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-2 text-ink-900/15">
+                        <svg
+                          width="32"
+                          height="32"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1"
+                        >
+                          <path d="M12 2L14.5 8.5L21 12L14.5 15.5L12 22L9.5 15.5L3 12L9.5 8.5L12 2Z" />
+                        </svg>
+                        <span className="text-xs font-medium uppercase tracking-widest">
+                          {name}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="absolute inset-0 bg-ink-900/0 group-hover:bg-ink-900/5 transition-colors" />
                   </div>
-                </div>
-
-                {/* Hover overlay */}
-                <div className="absolute inset-0 bg-ink-900/0 group-hover:bg-ink-900/5 transition-colors" />
-              </div>
-            ))}
+                ))}
           </div>
 
           {/* View all link */}
