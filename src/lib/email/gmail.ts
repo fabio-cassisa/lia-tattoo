@@ -44,6 +44,14 @@ export function getLiaEmail(): string {
 }
 
 /**
+ * Optional PayPal.me link used in deposit request emails.
+ */
+export function getPaypalMeUrl(): string | null {
+  const url = process.env.PAYPAL_ME_URL?.trim();
+  return url || null;
+}
+
+/**
  * Send an email via Gmail SMTP.
  * Drop-in replacement for Resend's emails.send().
  */

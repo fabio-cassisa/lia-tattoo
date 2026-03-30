@@ -1,4 +1,4 @@
-import { sendEmail, getFromEmail, getLiaEmail } from "./gmail";
+import { sendEmail, getFromEmail, getLiaEmail, getPaypalMeUrl } from "./gmail";
 import {
   emailWrapper,
   sectionHeading,
@@ -113,6 +113,7 @@ export async function sendBookingApprovedEmail(
   adminNote?: string
 ) {
   const from = getFromEmail();
+  const paypalMeUrl = getPaypalMeUrl();
 
   // Determine deposit amount — currency depends on location
   const currency = booking.location === "copenhagen" ? "DKK" : "SEK";
@@ -153,9 +154,18 @@ export async function sendBookingApprovedEmail(
       </p>
       <p style="margin: 0; font-size: 13px; color: ${BRAND.mutedText}; line-height: 1.5;">
         To confirm your appointment, please send the deposit (${depositText}) via PayPal.
-        I'll share the payment details with you directly.
+        ${paypalMeUrl
+          ? "You can use the button below to pay it directly."
+          : "I'll share the payment details with you directly."}
       </p>
     </div>
+    ${paypalMeUrl ? ctaButton(`Pay deposit - ${depositText}`, paypalMeUrl) : ""}
+    ${paypalMeUrl ? `
+    <p style="margin: 0; font-size: 12px; color: ${BRAND.mutedText}; text-align: center; line-height: 1.5; word-break: break-word;">
+      If the button doesn't open, use this link:<br>
+      <a href="${paypalMeUrl}" style="color: ${BRAND.tradRed}; text-decoration: none;">${paypalMeUrl}</a>
+    </p>
+    ` : ""}
     <p style="margin: 16px 0 0; font-size: 13px; color: ${BRAND.mutedText}; line-height: 1.5;">
       Questions? Reply to this email or reach out on
       <a href="https://instagram.com/liagiorgi.one.ttt" style="color: ${BRAND.tradRed}; text-decoration: none;">Instagram</a>.
