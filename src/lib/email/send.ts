@@ -36,6 +36,10 @@ const LOCATION_LABELS: Record<string, string> = {
   copenhagen: "Copenhagen — Good Morning Tattoo",
 };
 
+function getQrImageUrl(text: string): string {
+  return `https://quickchart.io/qr?text=${encodeURIComponent(text)}&size=180`;
+}
+
 function bookingDetailsHtml(booking: BookingRow): string {
   return detailsTable(
     detailRow("Location", LOCATION_LABELS[booking.location] ?? booking.location) +
@@ -114,6 +118,7 @@ export async function sendBookingApprovedEmail(
 ) {
   const from = getFromEmail();
   const paypalMeUrl = getPaypalMeUrl();
+  const paypalQrUrl = paypalMeUrl ? getQrImageUrl(paypalMeUrl) : null;
 
   // Determine deposit amount — currency depends on location
   const currency = booking.location === "copenhagen" ? "DKK" : "SEK";
@@ -165,6 +170,20 @@ export async function sendBookingApprovedEmail(
       If the button doesn't open, use this link:<br>
       <a href="${paypalMeUrl}" style="color: ${BRAND.tradRed}; text-decoration: none;">${paypalMeUrl}</a>
     </p>
+    ` : ""}
+    ${paypalQrUrl ? `
+    <div style="margin: 24px 0 0; text-align: center;">
+      <p style="margin: 0 0 12px; font-size: 12px; color: ${BRAND.mutedText}; line-height: 1.5;">
+        Prefer to scan from another device?
+      </p>
+      <img
+        src="${paypalQrUrl}"
+        alt="QR code for PayPal deposit payment"
+        width="160"
+        height="160"
+        style="display: block; margin: 0 auto; width: 160px; height: 160px; border: 1px solid ${BRAND.border}; border-radius: 3px; background-color: ${BRAND.white};"
+      />
+    </div>
     ` : ""}
     <p style="margin: 16px 0 0; font-size: 13px; color: ${BRAND.mutedText}; line-height: 1.5;">
       Questions? Reply to this email or reach out on
