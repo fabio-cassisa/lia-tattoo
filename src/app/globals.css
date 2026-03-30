@@ -66,8 +66,8 @@
   --color-warm-grey-600: var(--warm-grey-600);
   --color-blush-300: var(--blush-300);
   --color-blush-200: var(--blush-200);
-  --font-display: "Playfair Display", Georgia, serif;
-  --font-body: "Inter", system-ui, sans-serif;
+  --font-display: "Rye", "Playfair Display", Georgia, serif;
+  --font-body: "Lora", Georgia, serif;
 }
 
 /* Smooth scrolling */
@@ -88,23 +88,60 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Subtle paper grain effect */
+/* ═══════════════════════════════════════
+   Aged parchment paper texture
+   Three layers: grain + fiber + vignette
+   position: fixed = parallax on scroll
+   ═══════════════════════════════════════ */
+
+/* Layer 1: Paper grain — coarse fibers + fine speckle, warm-tinted */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
-  opacity: 0.03;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-image:
+    /* Coarse fiber structure — visible paper feel */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='fiber'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.4' numOctaves='3' seed='2' stitchTiles='stitch' result='n'/%3E%3CfeComponentTransfer in='n'%3E%3CfeFuncR type='linear' slope='2.0' intercept='-0.6'/%3E%3CfeFuncG type='linear' slope='1.6' intercept='-0.5'/%3E%3CfeFuncB type='linear' slope='1.0' intercept='-0.3'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23fiber)'/%3E%3C/svg%3E"),
+    /* Fine grain speckle — grit/tooth of the paper */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='speck'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' seed='7' stitchTiles='stitch' result='n'/%3E%3CfeComponentTransfer in='n'%3E%3CfeFuncR type='linear' slope='1.8' intercept='-0.5'/%3E%3CfeFuncG type='linear' slope='1.4' intercept='-0.4'/%3E%3CfeFuncB type='linear' slope='0.8' intercept='-0.2'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23speck)'/%3E%3C/svg%3E");
+  background-size: 400px 400px, 200px 200px;
+  opacity: 0.14;
+  mix-blend-mode: multiply;
   pointer-events: none;
   z-index: 1;
 }
 
-/* Typography — bold, confident, like tattoo shop signage */
+/* Layer 2: Edge vignette + warm age spots — parchment depth */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    /* Edge vignette — warm darkening, clearly visible at edges */
+    radial-gradient(ellipse at center, transparent 25%, rgba(100, 65, 15, 0.18) 100%),
+    /* Age spot — bottom left (foxing) */
+    radial-gradient(ellipse at 8% 92%, rgba(130, 75, 20, 0.09) 0%, transparent 45%),
+    /* Rust hint — top right corner */
+    radial-gradient(ellipse at 94% 6%, rgba(145, 65, 30, 0.07) 0%, transparent 35%),
+    /* Top edge — sun-aged band */
+    linear-gradient(to bottom, rgba(110, 75, 20, 0.08) 0%, transparent 10%),
+    /* Bottom edge — well-handled darkening */
+    linear-gradient(to top, rgba(80, 55, 10, 0.09) 0%, transparent 8%),
+    /* Left edge crease shadow */
+    linear-gradient(to right, rgba(90, 60, 15, 0.06) 0%, transparent 6%),
+    /* Right edge crease shadow */
+    linear-gradient(to left, rgba(90, 60, 15, 0.06) 0%, transparent 6%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Typography — Rye for headlines (single weight, decorative), Lora for body */
 h1, h2, h3, h4 {
   font-family: var(--font-display);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-weight: 400; /* Rye only has 400, it's bold by design */
+  letter-spacing: 0.03em;
   color: var(--foreground);
+  text-transform: uppercase;
 }
 
 /* Traditional-style divider */

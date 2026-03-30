@@ -199,7 +199,7 @@ export default function BookingContent() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center">
         <TradDivider className="w-32 mb-8" />
-        <h1 className="font-display text-3xl sm:text-4xl font-bold text-ink-900 mb-4">
+        <h1 className="font-display text-3xl sm:text-4xl font-normal text-ink-900 mb-4">
           {t("success")}
         </h1>
         <p className="text-foreground-muted text-sm max-w-md">
@@ -216,7 +216,7 @@ export default function BookingContent() {
         <p className="text-xs uppercase tracking-[0.4em] text-foreground-muted mb-4">
           liagiorgi.one.ttt
         </p>
-        <h1 className="font-display text-4xl sm:text-6xl font-bold text-ink-900 mb-4">
+        <h1 className="font-display text-4xl sm:text-6xl font-normal text-ink-900 mb-4">
           {t("title")}
         </h1>
         <p className="text-base text-foreground-muted max-w-lg mx-auto">

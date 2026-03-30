@@ -37,7 +37,7 @@ function AftercareContent() {
         <p className="text-xs uppercase tracking-[0.4em] text-foreground-muted mb-4">
           liagiorgi.one.ttt
         </p>
-        <h1 className="font-display text-4xl sm:text-6xl font-bold text-ink-900 mb-4">
+        <h1 className="font-display text-4xl sm:text-6xl font-normal text-ink-900 mb-4">
           {t("title")}
         </h1>
         <p className="text-base text-foreground-muted max-w-lg mx-auto">
@@ -72,7 +72,7 @@ function AftercareContent() {
 
               {/* Content */}
               <div className="flex-1 pt-1">
-                <h3 className="font-display text-lg font-bold text-ink-900 mb-2">
+                <h3 className="font-display text-lg font-normal text-ink-900 mb-2">
                   {step.title}
                 </h3>
                 <p className="text-sm text-foreground-muted leading-relaxed">
@@ -90,7 +90,7 @@ function AftercareContent() {
         <div className="max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
           {/* Do's */}
           <div className="p-6 sm:p-8 border border-ink-900/8 bg-sabbia-50">
-            <h2 className="font-display text-xl font-bold text-ink-900 mb-4 flex items-center gap-2">
+            <h2 className="font-display text-xl font-normal text-ink-900 mb-4 flex items-center gap-2">
               <svg
                 width="20"
                 height="20"
@@ -123,7 +123,7 @@ function AftercareContent() {
 
           {/* Don'ts */}
           <div className="p-6 sm:p-8 border border-ink-900/8 bg-sabbia-50">
-            <h2 className="font-display text-xl font-bold text-ink-900 mb-4 flex items-center gap-2">
+            <h2 className="font-display text-xl font-normal text-ink-900 mb-4 flex items-center gap-2">
               <svg
                 width="20"
                 height="20"

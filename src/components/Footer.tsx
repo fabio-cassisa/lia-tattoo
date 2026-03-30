@@ -13,7 +13,7 @@ export default function Footer() {
         <div className="flex flex-col sm:grid sm:grid-cols-2 gap-8 items-center sm:items-start">
           {/* Brand */}
           <div className="flex flex-col items-center sm:items-start gap-3">
-            <Link href="/" className="font-display text-lg sm:text-xl font-bold tracking-tight text-ink-900">
+            <Link href="/" className="font-display text-lg sm:text-xl font-normal text-ink-900">
               liagiorgi.one.ttt
             </Link>
             <p className="text-xs text-foreground-muted uppercase tracking-[0.3em]">

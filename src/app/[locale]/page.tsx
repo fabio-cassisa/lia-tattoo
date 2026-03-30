@@ -59,13 +59,13 @@ function HomeContent() {
             <div className="w-12 h-px bg-ink-900/20" />
           </div>
 
-          {/* Name */}
-          <h1 className="font-display text-5xl sm:text-7xl lg:text-8xl font-bold tracking-tight text-ink-900 leading-[0.9]">
+          {/* Name — Rye is wide, so scale down from Playfair sizes */}
+          <h1 className="font-display text-[1.55rem] min-[375px]:text-[2rem] sm:text-5xl lg:text-6xl font-normal text-ink-900 leading-[1]">
             {t("title")}
           </h1>
 
           {/* Subtitle */}
-          <p className="text-base sm:text-lg text-foreground-muted uppercase tracking-[0.2em] sm:tracking-[0.35em] font-medium">
+          <p className="text-[0.8rem] sm:text-lg text-foreground-muted uppercase tracking-[0.12em] min-[375px]:tracking-[0.2em] sm:tracking-[0.35em] font-medium">
             {t("subtitle")}
           </p>
 
@@ -196,7 +196,7 @@ function HomeContent() {
             {tAbout("title")}
           </p>
 
-          <blockquote className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold text-ink-900 leading-snug mb-8">
+          <blockquote className="font-display text-2xl sm:text-3xl lg:text-4xl font-normal text-ink-900 leading-snug mb-8">
             &ldquo;{tHome("quote")}
             <br />
             <span className="text-accent">{tHome("quoteHighlight")}</span>&rdquo;
@@ -241,7 +241,7 @@ function HomeContent() {
         <div className="relative z-10 max-w-xl mx-auto flex flex-col items-center gap-6">
           <TradDivider className="w-32 [&_svg]:text-sabbia-50/40 [&_div]:from-transparent [&_div]:to-sabbia-50/20" />
 
-          <h2 className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-sabbia-50">
+          <h2 className="font-display text-3xl sm:text-5xl font-normal text-sabbia-50">
             {tBooking("title")}
           </h2>
 

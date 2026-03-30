@@ -120,7 +120,7 @@ function PortfolioContent({
         <p className="text-xs uppercase tracking-[0.4em] text-foreground-muted mb-4">
           liagiorgi.one.ttt
         </p>
-        <h1 className="font-display text-4xl sm:text-6xl font-bold text-ink-900 mb-4">
+        <h1 className="font-display text-4xl sm:text-6xl font-normal text-ink-900 mb-4">
           {t("title")}
         </h1>
         <p className="text-base text-foreground-muted max-w-lg mx-auto">
@@ -133,7 +133,7 @@ function PortfolioContent({
       <section className="py-10 sm:py-16 px-4">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-8 sm:mb-12">
-            <h2 className="font-display text-2xl sm:text-3xl font-bold text-ink-900 mb-2">
+            <h2 className="font-display text-2xl sm:text-3xl font-normal text-ink-900 mb-2">
               {t("flashTitle")}
             </h2>
             <p className="text-sm text-foreground-muted">
@@ -155,7 +155,7 @@ function PortfolioContent({
         <LineDivider className="max-w-xs mx-auto mb-8 sm:mb-12" />
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
-            <h2 className="font-display text-2xl sm:text-3xl font-bold text-ink-900 mb-2">
+            <h2 className="font-display text-2xl sm:text-3xl font-normal text-ink-900 mb-2">
               {t("completedTitle")}
             </h2>
             <p className="text-sm text-foreground-muted">

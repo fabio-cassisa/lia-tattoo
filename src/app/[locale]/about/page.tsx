@@ -27,7 +27,7 @@ function AboutContent() {
         <p className="text-xs uppercase tracking-[0.4em] text-foreground-muted mb-4">
           liagiorgi.one.ttt
         </p>
-        <h1 className="font-display text-4xl sm:text-6xl font-bold text-ink-900 mb-4">
+        <h1 className="font-display text-4xl sm:text-6xl font-normal text-ink-900 mb-4">
           {t("title")}
         </h1>
         <TradDivider className="w-32 mx-auto mt-6" />
@@ -75,7 +75,7 @@ function AboutContent() {
         <div className="max-w-3xl mx-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-12">
             <div>
-              <h2 className="font-display text-2xl font-bold text-ink-900 mb-4">
+              <h2 className="font-display text-2xl font-normal text-ink-900 mb-4">
                 {t("approach")}
               </h2>
               <p className="text-sm text-foreground-muted leading-relaxed">
@@ -83,7 +83,7 @@ function AboutContent() {
               </p>
             </div>
             <div>
-              <h2 className="font-display text-2xl font-bold text-ink-900 mb-4">
+              <h2 className="font-display text-2xl font-normal text-ink-900 mb-4">
                 {t("style")}
               </h2>
               <p className="text-sm text-foreground-muted leading-relaxed">
@@ -97,19 +97,19 @@ function AboutContent() {
       {/* Studios / Find me */}
       <section className="py-10 sm:py-16 px-4">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="font-display text-2xl font-bold text-ink-900 mb-8">
+          <h2 className="font-display text-2xl font-normal text-ink-900 mb-8">
             {t("findMe")}
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-8">
             <div className="p-6 border border-ink-900/8 bg-sabbia-50">
-              <h3 className="font-display text-xl font-bold text-ink-900 mb-1">
+              <h3 className="font-display text-xl font-normal text-ink-900 mb-1">
                 Studio Diamant
               </h3>
               <p className="text-sm text-foreground-muted">Malmö, Sweden</p>
             </div>
             <div className="p-6 border border-ink-900/8 bg-sabbia-50">
-              <h3 className="font-display text-xl font-bold text-ink-900 mb-1">
+              <h3 className="font-display text-xl font-normal text-ink-900 mb-1">
                 Good Morning Tattoo
               </h3>
               <p className="text-sm text-foreground-muted">

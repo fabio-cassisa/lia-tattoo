@@ -2,17 +2,19 @@ import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { notFound } from "next/navigation";
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import { routing } from "@/i18n/routing";
-import { Playfair_Display, Inter } from "next/font/google";
+import { Rye, Lora } from "next/font/google";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import ParchmentBackground from "@/components/ParchmentBackground";
 
-const playfair = Playfair_Display({
+const rye = Rye({
   variable: "--font-display",
+  weight: "400",
   subsets: ["latin"],
   display: "swap",
 });
 
-const inter = Inter({
+const lora = Lora({
   variable: "--font-body",
   subsets: ["latin"],
   display: "swap",
@@ -46,12 +48,15 @@ export default async function LocaleLayout({ children, params }: Props) {
   setRequestLocale(locale);
 
   return (
-    <html lang={locale} className={`${playfair.variable} ${inter.variable}`}>
-      <body className="min-h-screen flex flex-col bg-background text-foreground">
+    <html lang={locale} className={`${rye.variable} ${lora.variable}`}>
+      <body className="min-h-screen bg-background text-foreground">
+        <ParchmentBackground />
         <NextIntlClientProvider>
-          <Header />
-          <main className="flex-1">{children}</main>
-          <Footer />
+          <div className="relative z-10 flex flex-col min-h-screen">
+            <Header />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </div>
         </NextIntlClientProvider>
       </body>
     </html>

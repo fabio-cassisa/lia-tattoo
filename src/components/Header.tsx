@@ -38,7 +38,7 @@ export default function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo / Brand */}
           <Link href="/" className="flex items-center gap-2">
-            <span className="font-display text-lg sm:text-xl font-bold tracking-tight text-ink-900">
+            <span className="font-display text-lg sm:text-xl font-normal text-ink-900">
               liagiorgi.one.ttt
             </span>
           </Link>
