@@ -167,6 +167,22 @@ export default function AdminDashboard() {
   }
 
   const pendingCount = bookings.filter((b) => b.status === "pending").length;
+  const depositPaidCount = bookings.filter((b) => b.status === "deposit_paid").length;
+
+  // This week: bookings created from Monday 00:00 of the current week
+  const now = new Date();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  monday.setHours(0, 0, 0, 0);
+  const thisWeekCount = bookings.filter(
+    (b) => new Date(b.created_at) >= monday
+  ).length;
+
+  // This month
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const thisMonthCount = bookings.filter(
+    (b) => new Date(b.created_at) >= monthStart
+  ).length;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-4 sm:py-6">
@@ -211,17 +227,36 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Stats bar */}
-      <div className="flex items-center gap-4 mb-4 text-sm text-foreground-muted">
-        <span>{bookings.length} total</span>
-        {pendingCount > 0 && (
-          <span className="text-yellow-700 font-medium">
-            {pendingCount} pending review
-          </span>
-        )}
+      {/* Stats cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 sm:mb-6">
+        <div className="bg-white border border-[var(--sabbia-200)] rounded p-3">
+          <p className="text-xs text-foreground-muted">Pending</p>
+          <p className={`text-xl font-medium tabular-nums ${pendingCount > 0 ? "text-yellow-700" : "text-foreground"}`}>
+            {pendingCount}
+          </p>
+        </div>
+        <div className="bg-white border border-[var(--sabbia-200)] rounded p-3">
+          <p className="text-xs text-foreground-muted">Confirmed</p>
+          <p className={`text-xl font-medium tabular-nums ${depositPaidCount > 0 ? "text-blue-700" : "text-foreground"}`}>
+            {depositPaidCount}
+          </p>
+        </div>
+        <div className="bg-white border border-[var(--sabbia-200)] rounded p-3">
+          <p className="text-xs text-foreground-muted">This week</p>
+          <p className="text-xl font-medium tabular-nums text-foreground">{thisWeekCount}</p>
+        </div>
+        <div className="bg-white border border-[var(--sabbia-200)] rounded p-3">
+          <p className="text-xs text-foreground-muted">This month</p>
+          <p className="text-xl font-medium tabular-nums text-foreground">{thisMonthCount}</p>
+        </div>
+      </div>
+
+      {/* Refresh row */}
+      <div className="flex items-center justify-between mb-4 text-sm text-foreground-muted">
+        <span>{bookings.length} total bookings</span>
         <button
           onClick={fetchBookings}
-          className="ml-auto text-xs hover:text-foreground transition-colors"
+          className="text-xs hover:text-foreground transition-colors"
         >
           Refresh
         </button>

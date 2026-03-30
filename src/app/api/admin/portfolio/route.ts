@@ -59,11 +59,13 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Validate file type
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
+    // Validate file type (HEIC is converted client-side but accept it server-side too as fallback)
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    const isHeicByExt = ext === "heic" || ext === "heif";
+    if (!allowedTypes.includes(file.type) && !isHeicByExt) {
       return Response.json(
-        { error: "Invalid file type. Use JPEG, PNG, or WebP." },
+        { error: "Invalid file type. Use JPEG, PNG, WebP, or HEIC." },
         { status: 400 }
       );
     }
@@ -75,10 +77,11 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminClient();
 
-    // Generate unique storage path
-    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    // Generate unique storage path — normalize HEIC extensions to jpg
+    const rawExt = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const storageExt = (rawExt === "heic" || rawExt === "heif") ? "jpg" : rawExt;
     const timestamp = Date.now();
-    const storagePath = `${category}/${timestamp}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const storagePath = `${category}/${timestamp}-${Math.random().toString(36).slice(2, 8)}.${storageExt}`;
 
     // Upload to storage
     const arrayBuffer = await file.arrayBuffer();

@@ -1,22 +1,26 @@
 import { useTranslations } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
-import Image from "next/image";
 import {
   TradDivider,
   LineDivider,
 } from "@/components/decorative/TradDivider";
+import { PortfolioGrid } from "@/components/PortfolioGrid";
 import { createAdminClient } from "@/lib/supabase/server";
-import type { PortfolioImageRow } from "@/lib/supabase/database.types";
 
 export const revalidate = 60; // ISR — revalidate every 60 seconds
 
-type PortfolioImage = PortfolioImageRow & { url: string };
+type PortfolioImage = {
+  id: string;
+  url: string;
+  title: string | null;
+  category: string;
+};
 
 async function getPortfolioImages(): Promise<PortfolioImage[]> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("portfolio_images")
-    .select("*")
+    .select("id, title, category, storage_path")
     .eq("is_visible", true)
     .order("display_order", { ascending: true })
     .order("created_at", { ascending: false });
@@ -28,7 +32,9 @@ async function getPortfolioImages(): Promise<PortfolioImage[]> {
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   return (data ?? []).map((img) => ({
-    ...img,
+    id: img.id,
+    title: img.title,
+    category: img.category,
     url: `${supabaseUrl}/storage/v1/object/public/portfolio/${img.storage_path}`,
   }));
 }
@@ -94,28 +100,6 @@ function EmptyState({ instagram }: { instagram: string }) {
   );
 }
 
-function ImageCard({ image }: { image: PortfolioImage }) {
-  return (
-    <div className="group relative aspect-square bg-sabbia-100 border border-ink-900/8 overflow-hidden transition-all hover:border-ink-900/15 hover:shadow-md">
-      <Image
-        src={image.url}
-        alt={image.title || "Tattoo design"}
-        fill
-        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-        className="object-cover transition-transform duration-300 group-hover:scale-105"
-        unoptimized
-      />
-      {image.title && (
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-900/60 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <p className="text-xs font-medium text-sabbia-50 uppercase tracking-widest">
-            {image.title}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function PortfolioContent({
   flashImages,
   completedImages,
@@ -159,11 +143,7 @@ function PortfolioContent({
           </div>
 
           {hasFlash ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-              {flashImages.map((image) => (
-                <ImageCard key={image.id} image={image} />
-              ))}
-            </div>
+            <PortfolioGrid images={flashImages} />
           ) : (
             <EmptyState instagram={t("comingSoon")} />
           )}
@@ -184,11 +164,7 @@ function PortfolioContent({
           </div>
 
           {hasCompleted ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-              {completedImages.map((image) => (
-                <ImageCard key={image.id} image={image} />
-              ))}
-            </div>
+            <PortfolioGrid images={completedImages} />
           ) : (
             <EmptyState instagram={t("comingSoon")} />
           )}
