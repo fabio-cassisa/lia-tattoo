@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://lia-tattoo.vercel.app";
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://lia-tattoo.vercel.app").trim();
 
 const locales = ["en", "sv", "it", "da"] as const;
 const pages = ["", "/portfolio", "/booking", "/about", "/aftercare"] as const;
