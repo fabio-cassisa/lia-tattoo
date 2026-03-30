@@ -215,9 +215,19 @@ export default function AdminPortfolio() {
             >
               {uploading ? "Uploading..." : "Choose files"}
             </button>
-            <span className="ml-2 text-xs text-foreground-muted">
-              JPEG, PNG, or WebP — max 10MB each
-            </span>
+          </div>
+        </div>
+
+        {/* Upload specs */}
+        <div className="mt-4 p-3 bg-[var(--sabbia-50)] border border-[var(--sabbia-200)] rounded text-xs text-foreground-muted space-y-1">
+          <p className="font-medium text-foreground text-[11px] uppercase tracking-wider mb-1.5">Image specs</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+            <p><span className="font-medium text-foreground">Formats:</span> JPEG, PNG, or WebP</p>
+            <p><span className="font-medium text-foreground">Max file size:</span> 10 MB per image</p>
+            <p><span className="font-medium text-foreground">Best size:</span> 1200 x 1200 px (square)</p>
+            <p><span className="font-medium text-foreground">Min recommended:</span> 800 x 800 px</p>
+            <p><span className="font-medium text-foreground">Aspect ratio:</span> Square works best, but any ratio is fine</p>
+            <p><span className="font-medium text-foreground">Tip:</span> Crop tight around the design/tattoo</p>
           </div>
         </div>
       </div>
