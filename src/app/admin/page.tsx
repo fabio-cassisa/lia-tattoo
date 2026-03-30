@@ -188,6 +188,19 @@ export default function AdminDashboard() {
         </button>
       </div>
 
+      {/* Admin nav */}
+      <div className="flex gap-2 mb-4 sm:mb-6">
+        <span className="px-3 py-1.5 text-xs rounded-full bg-[var(--ink-900)] text-[var(--sabbia-50)]">
+          Bookings
+        </span>
+        <a
+          href="/admin/portfolio"
+          className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)] transition-colors"
+        >
+          Portfolio
+        </a>
+      </div>
+
       {/* Error */}
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm mb-4">

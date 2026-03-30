@@ -1,0 +1,377 @@
+"use client";
+
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
+
+type PortfolioImage = {
+  id: string;
+  created_at: string;
+  title: string | null;
+  category: "flash" | "completed";
+  storage_path: string;
+  display_order: number;
+  is_visible: boolean;
+  url: string;
+};
+
+export default function AdminPortfolio() {
+  const router = useRouter();
+  const [images, setImages] = useState<PortfolioImage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "flash" | "completed">("all");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editCategory, setEditCategory] = useState<"flash" | "completed">("flash");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadCategory, setUploadCategory] = useState<"flash" | "completed">("flash");
+
+  const fetchImages = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/portfolio");
+      if (res.status === 401) { router.push("/admin/login"); return; }
+      if (!res.ok) throw new Error("Failed to fetch");
+      const data = await res.json();
+      setImages(data.images);
+      setError("");
+    } catch {
+      setError("Failed to load portfolio images");
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
+
+  useEffect(() => { fetchImages(); }, [fetchImages]);
+
+  async function handleUpload(files: FileList) {
+    setUploading(true);
+    setError("");
+
+    const results: PortfolioImage[] = [];
+    for (const file of Array.from(files)) {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("category", uploadCategory);
+
+      try {
+        const res = await fetch("/api/admin/portfolio", {
+          method: "POST",
+          body: formData,
+        });
+        if (res.status === 401) { router.push("/admin/login"); return; }
+        if (!res.ok) {
+          const err = await res.json();
+          setError(err.error || "Upload failed");
+          continue;
+        }
+        const data = await res.json();
+        results.push(data.image);
+      } catch {
+        setError("Upload failed");
+      }
+    }
+
+    if (results.length > 0) {
+      setImages((prev) => [...prev, ...results]);
+    }
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function handleUpdate(id: string, updates: Record<string, unknown>) {
+    try {
+      const res = await fetch("/api/admin/portfolio", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...updates }),
+      });
+      if (res.status === 401) { router.push("/admin/login"); return; }
+      if (!res.ok) throw new Error("Update failed");
+      const data = await res.json();
+      setImages((prev) => prev.map((img) => (img.id === id ? data.image : img)));
+      setEditingId(null);
+    } catch {
+      setError("Failed to update image");
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this image permanently?")) return;
+    try {
+      const res = await fetch("/api/admin/portfolio", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (res.status === 401) { router.push("/admin/login"); return; }
+      if (!res.ok) throw new Error("Delete failed");
+      setImages((prev) => prev.filter((img) => img.id !== id));
+    } catch {
+      setError("Failed to delete image");
+    }
+  }
+
+  async function handleMove(id: string, direction: "up" | "down") {
+    const filtered = filteredImages;
+    const idx = filtered.findIndex((img) => img.id === id);
+    if (idx < 0) return;
+
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= filtered.length) return;
+
+    const current = filtered[idx];
+    const swap = filtered[swapIdx];
+
+    // Swap display_order values
+    await Promise.all([
+      handleUpdate(current.id, { display_order: swap.display_order }),
+      handleUpdate(swap.id, { display_order: current.display_order }),
+    ]);
+    fetchImages();
+  }
+
+  const filteredImages =
+    categoryFilter === "all"
+      ? images
+      : images.filter((img) => img.category === categoryFilter);
+
+  async function handleLogout() {
+    await fetch("/api/admin/auth", { method: "DELETE" });
+    router.push("/admin/login");
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-4 sm:py-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
+        <div>
+          <h1 className="text-base sm:text-lg tracking-wider text-foreground">
+            liagiorgi.one.ttt
+          </h1>
+          <p className="text-[10px] sm:text-xs text-foreground-muted tracking-wider uppercase">
+            Portfolio Manager
+          </p>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="text-sm text-foreground-muted hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-end"
+        >
+          Sign out
+        </button>
+      </div>
+
+      {/* Admin nav */}
+      <div className="flex gap-2 mb-6">
+        <a
+          href="/admin"
+          className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)] transition-colors"
+        >
+          Bookings
+        </a>
+        <span className="px-3 py-1.5 text-xs rounded-full bg-[var(--ink-900)] text-[var(--sabbia-50)]">
+          Portfolio
+        </span>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm mb-4">
+          {error}
+          <button onClick={() => setError("")} className="ml-2 underline">dismiss</button>
+        </div>
+      )}
+
+      {/* Upload section */}
+      <div className="bg-white border border-[var(--sabbia-200)] rounded p-4 sm:p-5 mb-6">
+        <p className="text-sm font-medium text-foreground mb-3">Upload images</p>
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+          <div>
+            <label className="block text-xs text-foreground-muted mb-1">Category</label>
+            <select
+              value={uploadCategory}
+              onChange={(e) => setUploadCategory(e.target.value as "flash" | "completed")}
+              className="px-3 py-2 border border-[var(--sabbia-200)] rounded text-sm bg-white text-foreground"
+              style={{ fontSize: "16px" }}
+            >
+              <option value="flash">Flash Designs</option>
+              <option value="completed">Completed Work</option>
+            </select>
+          </div>
+          <div className="flex-1">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              onChange={(e) => e.target.files && handleUpload(e.target.files)}
+              className="hidden"
+              id="portfolio-upload"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="px-4 py-2 text-sm bg-[var(--ink-900)] text-[var(--sabbia-50)] rounded hover:bg-[var(--ink-900)]/90 disabled:opacity-50 transition-colors"
+            >
+              {uploading ? "Uploading..." : "Choose files"}
+            </button>
+            <span className="ml-2 text-xs text-foreground-muted">
+              JPEG, PNG, or WebP — max 10MB each
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex gap-2 mb-4">
+        {(["all", "flash", "completed"] as const).map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setCategoryFilter(cat)}
+            className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
+              categoryFilter === cat
+                ? "bg-[var(--ink-900)] text-[var(--sabbia-50)]"
+                : "bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)]"
+            }`}
+          >
+            {cat === "all" ? `All (${images.length})` : cat === "flash" ? `Flash (${images.filter(i => i.category === "flash").length})` : `Completed (${images.filter(i => i.category === "completed").length})`}
+          </button>
+        ))}
+      </div>
+
+      {/* Image grid */}
+      {loading ? (
+        <p className="text-sm text-foreground-muted py-8 text-center">Loading...</p>
+      ) : filteredImages.length === 0 ? (
+        <div className="text-center py-16">
+          <p className="text-sm text-foreground-muted">
+            {images.length === 0 ? "No images yet — upload some above!" : "No images in this category."}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          {filteredImages.map((img, idx) => (
+            <div
+              key={img.id}
+              className={`relative group bg-white border rounded overflow-hidden ${
+                !img.is_visible ? "opacity-50" : ""
+              } ${editingId === img.id ? "border-[var(--trad-red-500)]" : "border-[var(--sabbia-200)]"}`}
+            >
+              {/* Image */}
+              <div className="aspect-square relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={img.url}
+                  alt={img.title || "Portfolio image"}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+                {/* Hidden badge */}
+                {!img.is_visible && (
+                  <div className="absolute top-2 left-2 px-1.5 py-0.5 text-[10px] bg-gray-800 text-white rounded">
+                    Hidden
+                  </div>
+                )}
+                {/* Category badge */}
+                <div className="absolute top-2 right-2 px-1.5 py-0.5 text-[10px] bg-black/60 text-white rounded">
+                  {img.category === "flash" ? "Flash" : "Done"}
+                </div>
+              </div>
+
+              {/* Controls — always visible on mobile, hover on desktop */}
+              <div className="p-2 border-t border-[var(--sabbia-200)]">
+                {editingId === img.id ? (
+                  /* Edit mode */
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      placeholder="Title (optional)"
+                      className="w-full px-2 py-1 border border-[var(--sabbia-200)] rounded text-xs bg-white"
+                      style={{ fontSize: "16px" }}
+                    />
+                    <select
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value as "flash" | "completed")}
+                      className="w-full px-2 py-1 border border-[var(--sabbia-200)] rounded text-xs bg-white"
+                      style={{ fontSize: "16px" }}
+                    >
+                      <option value="flash">Flash</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleUpdate(img.id, { title: editTitle || null, category: editCategory })}
+                        className="flex-1 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="flex-1 py-1 text-xs border border-[var(--sabbia-200)] text-foreground-muted rounded hover:bg-[var(--sabbia-100)]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Display mode */
+                  <div>
+                    {img.title && (
+                      <p className="text-xs text-foreground truncate mb-1">{img.title}</p>
+                    )}
+                    <div className="flex gap-1 flex-wrap">
+                      {/* Move buttons */}
+                      <button
+                        onClick={() => handleMove(img.id, "up")}
+                        disabled={idx === 0}
+                        className="px-1.5 py-0.5 text-[10px] border border-[var(--sabbia-200)] rounded text-foreground-muted hover:bg-[var(--sabbia-100)] disabled:opacity-30"
+                        title="Move up"
+                      >
+                        &larr;
+                      </button>
+                      <button
+                        onClick={() => handleMove(img.id, "down")}
+                        disabled={idx === filteredImages.length - 1}
+                        className="px-1.5 py-0.5 text-[10px] border border-[var(--sabbia-200)] rounded text-foreground-muted hover:bg-[var(--sabbia-100)] disabled:opacity-30"
+                        title="Move down"
+                      >
+                        &rarr;
+                      </button>
+                      {/* Edit */}
+                      <button
+                        onClick={() => {
+                          setEditingId(img.id);
+                          setEditTitle(img.title || "");
+                          setEditCategory(img.category);
+                        }}
+                        className="px-1.5 py-0.5 text-[10px] border border-[var(--sabbia-200)] rounded text-foreground-muted hover:bg-[var(--sabbia-100)]"
+                      >
+                        Edit
+                      </button>
+                      {/* Toggle visibility */}
+                      <button
+                        onClick={() => handleUpdate(img.id, { is_visible: !img.is_visible })}
+                        className="px-1.5 py-0.5 text-[10px] border border-[var(--sabbia-200)] rounded text-foreground-muted hover:bg-[var(--sabbia-100)]"
+                      >
+                        {img.is_visible ? "Hide" : "Show"}
+                      </button>
+                      {/* Delete */}
+                      <button
+                        onClick={() => handleDelete(img.id)}
+                        className="px-1.5 py-0.5 text-[10px] border border-red-300 rounded text-red-600 hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

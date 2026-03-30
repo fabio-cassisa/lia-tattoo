@@ -77,6 +77,31 @@ export type BookingImageRow = {
   mime_type: string;
 };
 
+export type PortfolioCategory = "flash" | "completed";
+
+export type PortfolioImageRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  title: string | null;
+  category: PortfolioCategory;
+  storage_path: string;
+  display_order: number;
+  is_visible: boolean;
+  width: number | null;
+  height: number | null;
+};
+
+export type PortfolioImageInsert = {
+  title?: string | null;
+  category: PortfolioCategory;
+  storage_path: string;
+  display_order?: number;
+  is_visible?: boolean;
+  width?: number | null;
+  height?: number | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -92,6 +117,12 @@ export type Database = {
         Update: Partial<BookingImageRow>;
         Relationships: [];
       };
+      portfolio_images: {
+        Row: PortfolioImageRow;
+        Insert: PortfolioImageInsert;
+        Update: Partial<PortfolioImageRow>;
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -105,6 +136,7 @@ export type Database = {
       booking_size: BookingSize;
       color_preference: ColorPreference;
       booking_location: BookingLocation;
+      portfolio_category: PortfolioCategory;
     };
     CompositeTypes: {
       [_ in never]: never;
