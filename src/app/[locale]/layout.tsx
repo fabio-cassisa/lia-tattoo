@@ -34,8 +34,14 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const t = await getTranslations({ locale, namespace: "meta" });
 
   return {
-    title: t("title"),
+    title: {
+      default: t("title"),
+      template: `%s | liagiorgi.one.ttt`,
+    },
     description: t("description"),
+    openGraph: {
+      locale: locale,
+    },
   };
 }
 

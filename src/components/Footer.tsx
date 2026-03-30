@@ -24,7 +24,7 @@ export default function Footer() {
               href="https://www.instagram.com/liagiorgi.one.ttt/"
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 flex items-center gap-2 text-sm text-ink-900/60 hover:text-accent transition-colors"
+              className="mt-2 flex items-center gap-2 text-sm text-ink-900/75 hover:text-accent transition-colors"
             >
               <svg
                 className="w-4 h-4"
@@ -44,30 +44,30 @@ export default function Footer() {
 
           {/* Navigation */}
           <div className="flex flex-col items-center sm:items-end gap-2 sm:gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-ink-900/40 mb-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-ink-900/60 mb-1">
               {t("navigate")}
             </p>
             <Link
               href="/portfolio"
-              className="text-sm text-ink-900/60 hover:text-accent transition-colors"
+              className="text-sm text-ink-900/75 hover:text-accent transition-colors"
             >
               {tNav("portfolio")}
             </Link>
             <Link
               href="/booking"
-              className="text-sm text-ink-900/60 hover:text-accent transition-colors"
+              className="text-sm text-ink-900/75 hover:text-accent transition-colors"
             >
               {tNav("booking")}
             </Link>
             <Link
               href="/about"
-              className="text-sm text-ink-900/60 hover:text-accent transition-colors"
+              className="text-sm text-ink-900/75 hover:text-accent transition-colors"
             >
               {tNav("about")}
             </Link>
             <Link
               href="/aftercare"
-              className="text-sm text-ink-900/60 hover:text-accent transition-colors"
+              className="text-sm text-ink-900/75 hover:text-accent transition-colors"
             >
               {tNav("aftercare")}
             </Link>
@@ -76,10 +76,10 @@ export default function Footer() {
 
         {/* Bottom bar */}
         <div className="mt-12 pt-6 border-t border-ink-900/8 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-xs text-ink-900/30">
+          <p className="text-xs text-ink-900/50">
             &copy; {year} liagiorgi.one.ttt — {t("rights")}
           </p>
-          <p className="text-xs text-ink-900/20">
+          <p className="text-xs text-ink-900/40" aria-hidden="true">
             {t("madeWith")}
           </p>
         </div>

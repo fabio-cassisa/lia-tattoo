@@ -1,11 +1,12 @@
 import { useTranslations } from "next-intl";
-import { setRequestLocale } from "next-intl/server";
+import { setRequestLocale, getTranslations } from "next-intl/server";
 import {
   TradDivider,
   LineDivider,
 } from "@/components/decorative/TradDivider";
 import { PortfolioGrid } from "@/components/PortfolioGrid";
 import { createAdminClient } from "@/lib/supabase/server";
+import { getAlternates } from "@/lib/seo";
 
 export const revalidate = 60; // ISR — revalidate every 60 seconds
 
@@ -42,6 +43,17 @@ async function getPortfolioImages(): Promise<PortfolioImage[]> {
 type Props = {
   params: Promise<{ locale: string }>;
 };
+
+export async function generateMetadata({ params }: Props) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "meta" });
+
+  return {
+    title: t("portfolioTitle"),
+    description: t("portfolioDescription"),
+    alternates: getAlternates(locale, "/portfolio"),
+  };
+}
 
 export default async function PortfolioPage({ params }: Props) {
   const { locale } = await params;

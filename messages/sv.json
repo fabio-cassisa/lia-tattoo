@@ -1,7 +1,17 @@
 {
   "meta": {
     "title": "liagiorgi.one.ttt — ❋ Traditional Tattoo Artist ❋",
-    "description": "Boka din tatueringssession med liagiorgi.one.ttt. Traditionella & Old School tatueringar i Malmö och Köpenhamn."
+    "description": "Boka din tatueringssession med liagiorgi.one.ttt. Traditionella & Old School tatueringar i Malmö och Köpenhamn.",
+    "homeTitle": "❋ Traditional Tattoo Artist ❋ — Malmö & Köpenhamn",
+    "homeDescription": "Boka din tatueringssession med liagiorgi.one.ttt. Traditionell & Old School tatueringskonst i Malmö och Köpenhamn. Flash-designer, egendesignat och konsultationer.",
+    "portfolioTitle": "Portfolio — Flash-designer & utfört arbete",
+    "portfolioDescription": "Utforska traditionella flash-designer och utfört tatueringsarbete av liagiorgi.one.ttt. Old School tatueringskonst — djärva linjer, rika färger, tidlösa mönster.",
+    "bookingTitle": "Boka tatuering",
+    "bookingDescription": "Boka din tatueringssession med liagiorgi.one.ttt i Malmö eller Köpenhamn. Välj mellan flash-designer, egendesignat, cover-ups och konsultationer.",
+    "aboutTitle": "Om — Traditional Tattoo Artist",
+    "aboutDescription": "Traditionell tatuerare baserad i Malmö, Sverige. Specialiserad på Old School tatueringar — djärva linjer, rika färger, tidlösa mönster. Arbetar på Studio Diamant och Good Morning Tattoo.",
+    "aftercareTitle": "Eftervård för tatueringar",
+    "aftercareDescription": "Hur du tar hand om din nya tatuering. Steg-för-steg eftervårdsinstruktioner från liagiorgi.one.ttt — tvätt, återfuktning, läkningstips och långtidsvård."
   },
   "nav": {
     "portfolio": "Portfolio",

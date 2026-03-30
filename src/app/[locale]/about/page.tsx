@@ -1,14 +1,26 @@
 import { useTranslations } from "next-intl";
-import { setRequestLocale } from "next-intl/server";
+import { setRequestLocale, getTranslations } from "next-intl/server";
 import {
   TradDivider,
   LineDivider,
   CornerOrnament,
 } from "@/components/decorative/TradDivider";
+import { getAlternates } from "@/lib/seo";
 
 type Props = {
   params: Promise<{ locale: string }>;
 };
+
+export async function generateMetadata({ params }: Props) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "meta" });
+
+  return {
+    title: t("aboutTitle"),
+    description: t("aboutDescription"),
+    alternates: getAlternates(locale, "/about"),
+  };
+}
 
 export default async function AboutPage({ params }: Props) {
   const { locale } = await params;

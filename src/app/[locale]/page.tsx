@@ -1,15 +1,27 @@
 import { useTranslations } from "next-intl";
-import { setRequestLocale } from "next-intl/server";
+import { setRequestLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import {
   TradDivider,
   LineDivider,
   CornerOrnament,
 } from "@/components/decorative/TradDivider";
+import { getAlternates, getWebSiteJsonLd, getLocalBusinessJsonLd } from "@/lib/seo";
 
 type Props = {
   params: Promise<{ locale: string }>;
 };
+
+export async function generateMetadata({ params }: Props) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "meta" });
+
+  return {
+    title: t("homeTitle"),
+    description: t("homeDescription"),
+    alternates: getAlternates(locale, ""),
+  };
+}
 
 export default async function HomePage({ params }: Props) {
   const { locale } = await params;
@@ -25,8 +37,20 @@ function HomeContent() {
   const tBooking = useTranslations("booking");
   const tNav = useTranslations("nav");
 
+  const websiteJsonLd = getWebSiteJsonLd();
+  const businessJsonLd = getLocalBusinessJsonLd();
+
   return (
     <div className="flex flex-col">
+      {/* JSON-LD structured data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(businessJsonLd) }}
+      />
       {/* ═══════════════════════════════════════
           HERO SECTION
           ═══════════════════════════════════════ */}
@@ -82,7 +106,7 @@ function HomeContent() {
             </Link>
             <Link
               href="/portfolio"
-              className="group flex items-center gap-2 text-sm font-medium uppercase tracking-widest text-ink-900/60 hover:text-accent transition-colors"
+              className="group flex items-center gap-2 text-sm font-medium uppercase tracking-widest text-ink-900/75 hover:text-accent transition-colors"
             >
               {t("viewWork")}
               <svg
@@ -101,7 +125,7 @@ function HomeContent() {
         </div>
 
         {/* Bottom scroll hint */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-ink-900/20">
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-ink-900/20" aria-hidden="true">
           <div className="w-px h-8 bg-ink-900/15" />
           <svg width="12" height="8" viewBox="0 0 12 8" fill="currentColor">
             <path d="M1 1l5 5 5-5" stroke="currentColor" strokeWidth="1.5" fill="none" />
@@ -210,7 +234,7 @@ function HomeContent() {
 
           <Link
             href="/about"
-            className="inline-flex items-center gap-2 text-sm font-medium uppercase tracking-widest text-ink-900/60 hover:text-accent transition-colors"
+            className="inline-flex items-center gap-2 text-sm font-medium uppercase tracking-widest text-ink-900/75 hover:text-accent transition-colors"
           >
             {tAbout("title")}
             <svg
