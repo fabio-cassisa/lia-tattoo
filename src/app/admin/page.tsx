@@ -245,6 +245,12 @@ export default function AdminDashboard() {
         >
           Portfolio
         </a>
+        <a
+          href="/admin/insights"
+          className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)] transition-colors"
+        >
+          Creative Coach
+        </a>
       </div>
 
       {/* Error */}

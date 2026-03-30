@@ -279,6 +279,12 @@ export default function AdminPortfolio() {
         <span className="px-3 py-1.5 text-xs rounded-full bg-[var(--ink-900)] text-[var(--sabbia-50)]">
           Portfolio
         </span>
+        <a
+          href="/admin/insights"
+          className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)] transition-colors"
+        >
+          Creative Coach
+        </a>
       </div>
 
       {/* Error */}

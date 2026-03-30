@@ -112,6 +112,36 @@ export type PortfolioImageInsert = {
   height?: number | null;
 };
 
+// ── Instagram cache types ────────────────────────────────
+
+export type InstagramMediaCacheRow = {
+  id: string;
+  instagram_id: string;
+  media_type: string;
+  caption: string | null;
+  permalink: string;
+  media_url: string;
+  thumbnail_url: string | null;
+  timestamp: string;
+  like_count: number;
+  comments_count: number;
+  impressions: number | null;
+  reach: number | null;
+  engagement: number | null;
+  saved: number | null;
+  shares: number | null;
+  fetched_at: string;
+};
+
+export type InstagramTokenRow = {
+  id: string;
+  access_token: string;
+  token_type: string;
+  expires_at: string;
+  instagram_user_id: string;
+  updated_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -131,6 +161,18 @@ export type Database = {
         Row: PortfolioImageRow;
         Insert: PortfolioImageInsert;
         Update: Partial<PortfolioImageRow>;
+        Relationships: [];
+      };
+      instagram_media_cache: {
+        Row: InstagramMediaCacheRow;
+        Insert: Omit<InstagramMediaCacheRow, "id" | "fetched_at">;
+        Update: Partial<InstagramMediaCacheRow>;
+        Relationships: [];
+      };
+      instagram_tokens: {
+        Row: InstagramTokenRow;
+        Insert: Omit<InstagramTokenRow, "id" | "updated_at">;
+        Update: Partial<InstagramTokenRow>;
         Relationships: [];
       };
     };
