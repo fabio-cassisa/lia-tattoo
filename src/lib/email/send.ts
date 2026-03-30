@@ -56,8 +56,8 @@ export async function sendBookingReceivedEmail(booking: BookingRow) {
     ${sectionHeading("Booking request received")}
     <p style="margin: 0 0 16px; font-size: 14px; color: ${BRAND.ink}; line-height: 1.6;">
       Hey ${booking.client_name.split(" ")[0]},<br><br>
-      Thanks for reaching out! Your booking request has been received and Lia will review it soon.
-      You'll get another email once your request has been reviewed.
+      Thanks for reaching out! I've received your booking request and will review it soon.
+      I'll send you another email once I've had a look.
     </p>
     <p style="margin: 0 0 8px; font-size: 13px; color: ${BRAND.mutedText}; font-style: italic;">
       Here's a summary of your request:
@@ -132,7 +132,7 @@ export async function sendBookingApprovedEmail(
   const html = emailWrapper(`
     ${sectionHeading("Your booking is approved!")}
     <p style="margin: 0 0 16px; font-size: 14px; color: ${BRAND.ink}; line-height: 1.6;">
-      Great news, ${booking.client_name.split(" ")[0]}! Lia has reviewed your request and you're all set.
+      Great news, ${booking.client_name.split(" ")[0]}! I've reviewed your request and you're all set.
     </p>
     ${adminNote ? `
     <div style="margin: 0 0 20px; padding: 16px; background-color: ${BRAND.sabbia}; border-left: 3px solid ${BRAND.tradRed}; border-radius: 0 3px 3px 0;">
@@ -153,7 +153,7 @@ export async function sendBookingApprovedEmail(
       </p>
       <p style="margin: 0; font-size: 13px; color: ${BRAND.mutedText}; line-height: 1.5;">
         To confirm your appointment, please send the deposit (${depositText}) via PayPal.
-        Lia will share the payment details with you directly.
+        I'll share the payment details with you directly.
       </p>
     </div>
     <p style="margin: 16px 0 0; font-size: 13px; color: ${BRAND.mutedText}; line-height: 1.5;">
@@ -181,7 +181,7 @@ export async function sendBookingDeclinedEmail(
     ${sectionHeading("About your booking request")}
     <p style="margin: 0 0 16px; font-size: 14px; color: ${BRAND.ink}; line-height: 1.6;">
       Hey ${booking.client_name.split(" ")[0]},<br><br>
-      Thanks for your interest! Unfortunately, Lia is unable to accommodate this particular request at this time.
+      Thanks for your interest! Unfortunately, I'm unable to accommodate this particular request at this time.
     </p>
     ${adminNote ? `
     <div style="margin: 0 0 20px; padding: 16px; background-color: ${BRAND.sabbia}; border-left: 3px solid ${BRAND.tradRed}; border-radius: 0 3px 3px 0;">
@@ -215,7 +215,7 @@ export async function sendAftercareEmail(booking: BookingRow) {
     ${sectionHeading("Your new tattoo — aftercare")}
     <p style="margin: 0 0 16px; font-size: 14px; color: ${BRAND.ink}; line-height: 1.6;">
       Hey ${booking.client_name.split(" ")[0]},<br><br>
-      Thanks for trusting Lia with your new ink! Here's everything you need to know to keep it looking perfect.
+      Thanks for trusting me with your new ink! Here's everything you need to know to keep it looking perfect.
     </p>
 
     <h3 style="margin: 24px 0 12px; font-size: 15px; color: ${BRAND.tradRed}; font-weight: normal;">The first 24 hours</h3>
@@ -240,7 +240,7 @@ export async function sendAftercareEmail(booking: BookingRow) {
 
     <p style="margin: 16px 0 0; font-size: 13px; color: ${BRAND.mutedText}; line-height: 1.5;">
       If you notice anything unusual (excessive redness, swelling, or discharge after the first couple days), don't hesitate to reach out.
-      And once it's healed — Lia would love to see a photo!
+      And once it's healed — I'd love to see a photo!
     </p>
     <p style="margin: 16px 0 0; font-size: 13px; color: ${BRAND.mutedText};">
       <a href="https://instagram.com/liagiorgi.one.ttt" style="color: ${BRAND.tradRed}; text-decoration: none;">@liagiorgi.one.ttt</a>
