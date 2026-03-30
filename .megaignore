@@ -1,0 +1,25 @@
+# .megaignore — Exclude sensitive and heavy files from MEGA sync
+# https://help.mega.io/desktop-app/desktop-setup/megaignore
+
+# ── Secrets — NEVER sync to cloud ──────────────────────────
+-f:.env
+-f:.env.*
+-f:.env.local
+-f:.env.production
+-f:.env.development
+
+# ── Heavy build artifacts ──────────────────────────────────
+-d:node_modules
+-d:.next
+-d:.turbo
+-d:out
+
+# ── Supabase local state ──────────────────────────────────
+-dp:supabase/.temp
+
+# ── OS junk ────────────────────────────────────────────────
+-f:.DS_Store
+-f:Thumbs.db
+
+# ── Sync this file so rules apply on all devices ──────────
++sync:.megaignore
