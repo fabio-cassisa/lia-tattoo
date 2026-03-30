@@ -114,6 +114,7 @@ export async function PATCH(request: NextRequest) {
 
     // ── Calendar integration ─────────────────────────────
     // Create event when deposit is paid (Malmö bookings with appointment dates)
+    let calendarError: string | null = null;
     if (
       status === "deposit_paid" &&
       (currentBooking as BookingRow).location === "malmo" &&
@@ -125,7 +126,11 @@ export async function PATCH(request: NextRequest) {
         updatePayload.calendar_event_id = eventId;
         console.log(`Calendar event created: ${eventId} for booking ${id}`);
       } catch (calErr) {
-        console.error("Failed to create calendar event:", calErr);
+        const errMsg = calErr instanceof Error
+          ? `${calErr.message}\n${calErr.stack}`
+          : String(calErr);
+        console.error("Failed to create calendar event:", errMsg);
+        calendarError = errMsg;
         // Don't block the status update — calendar event is non-critical
       }
     }
@@ -177,6 +182,7 @@ export async function PATCH(request: NextRequest) {
     return Response.json({
       message: "Booking updated",
       booking: data,
+      ...(calendarError && { calendar_error: calendarError }),
     });
   } catch {
     return Response.json(

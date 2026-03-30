@@ -12,7 +12,7 @@ import {
 // ── Auth ────────────────────────────────────────────────────
 
 function getCalendarClient(): calendar_v3.Calendar {
-  const keyBase64 = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+  const keyBase64 = process.env.GOOGLE_SERVICE_ACCOUNT_KEY?.trim();
   if (!keyBase64) {
     throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY env var is not set");
   }
@@ -30,7 +30,7 @@ function getCalendarClient(): calendar_v3.Calendar {
 }
 
 function getCalendarId(): string {
-  const id = process.env.GOOGLE_CALENDAR_ID;
+  const id = process.env.GOOGLE_CALENDAR_ID?.trim();
   if (!id) throw new Error("GOOGLE_CALENDAR_ID env var is not set");
   return id;
 }
