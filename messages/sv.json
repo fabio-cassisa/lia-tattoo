@@ -83,6 +83,17 @@
       "info": "En deposition krävs för att bekräfta din bokning.",
       "small": "Deposition: 300 SEK (för tatueringar upp till 3 000 SEK)",
       "large": "Deposition: 500 SEK (för tatueringar över 3 000 SEK)"
+    },
+    "calendar": {
+      "title": "Önskat datum & tid",
+      "selectSize": "Välj storlek först för att se lediga tider",
+      "prevWeek": "Föregående vecka",
+      "nextWeek": "Nästa vecka",
+      "sessionLength": "Session",
+      "noSlots": "Inga lediga tider denna vecka — prova nästa",
+      "error": "Kunde inte hämta lediga tider. Försök igen.",
+      "copenhagenNote": "Bokningar i Köpenhamn sker enligt överenskommelse. Föreslå önskade datum så återkommer jag.",
+      "copenhagenPlaceholder": "t.ex. första två veckorna i maj, helger föredragna..."
     }
   },
   "portfolio": {

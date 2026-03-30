@@ -30,6 +30,9 @@ type Booking = {
   admin_notes: string | null;
   deposit_amount: number | null;
   appointment_date: string | null;
+  appointment_end: string | null;
+  calendar_event_id: string | null;
+  preferred_dates: string | null;
 };
 
 // ── Label maps ───────────────────────────────────────────
@@ -273,6 +276,22 @@ export default function AdminDashboard() {
                           day: "numeric",
                           month: "short",
                         })}
+                        {booking.appointment_date && (
+                          <>
+                            {" "}
+                            &middot;{" "}
+                            <span className="text-blue-600">
+                              {new Date(booking.appointment_date).toLocaleDateString("en-GB", {
+                                day: "numeric",
+                                month: "short",
+                              })}{" "}
+                              {new Date(booking.appointment_date).toLocaleTimeString("en-GB", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </>
+                        )}
                       </p>
                     </div>
                     <span
@@ -426,12 +445,13 @@ export default function AdminDashboard() {
                 <div className="mb-3 text-sm">
                   <p className="text-xs text-foreground-muted">Deposit</p>
                   <p className="text-foreground">
-                    {selectedBooking.deposit_amount} SEK
+                    {selectedBooking.deposit_amount}{" "}
+                    {selectedBooking.location === "copenhagen" ? "DKK" : "SEK"}
                   </p>
                 </div>
               )}
 
-              {/* Appointment date */}
+              {/* Appointment date/time (Malmö — slot picker) */}
               {selectedBooking.appointment_date && (
                 <div className="mb-3 text-sm">
                   <p className="text-xs text-foreground-muted">Appointment</p>
@@ -444,6 +464,46 @@ export default function AdminDashboard() {
                       month: "long",
                       year: "numeric",
                     })}
+                    {" at "}
+                    {new Date(
+                      selectedBooking.appointment_date
+                    ).toLocaleTimeString("en-GB", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                    {selectedBooking.appointment_end && (
+                      <>
+                        {" – "}
+                        {new Date(
+                          selectedBooking.appointment_end
+                        ).toLocaleTimeString("en-GB", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </>
+                    )}
+                  </p>
+                  {/* Calendar sync indicator */}
+                  {selectedBooking.calendar_event_id ? (
+                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                      <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
+                      Synced to Google Calendar
+                    </p>
+                  ) : selectedBooking.status === "deposit_paid" ? (
+                    <p className="text-xs text-yellow-600 mt-1 flex items-center gap-1">
+                      <span className="inline-block w-2 h-2 rounded-full bg-yellow-500" />
+                      Calendar event pending
+                    </p>
+                  ) : null}
+                </div>
+              )}
+
+              {/* Preferred dates (Copenhagen — free text) */}
+              {selectedBooking.preferred_dates && (
+                <div className="mb-3 text-sm">
+                  <p className="text-xs text-foreground-muted">Preferred dates</p>
+                  <p className="text-foreground whitespace-pre-wrap">
+                    {selectedBooking.preferred_dates}
                   </p>
                 </div>
               )}
@@ -470,7 +530,7 @@ export default function AdminDashboard() {
                   {selectedBooking.status === "pending" && (
                     <div>
                       <label className="block text-xs text-foreground-muted mb-1">
-                        Deposit amount (SEK)
+                        Deposit amount ({selectedBooking?.location === "copenhagen" ? "DKK" : "SEK"})
                       </label>
                       <input
                         type="number"

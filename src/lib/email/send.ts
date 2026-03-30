@@ -114,9 +114,10 @@ export async function sendBookingApprovedEmail(
 ) {
   const from = getFromEmail();
 
-  // Determine deposit amount based on tiers
+  // Determine deposit amount — currency depends on location
+  const currency = booking.location === "copenhagen" ? "DKK" : "SEK";
   const depositText = booking.deposit_amount
-    ? `${booking.deposit_amount} SEK`
+    ? `${booking.deposit_amount} ${currency}`
     : "will be communicated separately";
 
   const appointmentText = booking.appointment_date

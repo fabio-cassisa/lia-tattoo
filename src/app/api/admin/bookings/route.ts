@@ -5,7 +5,8 @@ import {
   sendBookingDeclinedEmail,
   sendAftercareEmail,
 } from "@/lib/email";
-import type { BookingStatus } from "@/lib/supabase/database.types";
+import { createBookingEvent, deleteBookingEvent } from "@/lib/google-calendar";
+import type { BookingStatus, BookingRow } from "@/lib/supabase/database.types";
 
 /** Verify the caller is authenticated */
 async function requireAuth() {
@@ -55,6 +56,13 @@ export async function GET(request: NextRequest) {
  * PATCH /api/admin/bookings — Update booking status (approve/decline/complete)
  *
  * Body: { id: string, status: BookingStatus, admin_notes?: string, deposit_amount?: number, appointment_date?: string }
+ *
+ * Side-effects:
+ *   - approved → sends approval email
+ *   - declined → sends decline email
+ *   - deposit_paid → creates Google Calendar event (Malmö only)
+ *   - completed → sends aftercare email
+ *   - cancelled → deletes Google Calendar event if it exists
  */
 export async function PATCH(request: NextRequest) {
   const user = await requireAuth();
@@ -87,11 +95,55 @@ export async function PATCH(request: NextRequest) {
 
     const admin = createAdminClient();
 
+    // Fetch current booking state (needed for calendar operations)
+    const { data: currentBooking } = await admin
+      .from("bookings")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (!currentBooking) {
+      return Response.json({ error: "Booking not found" }, { status: 404 });
+    }
+
     // Build update payload
     const updatePayload: Record<string, unknown> = { status };
     if (admin_notes !== undefined) updatePayload.admin_notes = admin_notes;
     if (deposit_amount !== undefined) updatePayload.deposit_amount = deposit_amount;
     if (appointment_date !== undefined) updatePayload.appointment_date = appointment_date;
+
+    // ── Calendar integration ─────────────────────────────
+    // Create event when deposit is paid (Malmö bookings with appointment dates)
+    if (
+      status === "deposit_paid" &&
+      (currentBooking as BookingRow).location === "malmo" &&
+      (currentBooking as BookingRow).appointment_date &&
+      !(currentBooking as BookingRow).calendar_event_id
+    ) {
+      try {
+        const eventId = await createBookingEvent(currentBooking as BookingRow);
+        updatePayload.calendar_event_id = eventId;
+        console.log(`Calendar event created: ${eventId} for booking ${id}`);
+      } catch (calErr) {
+        console.error("Failed to create calendar event:", calErr);
+        // Don't block the status update — calendar event is non-critical
+      }
+    }
+
+    // Delete event when booking is cancelled
+    if (
+      status === "cancelled" &&
+      (currentBooking as BookingRow).calendar_event_id
+    ) {
+      try {
+        await deleteBookingEvent((currentBooking as BookingRow).calendar_event_id!);
+        updatePayload.calendar_event_id = null;
+        console.log(`Calendar event deleted for booking ${id}`);
+      } catch (calErr) {
+        console.error("Failed to delete calendar event:", calErr);
+        // Don't block the cancellation
+      }
+    }
 
     const { data, error } = await admin
       .from("bookings")

@@ -67,6 +67,9 @@ export async function POST(request: NextRequest) {
         client_name: body.client_name.trim(),
         client_email: body.client_email.trim().toLowerCase(),
         client_phone: body.client_phone?.trim() || null,
+        appointment_date: body.appointment_date || null,
+        appointment_end: body.appointment_end || null,
+        preferred_dates: body.preferred_dates?.trim() || null,
       })
       .select()
       .single();

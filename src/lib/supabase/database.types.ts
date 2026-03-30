@@ -46,6 +46,9 @@ export type BookingRow = {
   admin_notes: string | null;
   deposit_amount: number | null;
   appointment_date: string | null;
+  appointment_end: string | null;
+  calendar_event_id: string | null;
+  preferred_dates: string | null;
 };
 
 export type BookingInsert = {
@@ -59,6 +62,9 @@ export type BookingInsert = {
   client_name: string;
   client_email: string;
   client_phone?: string | null;
+  appointment_date?: string | null;
+  appointment_end?: string | null;
+  preferred_dates?: string | null;
 };
 
 export type BookingImageRow = {

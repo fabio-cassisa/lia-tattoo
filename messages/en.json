@@ -83,6 +83,17 @@
       "info": "A deposit is required to confirm your booking.",
       "small": "Deposit: 300 SEK / 30 EUR (for tattoos up to 3,000 SEK / 300 EUR)",
       "large": "Deposit: 500 SEK / 50 EUR (for tattoos over 3,000 SEK / 300 EUR)"
+    },
+    "calendar": {
+      "title": "Preferred date & time",
+      "selectSize": "Select a size first to see available time slots",
+      "prevWeek": "Previous week",
+      "nextWeek": "Next week",
+      "sessionLength": "Session",
+      "noSlots": "No available slots this week — try the next one",
+      "error": "Could not load availability. Please try again.",
+      "copenhagenNote": "Copenhagen bookings are by arrangement. Suggest your preferred dates and I'll get back to you.",
+      "copenhagenPlaceholder": "e.g. first two weeks of May, weekends preferred..."
     }
   },
   "portfolio": {

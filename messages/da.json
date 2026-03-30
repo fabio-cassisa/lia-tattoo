@@ -81,8 +81,19 @@
     "success": "Forespørgsel sendt! Jeg gennemgår den og vender tilbage snart.",
     "deposit": {
       "info": "Et depositum er påkrævet for at bekræfte din booking.",
-      "small": "Depositum: 300 SEK / 30 EUR (for tatoveringer op til 3.000 SEK / 300 EUR)",
-      "large": "Depositum: 500 SEK / 50 EUR (for tatoveringer over 3.000 SEK / 300 EUR)"
+      "small": "Depositum: 200 DKK / 30 EUR (for tatoveringer op til 2.000 DKK / 300 EUR)",
+      "large": "Depositum: 350 DKK / 50 EUR (for tatoveringer over 2.000 DKK / 300 EUR)"
+    },
+    "calendar": {
+      "title": "Foretrukken dato & tid",
+      "selectSize": "Vælg størrelse først for at se ledige tider",
+      "prevWeek": "Forrige uge",
+      "nextWeek": "Næste uge",
+      "sessionLength": "Session",
+      "noSlots": "Ingen ledige tider denne uge — prøv den næste",
+      "error": "Kunne ikke hente ledige tider. Prøv igen.",
+      "copenhagenNote": "Bookinger i København sker efter aftale. Foreslå dine foretrukne datoer, så vender jeg tilbage.",
+      "copenhagenPlaceholder": "f.eks. første to uger i maj, helst weekender..."
     }
   },
   "portfolio": {

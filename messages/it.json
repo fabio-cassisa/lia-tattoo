@@ -83,6 +83,17 @@
       "info": "È richiesto un deposito per confermare la prenotazione.",
       "small": "Deposito: 30 EUR (per tatuaggi fino a 300 EUR)",
       "large": "Deposito: 50 EUR (per tatuaggi oltre 300 EUR)"
+    },
+    "calendar": {
+      "title": "Data e ora preferite",
+      "selectSize": "Seleziona prima una dimensione per vedere gli orari disponibili",
+      "prevWeek": "Settimana precedente",
+      "nextWeek": "Settimana successiva",
+      "sessionLength": "Sessione",
+      "noSlots": "Nessun orario disponibile questa settimana — prova la prossima",
+      "error": "Impossibile caricare la disponibilità. Riprova.",
+      "copenhagenNote": "Le prenotazioni a Copenaghen sono su appuntamento. Suggerisci le date preferite e ti ricontatterò.",
+      "copenhagenPlaceholder": "es. prime due settimane di maggio, preferibilmente weekend..."
     }
   },
   "portfolio": {

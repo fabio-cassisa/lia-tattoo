@@ -6,6 +6,8 @@ import {
   TradDivider,
   LineDivider,
 } from "@/components/decorative/TradDivider";
+import SlotPicker from "@/components/SlotPicker";
+import type { BookingSize } from "@/lib/supabase/database.types";
 
 type SubmitState = "idle" | "submitting" | "success" | "error";
 
@@ -26,12 +28,17 @@ export default function BookingContent() {
     name: "",
     email: "",
     phone: "",
+    preferred_dates: "", // Copenhagen only — free text
   });
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileError, setFileError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<{
+    start: string;
+    end: string;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleChange(
@@ -139,6 +146,13 @@ export default function BookingContent() {
           client_name: formData.name,
           client_email: formData.email,
           client_phone: formData.phone,
+          // Malmö: selected calendar slot; Copenhagen: preferred dates as text
+          appointment_date: selectedSlot?.start || null,
+          appointment_end: selectedSlot?.end || null,
+          preferred_dates:
+            formData.location === "copenhagen"
+              ? formData.preferred_dates
+              : null,
         }),
       });
 
@@ -529,6 +543,47 @@ export default function BookingContent() {
               className="w-full px-4 py-3 bg-sabbia-50 border border-ink-900/10 text-sm text-ink-900 placeholder:text-ink-900/30 focus:border-accent focus:outline-none transition-colors"
             />
           </fieldset>
+
+          <LineDivider className="max-w-xs mx-auto" />
+
+          {/* Date & Time — only show after location and size are selected */}
+          {formData.location && (
+            <fieldset className="flex flex-col gap-3">
+              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/60">
+                {t("calendar.title")}
+              </label>
+
+              {formData.location === "malmo" ? (
+                // Malmö: calendar slot picker
+                formData.size ? (
+                  <SlotPicker
+                    size={formData.size as BookingSize}
+                    selectedSlot={selectedSlot}
+                    onSlotSelect={setSelectedSlot}
+                  />
+                ) : (
+                  <p className="text-sm text-ink-900/30 py-4 text-center">
+                    {t("calendar.selectSize")}
+                  </p>
+                )
+              ) : (
+                // Copenhagen: free text for preferred dates
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-foreground-muted">
+                    {t("calendar.copenhagenNote")}
+                  </p>
+                  <textarea
+                    name="preferred_dates"
+                    value={formData.preferred_dates}
+                    onChange={handleChange}
+                    placeholder={t("calendar.copenhagenPlaceholder")}
+                    rows={3}
+                    className="w-full px-4 py-3 bg-sabbia-50 border border-ink-900/10 text-sm text-ink-900 placeholder:text-ink-900/30 focus:border-accent focus:outline-none transition-colors resize-none"
+                  />
+                </div>
+              )}
+            </fieldset>
+          )}
 
           <LineDivider className="max-w-xs mx-auto" />
 
