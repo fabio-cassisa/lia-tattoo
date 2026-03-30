@@ -124,12 +124,11 @@ function generateSlotsForDay(
 
   // For full-day bookings, just return one slot
   if (durationMinutes >= 420) {
-    const start = new Date(`${dateStr}T${pad(startHour)}:00:00`);
-    const end = new Date(`${dateStr}T${pad(endHour)}:00:00`);
+    const start = stockholmToUTC(dateStr, startHour);
+    const end = stockholmToUTC(dateStr, endHour);
 
-    // Localize to Stockholm timezone
-    const startISO = toStockholmISO(start);
-    const endISO = toStockholmISO(end);
+    const startISO = start.toISOString();
+    const endISO = end.toISOString();
 
     const available =
       start > now && !isOverlapping(startISO, endISO, busyPeriods);
@@ -140,11 +139,11 @@ function generateSlotsForDay(
 
   // Generate hourly slots where the session fits within working hours
   for (let hour = startHour; hour + durationMinutes / 60 <= endHour; hour++) {
-    const start = new Date(`${dateStr}T${pad(hour)}:00:00`);
+    const start = stockholmToUTC(dateStr, hour);
     const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
 
-    const startISO = toStockholmISO(start);
-    const endISO = toStockholmISO(end);
+    const startISO = start.toISOString();
+    const endISO = end.toISOString();
 
     // Slot must be in the future and not overlap with busy periods
     const available =
@@ -287,13 +286,36 @@ function formatDateLocal(date: Date): string {
 }
 
 /**
- * Convert a local-ish Date to an ISO string representing Stockholm time.
- * For server-side usage where the server may not be in Europe/Stockholm.
+ * Convert a Stockholm local time (date + hour) to a UTC Date object.
+ * Handles CET/CEST transitions correctly regardless of server timezone.
+ *
+ * Approach: format a known instant in Europe/Stockholm to find the current
+ * UTC offset, then apply it to construct the correct UTC timestamp.
  */
-function toStockholmISO(date: Date): string {
-  // We construct dates from "YYYY-MM-DDThh:mm:ss" strings (no TZ offset),
-  // which JavaScript parses as local time. On the server this may differ
-  // from Stockholm. To keep it correct, we format with the IANA timezone
-  // and return an ISO-like string that Google Calendar understands.
-  return date.toISOString();
+function stockholmToUTC(dateStr: string, hour: number): Date {
+  // Create a reference date at noon on the target day in UTC.
+  // We use noon to avoid any DST-boundary edge cases in the lookup.
+  const refDate = new Date(`${dateStr}T12:00:00Z`);
+
+  // Get the Stockholm local time string for this reference date
+  const stockholmStr = refDate.toLocaleString("en-US", {
+    timeZone: TIMEZONE,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
+  // Parse the Stockholm local time back to a Date (interpreted as UTC)
+  const stockholmAsUTC = new Date(stockholmStr + " UTC");
+
+  // The offset is: Stockholm local - UTC
+  const offsetMs = stockholmAsUTC.getTime() - refDate.getTime();
+
+  // Construct the desired Stockholm local time, then subtract the offset to get UTC
+  const localMs = new Date(`${dateStr}T${pad(hour)}:00:00Z`).getTime();
+  return new Date(localMs - offsetMs);
 }
