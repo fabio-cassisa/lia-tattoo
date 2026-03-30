@@ -68,7 +68,7 @@ export default function Header() {
                   className={`text-xs font-medium px-2 py-1 rounded transition-colors ${
                     locale === loc
                       ? "bg-ink-900 text-sabbia-50"
-                      : "text-ink-900/50 hover:text-ink-900"
+                      : "text-ink-900/60 hover:text-ink-900"
                   }`}
                 >
                   {localeLabels[loc]}
@@ -134,7 +134,7 @@ export default function Header() {
                     className={`text-xs font-medium px-3 py-2 min-h-[44px] min-w-[44px] rounded transition-colors ${
                       locale === loc
                         ? "bg-ink-900 text-sabbia-50"
-                        : "text-ink-900/50 hover:text-ink-900"
+                        : "text-ink-900/60 hover:text-ink-900"
                     }`}
                   >
                     {localeLabels[loc]}

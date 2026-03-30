@@ -240,7 +240,7 @@ export default function BookingContent() {
 
           {/* Location */}
           <fieldset className="flex flex-col gap-2">
-            <label className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/60">
+            <label className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/75">
               {t("location.label")}
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -284,7 +284,7 @@ export default function BookingContent() {
 
           {/* Type of request */}
           <fieldset className="flex flex-col gap-2">
-            <label className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/60">
+            <label className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/75">
               {t("type.label")}
             </label>
             <div className="flex flex-wrap gap-2">
@@ -302,7 +302,7 @@ export default function BookingContent() {
                   className={`px-4 py-2 border text-sm cursor-pointer transition-all ${
                     formData.type === type
                       ? "border-accent bg-accent/5 text-accent font-medium"
-                      : "border-ink-900/10 text-ink-900/60 hover:border-ink-900/20"
+                      : "border-ink-900/10 text-ink-900/75 hover:border-ink-900/20"
                   }`}
                 >
                   <input
@@ -323,7 +323,7 @@ export default function BookingContent() {
           <fieldset className="flex flex-col gap-2">
             <label
               htmlFor="description"
-              className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/60"
+              className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/75"
             >
               {t("description.label")}
             </label>
@@ -340,7 +340,7 @@ export default function BookingContent() {
 
           {/* Reference images */}
           <fieldset className="flex flex-col gap-2">
-            <label className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/60">
+            <label className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/75">
               {t("reference.label")}
             </label>
             <p className="text-xs text-foreground-muted mb-1">
@@ -371,7 +371,7 @@ export default function BookingContent() {
                   : "border-ink-900/10 hover:border-ink-900/20"
               } ${selectedFiles.length >= MAX_FILES ? "opacity-40 pointer-events-none" : ""}`}
             >
-              <div className="flex flex-col items-center gap-2 text-ink-900/30">
+              <div className="flex flex-col items-center gap-2 text-ink-900/40">
                 <svg
                   width="24"
                   height="24"
@@ -385,14 +385,14 @@ export default function BookingContent() {
                 <span className="text-xs uppercase tracking-wider">
                   {t("reference.upload")}
                 </span>
-                <span className="text-[10px] text-ink-900/20 normal-case tracking-normal hidden sm:block">
+                <span className="text-[10px] text-ink-900/30 normal-case tracking-normal hidden sm:block" aria-hidden="true">
                   {t("reference.drop")}
                 </span>
               </div>
             </button>
 
             {/* Max info */}
-            <p className="text-[10px] text-ink-900/25">
+            <p className="text-[10px] text-ink-900/35" aria-hidden="true">
               {t("reference.maxInfo")}
             </p>
 
@@ -424,7 +424,7 @@ export default function BookingContent() {
                       />
                     ) : (
                       <div className="flex items-center justify-center w-full h-full p-1">
-                        <span className="text-[9px] text-ink-900/40 text-center leading-tight break-all">
+                        <span className="text-[9px] text-ink-900/55 text-center leading-tight break-all">
                           {file.name}
                         </span>
                       </div>
@@ -450,7 +450,7 @@ export default function BookingContent() {
             <fieldset className="flex flex-col gap-2">
               <label
                 htmlFor="placement"
-                className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/60"
+                className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/75"
               >
                 {t("placement.label")}
               </label>
@@ -466,7 +466,7 @@ export default function BookingContent() {
             </fieldset>
 
             <fieldset className="flex flex-col gap-2">
-              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/60">
+              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/75">
                 {t("size.label")}
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -477,7 +477,7 @@ export default function BookingContent() {
                       className={`px-3 py-2 border text-xs text-center cursor-pointer transition-all ${
                         formData.size === size
                           ? "border-accent bg-accent/5 text-accent font-medium"
-                          : "border-ink-900/10 text-ink-900/60 hover:border-ink-900/20"
+                          : "border-ink-900/10 text-ink-900/75 hover:border-ink-900/20"
                       }`}
                     >
                       <input
@@ -498,7 +498,7 @@ export default function BookingContent() {
 
           {/* Color preference */}
           <fieldset className="flex flex-col gap-2">
-            <label className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/60">
+            <label className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/75">
               {t("color.label")}
             </label>
             <div className="flex flex-wrap gap-2">
@@ -508,7 +508,7 @@ export default function BookingContent() {
                   className={`px-4 py-2 border text-sm cursor-pointer transition-all ${
                     formData.color === color
                       ? "border-accent bg-accent/5 text-accent font-medium"
-                      : "border-ink-900/10 text-ink-900/60 hover:border-ink-900/20"
+                      : "border-ink-900/10 text-ink-900/75 hover:border-ink-900/20"
                   }`}
                 >
                   <input
@@ -529,7 +529,7 @@ export default function BookingContent() {
           <fieldset className="flex flex-col gap-2">
             <label
               htmlFor="allergies"
-              className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/60"
+              className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/75"
             >
               {t("allergies.label")}
             </label>
@@ -549,7 +549,7 @@ export default function BookingContent() {
           {/* Date & Time — only show after location and size are selected */}
           {formData.location && (
             <fieldset className="flex flex-col gap-3">
-              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/60">
+              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/75">
                 {t("calendar.title")}
               </label>
 
@@ -562,7 +562,7 @@ export default function BookingContent() {
                     onSlotSelect={setSelectedSlot}
                   />
                 ) : (
-                  <p className="text-sm text-ink-900/30 py-4 text-center">
+                  <p className="text-sm text-ink-900/50 py-4 text-center">
                     {t("calendar.selectSize")}
                   </p>
                 )
@@ -589,14 +589,14 @@ export default function BookingContent() {
 
           {/* Contact info */}
           <div className="flex flex-col gap-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/60">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/75">
               {t("contact.title")}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <fieldset className="flex flex-col gap-1">
                 <label
                   htmlFor="name"
-                  className="text-xs text-ink-900/40"
+                   className="text-xs text-ink-900/55"
                 >
                   {t("contact.name")}
                 </label>
@@ -613,7 +613,7 @@ export default function BookingContent() {
               <fieldset className="flex flex-col gap-1">
                 <label
                   htmlFor="email"
-                  className="text-xs text-ink-900/40"
+                   className="text-xs text-ink-900/55"
                 >
                   {t("contact.email")}
                 </label>
@@ -648,7 +648,7 @@ export default function BookingContent() {
 
           {/* Deposit info */}
           <div className="p-4 border border-ink-900/8 bg-sabbia-100/40 text-xs text-foreground-muted space-y-1">
-            <p className="font-medium text-ink-900/60">
+            <p className="font-medium text-ink-900/75">
               {t("deposit.info")}
             </p>
             <p>{t("deposit.small")}</p>

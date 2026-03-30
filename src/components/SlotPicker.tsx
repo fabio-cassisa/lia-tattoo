@@ -137,10 +137,10 @@ export default function SlotPicker({
         </button>
 
         <div className="text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-ink-900/60">
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-ink-900/75">
             {formatDateRange(startDate, endDate)}
           </p>
-          <p className="text-[10px] text-ink-900/30 mt-0.5">
+          <p className="text-[10px] text-ink-900/50 mt-0.5">
             {t("sessionLength")}: {SESSION_LABELS[size]}
           </p>
         </div>
@@ -174,7 +174,7 @@ export default function SlotPicker({
 
       {/* No availability */}
       {!loading && !error && days.length === 0 && (
-        <div className="py-8 text-center text-sm text-ink-900/40">
+        <div className="py-8 text-center text-sm text-ink-900/55">
           {t("noSlots")}
         </div>
       )}
