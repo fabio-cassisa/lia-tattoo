@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import { Rye, Lora } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ParchmentBackground from "@/components/ParchmentBackground";
@@ -63,6 +65,8 @@ export default async function LocaleLayout({ children, params }: Props) {
             <main className="flex-1">{children}</main>
             <Footer />
           </div>
+          <Analytics />
+          <SpeedInsights />
         </NextIntlClientProvider>
       </body>
     </html>

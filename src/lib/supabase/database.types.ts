@@ -49,6 +49,11 @@ export type BookingRow = {
   appointment_end: string | null;
   calendar_event_id: string | null;
   preferred_dates: string | null;
+  referrer: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
 };
 
 export type BookingInsert = {
@@ -65,6 +70,11 @@ export type BookingInsert = {
   appointment_date?: string | null;
   appointment_end?: string | null;
   preferred_dates?: string | null;
+  referrer?: string | null;
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+  utm_content?: string | null;
 };
 
 export type BookingImageRow = {

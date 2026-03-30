@@ -33,6 +33,11 @@ type Booking = {
   appointment_end: string | null;
   calendar_event_id: string | null;
   preferred_dates: string | null;
+  referrer: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
 };
 
 // ── Label maps ───────────────────────────────────────────
@@ -184,6 +189,31 @@ export default function AdminDashboard() {
     (b) => new Date(b.created_at) >= monthStart
   ).length;
 
+  // ── Traffic source breakdown ────────────────────────────
+  function classifySource(b: Booking): string {
+    if (b.utm_source) return b.utm_source;
+    if (!b.referrer) return "Direct";
+    try {
+      const host = new URL(b.referrer).hostname.replace("www.", "");
+      if (host.includes("instagram")) return "Instagram";
+      if (host.includes("facebook") || host.includes("fb.")) return "Facebook";
+      if (host.includes("google")) return "Google";
+      if (host.includes("tiktok")) return "TikTok";
+      return host;
+    } catch {
+      return "Other";
+    }
+  }
+
+  const sourceCounts: Record<string, number> = {};
+  for (const b of bookings) {
+    const src = classifySource(b);
+    sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+  }
+  const sortedSources = Object.entries(sourceCounts).sort(
+    ([, a], [, b]) => b - a
+  );
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-4 sm:py-6">
       {/* Header */}
@@ -250,6 +280,24 @@ export default function AdminDashboard() {
           <p className="text-xl font-medium tabular-nums text-foreground">{thisMonthCount}</p>
         </div>
       </div>
+
+      {/* Traffic sources */}
+      {sortedSources.length > 0 && bookings.length > 0 && (
+        <div className="bg-white border border-[var(--sabbia-200)] rounded p-3 mb-4 sm:mb-6">
+          <p className="text-xs text-foreground-muted mb-2">Traffic sources</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {sortedSources.map(([source, count]) => (
+              <div key={source} className="flex items-center gap-1.5 text-sm">
+                <span className="font-medium text-foreground tabular-nums">{count}</span>
+                <span className="text-foreground-muted text-xs">{source}</span>
+                <span className="text-foreground-muted text-[10px]">
+                  ({Math.round((count / bookings.length) * 100)}%)
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Refresh row */}
       <div className="flex items-center justify-between mb-4 text-sm text-foreground-muted">
@@ -552,6 +600,21 @@ export default function AdminDashboard() {
                   <p className="text-xs text-foreground-muted">Preferred dates</p>
                   <p className="text-foreground whitespace-pre-wrap">
                     {selectedBooking.preferred_dates}
+                  </p>
+                </div>
+              )}
+
+              {/* Referral source */}
+              {(selectedBooking.referrer || selectedBooking.utm_source) && (
+                <div className="mb-3 text-sm">
+                  <p className="text-xs text-foreground-muted">Came from</p>
+                  <p className="text-foreground">
+                    {classifySource(selectedBooking)}
+                    {selectedBooking.utm_campaign && (
+                      <span className="text-foreground-muted text-xs ml-1">
+                        ({selectedBooking.utm_campaign})
+                      </span>
+                    )}
                   </p>
                 </div>
               )}

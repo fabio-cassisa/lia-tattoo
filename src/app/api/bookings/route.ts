@@ -70,6 +70,11 @@ export async function POST(request: NextRequest) {
         appointment_date: body.appointment_date || null,
         appointment_end: body.appointment_end || null,
         preferred_dates: body.preferred_dates?.trim() || null,
+        referrer: body.referrer?.trim() || null,
+        utm_source: body.utm_source?.trim() || null,
+        utm_medium: body.utm_medium?.trim() || null,
+        utm_campaign: body.utm_campaign?.trim() || null,
+        utm_content: body.utm_content?.trim() || null,
       })
       .select()
       .single();

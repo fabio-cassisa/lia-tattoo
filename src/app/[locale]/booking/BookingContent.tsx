@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   TradDivider,
   LineDivider,
@@ -40,6 +40,26 @@ export default function BookingContent() {
     end: string;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Referral tracking — capture on mount ──────────────
+  const [referralData, setReferralData] = useState<{
+    referrer: string;
+    utm_source: string;
+    utm_medium: string;
+    utm_campaign: string;
+    utm_content: string;
+  }>({ referrer: "", utm_source: "", utm_medium: "", utm_campaign: "", utm_content: "" });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setReferralData({
+      referrer: document.referrer || "",
+      utm_source: params.get("utm_source") || "",
+      utm_medium: params.get("utm_medium") || "",
+      utm_campaign: params.get("utm_campaign") || "",
+      utm_content: params.get("utm_content") || "",
+    });
+  }, []);
 
   function handleChange(
     e: React.ChangeEvent<
@@ -153,6 +173,12 @@ export default function BookingContent() {
             formData.location === "copenhagen"
               ? formData.preferred_dates
               : null,
+          // Referral tracking
+          referrer: referralData.referrer,
+          utm_source: referralData.utm_source,
+          utm_medium: referralData.utm_medium,
+          utm_campaign: referralData.utm_campaign,
+          utm_content: referralData.utm_content,
         }),
       });
 
