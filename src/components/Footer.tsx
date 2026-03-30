@@ -44,7 +44,7 @@ export default function Footer() {
 
           {/* Navigation */}
           <div className="flex flex-col items-center sm:items-end gap-2 sm:gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-ink-900/60 mb-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-ink-900/70 mb-1">
               {t("navigate")}
             </p>
             <Link
@@ -76,10 +76,10 @@ export default function Footer() {
 
         {/* Bottom bar */}
         <div className="mt-12 pt-6 border-t border-ink-900/8 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-xs text-ink-900/50">
+          <p className="text-xs text-ink-900/70">
             &copy; {year} liagiorgi.one.ttt — {t("rights")}
           </p>
-          <p className="text-xs text-ink-900/40" aria-hidden="true">
+          <p className="text-xs text-ink-900/55" aria-hidden="true">
             {t("madeWith")}
           </p>
         </div>
