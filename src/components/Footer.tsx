@@ -1,6 +1,5 @@
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { TradDivider } from "@/components/decorative/TradDivider";
 
 export default function Footer() {
   const t = useTranslations("footer");

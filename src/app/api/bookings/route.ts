@@ -4,6 +4,7 @@ import {
   sendBookingReceivedEmail,
   sendNewBookingNotificationEmail,
 } from "@/lib/email";
+import { getDefaultDepositAmount } from "@/lib/bookings/deposit";
 import type {
   BookingType,
   BookingSize,
@@ -53,20 +54,23 @@ export async function POST(request: NextRequest) {
 
     // ── Insert booking ────────────────────────────────────
     const supabase = createAdminClient();
+    const location = body.location as BookingLocation;
+    const size = body.size as BookingSize;
 
     const { data, error } = await supabase
       .from("bookings")
       .insert({
-        location: body.location as BookingLocation,
+        location,
         type: body.type as BookingType,
         description: body.description?.trim() || "",
         placement: body.placement?.trim() || "",
-        size: body.size as BookingSize,
+        size,
         color: body.color as ColorPreference,
         allergies: body.allergies?.trim() || null,
         client_name: body.client_name.trim(),
         client_email: body.client_email.trim().toLowerCase(),
         client_phone: body.client_phone?.trim() || null,
+        deposit_amount: getDefaultDepositAmount(location, size),
         appointment_date: body.appointment_date || null,
         appointment_end: body.appointment_end || null,
         preferred_dates: body.preferred_dates?.trim() || null,

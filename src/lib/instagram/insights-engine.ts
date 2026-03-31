@@ -75,10 +75,6 @@ function hoursSince(dateStr: string): number {
   return (Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60);
 }
 
-function daysBetween(a: string, b: string): number {
-  return Math.abs(new Date(a).getTime() - new Date(b).getTime()) / (1000 * 60 * 60 * 24);
-}
-
 function isThisWeek(dateStr: string): boolean {
   const now = new Date();
   const d = new Date(dateStr);

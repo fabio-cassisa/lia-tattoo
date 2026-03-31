@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 // ── Types ────────────────────────────────────────────────
@@ -536,18 +537,18 @@ export default function AdminInsights() {
 
       {/* Admin nav */}
       <div className="flex gap-2 mb-4 sm:mb-6">
-        <a
+        <Link
           href="/admin"
           className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)] transition-colors"
         >
           Bookings
-        </a>
-        <a
+        </Link>
+        <Link
           href="/admin/portfolio"
           className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)] transition-colors"
         >
           Portfolio
-        </a>
+        </Link>
         <span className="px-3 py-1.5 text-xs rounded-full bg-[var(--ink-900)] text-[var(--sabbia-50)]">
           Creative Coach
         </span>

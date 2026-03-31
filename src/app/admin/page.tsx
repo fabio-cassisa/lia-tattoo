@@ -1,27 +1,29 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  getDefaultDepositAmount,
+  getDepositCurrency,
+} from "@/lib/bookings/deposit";
+import type {
+  BookingStatus,
+  BookingLocation,
+  BookingSize,
+} from "@/lib/supabase/database.types";
 
 // ── Types ────────────────────────────────────────────────
-type BookingStatus =
-  | "pending"
-  | "approved"
-  | "declined"
-  | "deposit_paid"
-  | "completed"
-  | "cancelled";
-
 type Booking = {
   id: string;
   created_at: string;
   updated_at: string;
   status: BookingStatus;
-  location: string;
+  location: BookingLocation;
   type: string;
   description: string;
   placement: string;
-  size: string;
+  size: BookingSize;
   color: string;
   allergies: string | null;
   client_name: string;
@@ -96,7 +98,19 @@ export default function AdminDashboard() {
   const [actionLoading, setActionLoading] = useState(false);
   const [adminNote, setAdminNote] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
-  const [showNoteField, setShowNoteField] = useState(false);
+
+  function getInitialDepositAmount(booking: Booking): string {
+    return String(
+      booking.deposit_amount ??
+        getDefaultDepositAmount(booking.location, booking.size)
+    );
+  }
+
+  function selectBooking(booking: Booking) {
+    setSelectedBooking(booking);
+    setAdminNote(booking.admin_notes || "");
+    setDepositAmount(getInitialDepositAmount(booking));
+  }
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -155,10 +169,7 @@ export default function AdminDashboard() {
       setBookings((prev) =>
         prev.map((b) => (b.id === bookingId ? data.booking : b))
       );
-      setSelectedBooking(data.booking);
-      setAdminNote("");
-      setDepositAmount("");
-      setShowNoteField(false);
+      selectBooking(data.booking);
     } catch {
       setError("Failed to update booking");
     } finally {
@@ -239,18 +250,18 @@ export default function AdminDashboard() {
         <span className="px-3 py-1.5 text-xs rounded-full bg-[var(--ink-900)] text-[var(--sabbia-50)]">
           Bookings
         </span>
-        <a
+        <Link
           href="/admin/portfolio"
           className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)] transition-colors"
         >
           Portfolio
-        </a>
-        <a
+        </Link>
+        <Link
           href="/admin/insights"
           className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)] transition-colors"
         >
           Creative Coach
-        </a>
+        </Link>
       </div>
 
       {/* Error */}
@@ -355,11 +366,7 @@ export default function AdminDashboard() {
               {bookings.map((booking) => (
                 <button
                   key={booking.id}
-                  onClick={() => {
-                    setSelectedBooking(booking);
-                    setShowNoteField(false);
-                    setAdminNote(booking.admin_notes || "");
-                  }}
+                  onClick={() => selectBooking(booking)}
                   className={`w-full text-left p-4 rounded border transition-colors ${
                     selectedBooking?.id === booking.id
                       ? "border-[var(--trad-red-500)] bg-white"
@@ -533,7 +540,7 @@ export default function AdminDashboard() {
               )}
 
               {/* Admin notes (existing) */}
-              {selectedBooking.admin_notes && !showNoteField && (
+              {selectedBooking.admin_notes && selectedBooking.status !== "pending" && (
                 <div className="mb-3 text-sm">
                   <p className="text-xs text-foreground-muted">Your notes</p>
                   <p className="text-foreground italic">
@@ -543,12 +550,13 @@ export default function AdminDashboard() {
               )}
 
               {/* Deposit info */}
-              {selectedBooking.deposit_amount && (
+              {selectedBooking.deposit_amount !== null &&
+                selectedBooking.status !== "pending" && (
                 <div className="mb-3 text-sm">
                   <p className="text-xs text-foreground-muted">Deposit</p>
                   <p className="text-foreground">
                     {selectedBooking.deposit_amount}{" "}
-                    {selectedBooking.location === "copenhagen" ? "DKK" : "SEK"}
+                    {getDepositCurrency(selectedBooking.location)}
                   </p>
                 </div>
               )}
@@ -628,8 +636,8 @@ export default function AdminDashboard() {
               {/* Divider */}
               <hr className="my-4 border-[var(--sabbia-200)]" />
 
-              {/* Note + deposit input (toggled) */}
-              {showNoteField && (
+              {/* Approval inputs */}
+              {selectedBooking.status === "pending" && (
                 <div className="mb-4 space-y-3">
                   <div>
                     <label className="block text-xs text-foreground-muted mb-1">
@@ -644,21 +652,28 @@ export default function AdminDashboard() {
                       placeholder="Add a personal note..."
                     />
                   </div>
-                  {selectedBooking.status === "pending" && (
-                    <div>
-                      <label className="block text-xs text-foreground-muted mb-1">
-                        Deposit amount ({selectedBooking?.location === "copenhagen" ? "DKK" : "SEK"})
-                      </label>
-                      <input
-                        type="number"
-                        value={depositAmount}
-                        onChange={(e) => setDepositAmount(e.target.value)}
-                        className="w-full px-3 py-2 border border-[var(--sabbia-200)] rounded text-sm bg-white text-foreground focus:outline-none focus:border-[var(--trad-red-500)]"
-                        style={{ fontSize: "16px" }}
-                        placeholder="300 or 500"
-                      />
-                    </div>
-                  )}
+                  <div>
+                    <label className="block text-xs text-foreground-muted mb-1">
+                      Deposit amount ({getDepositCurrency(selectedBooking.location)})
+                    </label>
+                    <input
+                      type="number"
+                      value={depositAmount}
+                      onChange={(e) => setDepositAmount(e.target.value)}
+                      className="w-full px-3 py-2 border border-[var(--sabbia-200)] rounded text-sm bg-white text-foreground focus:outline-none focus:border-[var(--trad-red-500)]"
+                      style={{ fontSize: "16px" }}
+                      placeholder={String(
+                        getDefaultDepositAmount(
+                          selectedBooking.location,
+                          selectedBooking.size
+                        )
+                      )}
+                    />
+                    <p className="mt-1 text-[11px] text-foreground-muted">
+                      Pre-filled from size and location. Override it if needed
+                      before approving.
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -666,14 +681,6 @@ export default function AdminDashboard() {
               <div className="space-y-2">
                 {selectedBooking.status === "pending" && (
                   <>
-                    {!showNoteField ? (
-                      <button
-                        onClick={() => setShowNoteField(true)}
-                        className="w-full py-2 text-sm border border-[var(--sabbia-200)] rounded text-foreground-muted hover:border-[var(--sabbia-300)] transition-colors"
-                      >
-                        Add note / deposit amount
-                      </button>
-                    ) : null}
                     <div className="flex gap-2">
                       <button
                         onClick={() =>

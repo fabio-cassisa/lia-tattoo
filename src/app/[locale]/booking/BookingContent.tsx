@@ -257,13 +257,6 @@ export default function BookingContent() {
           onSubmit={handleSubmit}
           className="max-w-2xl mx-auto flex flex-col gap-6 sm:gap-8"
         >
-          {/* Error banner */}
-          {submitState === "error" && (
-            <div className="p-4 border border-accent/30 bg-accent/5 text-sm text-accent">
-              {errorMessage}
-            </div>
-          )}
-
           {/* Location */}
           <fieldset className="flex flex-col gap-2">
             <label className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-900/75">
@@ -437,6 +430,7 @@ export default function BookingContent() {
                   >
                     {/* Thumbnail — HEIC won't preview, show filename instead */}
                     {file.type && file.type !== "image/heic" ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
                       <img
                         src={URL.createObjectURL(file)}
                         alt={file.name}
@@ -680,6 +674,16 @@ export default function BookingContent() {
             <p>{t("deposit.small")}</p>
             <p>{t("deposit.large")}</p>
           </div>
+
+          {/* Error banner near submit for mobile visibility */}
+          {submitState === "error" && (
+            <div
+              role="alert"
+              className="p-4 border border-accent/30 bg-accent/5 text-sm text-accent"
+            >
+              {errorMessage}
+            </div>
+          )}
 
           {/* Submit */}
           <button

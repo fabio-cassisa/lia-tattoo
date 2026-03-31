@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { processImageForUpload, formatFileSize } from "@/lib/image-processing";
 
@@ -270,21 +271,21 @@ export default function AdminPortfolio() {
 
       {/* Admin nav */}
       <div className="flex gap-2 mb-6">
-        <a
+        <Link
           href="/admin"
           className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)] transition-colors"
         >
           Bookings
-        </a>
+        </Link>
         <span className="px-3 py-1.5 text-xs rounded-full bg-[var(--ink-900)] text-[var(--sabbia-50)]">
           Portfolio
         </span>
-        <a
+        <Link
           href="/admin/insights"
           className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)] transition-colors"
         >
           Creative Coach
-        </a>
+        </Link>
       </div>
 
       {/* Error */}
