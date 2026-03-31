@@ -18,20 +18,18 @@ type FlashPreviewImage = {
   title: string | null;
 };
 
-async function getFlashPreviewImages(): Promise<FlashPreviewImage[]> {
+async function getHomepagePreviewImages(): Promise<FlashPreviewImage[]> {
   try {
     const admin = createAdminClient();
     const { data, error } = await admin
       .from("portfolio_images")
       .select("id, title, storage_path")
       .eq("is_visible", true)
-      .eq("category", "flash")
-      .order("display_order", { ascending: true })
       .order("created_at", { ascending: false })
       .limit(8);
 
     if (error) {
-      console.error("Flash preview fetch error:", error);
+      console.error("Homepage preview fetch error:", error);
       return [];
     }
 
@@ -42,7 +40,7 @@ async function getFlashPreviewImages(): Promise<FlashPreviewImage[]> {
       url: `${supabaseUrl}/storage/v1/object/public/portfolio/${img.storage_path}`,
     }));
   } catch (err) {
-    console.error("Flash preview fetch failed:", err);
+    console.error("Homepage preview fetch failed:", err);
     return [];
   }
 }
@@ -66,7 +64,7 @@ export default async function HomePage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const flashImages = await getFlashPreviewImages();
+  const flashImages = await getHomepagePreviewImages();
 
   return <HomeContent flashImages={flashImages} />;
 }
@@ -187,7 +185,7 @@ function HomeContent({ flashImages }: { flashImages: FlashPreviewImage[] }) {
             <LineDivider className="max-w-xs mx-auto" />
           </div>
 
-          {/* Flash grid — real portfolio images or placeholder cards */}
+          {/* Homepage preview — latest visible portfolio images or placeholder cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
             {flashImages.length > 0
               ? flashImages.map((image) => (
