@@ -50,7 +50,7 @@ INSERT INTO finance_context_settings (
 )
 VALUES
   ('malmo_studio', 'Malmö studio', 'SEK', 30, 0),
-  ('copenhagen_studio', 'Copenhagen studio', 'DKK', 40, 1),
+  ('copenhagen_studio', 'Copenhagen studio', 'DKK', 30, 1),
   ('guest_spot', 'Guest spot', 'EUR', 40, 2),
   ('private_home', 'Private / home', 'EUR', 0, 3)
 ON CONFLICT (context) DO NOTHING;

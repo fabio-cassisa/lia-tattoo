@@ -1,0 +1,391 @@
+import { NextRequest } from "next/server";
+import { createAdminClient, createServerSupabaseClient } from "@/lib/supabase/server";
+import {
+  getPreviousMonthKey,
+  filterProjectsForMonth,
+  buildProjectsWithPayments,
+  buildInvoiceReminders,
+  getNetTotalsByCurrency,
+  getFeeTotalsByCurrency,
+  getFeeTotalsByContext,
+  resolveExchangeRates,
+  getApproxTotal,
+  buildComparison,
+  normalizeMonthKey,
+} from "@/lib/finance/reporting";
+import {
+  getContextCurrencyDefault,
+  getContextFeeDefault,
+  paymentMethodNeedsInvoiceByDefault,
+} from "@/lib/finance/config";
+import type {
+  BookingRow,
+  FinancePaymentInsert,
+  FinancePaymentMethod,
+  FinanceProjectInsert,
+  FinanceSettingsRow,
+  FinanceWorkContext,
+} from "@/lib/supabase/database.types";
+import type {
+  FinanceBookingOption,
+  FinanceDashboardResponse,
+  FinanceProjectWithPayments,
+} from "@/lib/finance/types";
+
+async function requireAuth() {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  return user ?? null;
+}
+
+async function loadFinanceBase(admin = createAdminClient()) {
+  const [
+    contextResult,
+    settingsResult,
+    projectsResult,
+    paymentsResult,
+    bookingsResult,
+  ] = await Promise.all([
+    admin
+      .from("finance_context_settings")
+      .select("*")
+      .order("sort_order", { ascending: true }),
+    admin.from("finance_settings").select("*").eq("scope", "default").single(),
+    admin
+      .from("finance_projects")
+      .select("*")
+      .order("session_date", { ascending: false })
+      .order("created_at", { ascending: false }),
+    admin
+      .from("finance_payments")
+      .select("*")
+      .order("payment_date", { ascending: false })
+      .order("created_at", { ascending: false }),
+    admin
+      .from("bookings")
+      .select(
+        "id, client_name, location, type, status, appointment_date, preferred_dates"
+      )
+      .order("created_at", { ascending: false }),
+  ]);
+
+  if (contextResult.error) throw contextResult.error;
+  if (settingsResult.error) throw settingsResult.error;
+  if (projectsResult.error) throw projectsResult.error;
+  if (paymentsResult.error) throw paymentsResult.error;
+  if (bookingsResult.error) throw bookingsResult.error;
+
+  return {
+    contextSettings: contextResult.data ?? [],
+    settings: settingsResult.data as FinanceSettingsRow,
+    projects: projectsResult.data ?? [],
+    payments: paymentsResult.data ?? [],
+    bookings: (bookingsResult.data ?? []) as Pick<
+      BookingRow,
+      | "id"
+      | "client_name"
+      | "location"
+      | "type"
+      | "status"
+      | "appointment_date"
+      | "preferred_dates"
+    >[],
+  };
+}
+
+function buildBookingOptions(
+  bookings: Pick<
+    BookingRow,
+    | "id"
+    | "client_name"
+    | "location"
+    | "type"
+    | "status"
+    | "appointment_date"
+    | "preferred_dates"
+  >[],
+  projects: FinanceProjectWithPayments[]
+): FinanceBookingOption[] {
+  const linkedBookingIds = new Set(
+    projects.map((project) => project.booking_id).filter(Boolean)
+  );
+
+  return bookings.map((booking) => ({
+    ...booking,
+    is_linked: linkedBookingIds.has(booking.id),
+  }));
+}
+
+async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboardResponse> {
+  const admin = createAdminClient();
+  const { contextSettings, settings, projects, payments, bookings } = await loadFinanceBase(admin);
+
+  const projectsWithPayments = buildProjectsWithPayments(projects, payments);
+  const monthlyProjects = filterProjectsForMonth(projectsWithPayments, monthKey);
+  const monthlyPayments = monthlyProjects.flatMap((project) =>
+    project.payments.filter((payment) => payment.payment_date.startsWith(monthKey))
+  );
+  const invoiceReminders = buildInvoiceReminders(monthlyProjects);
+  const netTotals = getNetTotalsByCurrency(monthlyPayments);
+  const feeTotals = getFeeTotalsByCurrency(monthlyPayments);
+  const feeTotalsByContext = getFeeTotalsByContext(monthlyProjects, monthKey);
+
+  const rates = await resolveExchangeRates(settings);
+  const approxPrimaryAmount = getApproxTotal(
+    monthlyPayments,
+    settings.reporting_currency_primary,
+    rates
+  );
+  const approxSecondaryAmount = getApproxTotal(
+    monthlyPayments,
+    settings.reporting_currency_secondary,
+    rates
+  );
+
+  const previousMonth = getPreviousMonthKey(monthKey);
+  const previousProjects = filterProjectsForMonth(projectsWithPayments, previousMonth);
+  const previousPayments = previousProjects.flatMap((project) =>
+    project.payments.filter((payment) => payment.payment_date.startsWith(previousMonth))
+  );
+  const previousPrimaryAmount = getApproxTotal(
+    previousPayments,
+    settings.reporting_currency_primary,
+    rates
+  );
+
+  return {
+    month: monthKey,
+    summary: {
+      month: monthKey,
+      entry_count: monthlyPayments.length,
+      open_invoice_count: invoiceReminders.length,
+      net_totals: netTotals,
+      fee_totals: feeTotals,
+      fee_totals_by_context: feeTotalsByContext,
+      approx_primary: {
+        currency: settings.reporting_currency_primary,
+        amount: approxPrimaryAmount,
+        source: rates.source,
+      },
+      approx_secondary: {
+        currency: settings.reporting_currency_secondary,
+        amount: approxSecondaryAmount,
+        source: rates.source,
+      },
+      comparison: buildComparison(
+        approxPrimaryAmount,
+        previousPrimaryAmount,
+        previousMonth
+      ),
+    },
+    context_settings: contextSettings,
+    settings,
+    bookings: buildBookingOptions(bookings, projectsWithPayments),
+    projects: monthlyProjects,
+    invoice_reminders: invoiceReminders,
+  };
+}
+
+function getString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function getNumber(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
+function isFinanceWorkContext(value: unknown): value is FinanceWorkContext {
+  return [
+    "malmo_studio",
+    "copenhagen_studio",
+    "guest_spot",
+    "private_home",
+  ].includes(String(value));
+}
+
+function isPaymentMethod(value: unknown): value is FinancePaymentMethod {
+  return ["cash", "card", "bank_transfer", "paypal", "revolut", "swish"].includes(
+    String(value)
+  );
+}
+
+function isCurrency(value: unknown): value is FinancePaymentInsert["currency"] {
+  return ["SEK", "DKK", "EUR"].includes(String(value));
+}
+
+export async function GET(request: NextRequest) {
+  const user = await requireAuth();
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const monthKey = normalizeMonthKey(request.nextUrl.searchParams.get("month"));
+    const response = await buildDashboardResponse(monthKey);
+    return Response.json(response);
+  } catch (error) {
+    console.error("Finance dashboard fetch error:", error);
+    return Response.json({ error: "Failed to load finance dashboard" }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const user = await requireAuth();
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = (await request.json()) as Record<string, unknown>;
+    const admin = createAdminClient();
+
+    const clientName = getString(body.client_name);
+    const projectLabel = getString(body.project_label);
+    const workContext = body.work_context;
+    const paymentDate = getString(body.payment_date);
+    const grossAmount = getNumber(body.gross_amount);
+    const paymentMethod = body.payment_method;
+
+    if (!clientName || !projectLabel || !isFinanceWorkContext(workContext)) {
+      return Response.json(
+        { error: "Client name, project label, and work context are required" },
+        { status: 400 }
+      );
+    }
+
+    if (!paymentDate || grossAmount === null || !isPaymentMethod(paymentMethod)) {
+      return Response.json(
+        { error: "Payment date, amount, and payment method are required" },
+        { status: 400 }
+      );
+    }
+
+    const { contextSettings, settings } = await loadFinanceBase(admin);
+    const currency = isCurrency(body.currency)
+      ? body.currency
+      : getContextCurrencyDefault(workContext, contextSettings);
+    const feePercentage =
+      getNumber(body.fee_percentage) ??
+      getContextFeeDefault(workContext, contextSettings);
+    const invoiceNeeded =
+      getBoolean(body.invoice_needed) ??
+      (settings.card_invoice_default
+        ? paymentMethodNeedsInvoiceByDefault(paymentMethod)
+        : false);
+    const invoiceDone = getBoolean(body.invoice_done) ?? false;
+
+    const projectInsert: FinanceProjectInsert = {
+      booking_id: getString(body.booking_id),
+      client_name: clientName,
+      project_label: projectLabel,
+      session_date: getString(body.session_date),
+      work_context: workContext,
+      context_label: getString(body.context_label),
+      notes: getString(body.project_notes),
+    };
+
+    const { data: createdProject, error: projectError } = await admin
+      .from("finance_projects")
+      .insert(projectInsert)
+      .select()
+      .single();
+
+    if (projectError || !createdProject) {
+      console.error("Finance project create error:", projectError);
+      return Response.json({ error: "Failed to create project" }, { status: 500 });
+    }
+
+    const paymentInsert: FinancePaymentInsert = {
+      project_id: createdProject.id,
+      payment_label: getString(body.payment_label) ?? "session payment",
+      payment_date: paymentDate,
+      gross_amount: grossAmount,
+      currency,
+      payment_method: paymentMethod,
+      fee_percentage: feePercentage,
+      invoice_needed: invoiceNeeded,
+      invoice_done: invoiceDone,
+      invoice_reference: getString(body.invoice_reference),
+      notes: getString(body.payment_notes),
+    };
+
+    const { error: paymentError } = await admin
+      .from("finance_payments")
+      .insert(paymentInsert);
+
+    if (paymentError) {
+      console.error("Finance payment create error:", paymentError);
+      await admin.from("finance_projects").delete().eq("id", createdProject.id);
+      return Response.json({ error: "Failed to create payment" }, { status: 500 });
+    }
+
+    const monthKey = normalizeMonthKey(paymentDate.slice(0, 7));
+    const response = await buildDashboardResponse(monthKey);
+    return Response.json({ message: "Finance entry created", ...response });
+  } catch (error) {
+    console.error("Finance create error:", error);
+    return Response.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  const user = await requireAuth();
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = (await request.json()) as Record<string, unknown>;
+    const id = getString(body.id);
+
+    if (!id) {
+      return Response.json({ error: "Payment ID is required" }, { status: 400 });
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (getString(body.payment_label) !== null) updates.payment_label = getString(body.payment_label);
+    if (getString(body.payment_date) !== null) updates.payment_date = getString(body.payment_date);
+    if (getNumber(body.gross_amount) !== null) updates.gross_amount = getNumber(body.gross_amount);
+    if (isCurrency(body.currency)) updates.currency = body.currency;
+    if (isPaymentMethod(body.payment_method)) updates.payment_method = body.payment_method;
+    if (getNumber(body.fee_percentage) !== null) updates.fee_percentage = getNumber(body.fee_percentage);
+    if (getBoolean(body.invoice_needed) !== null) updates.invoice_needed = getBoolean(body.invoice_needed);
+    if (getBoolean(body.invoice_done) !== null) updates.invoice_done = getBoolean(body.invoice_done);
+    if (body.invoice_reference !== undefined) updates.invoice_reference = getString(body.invoice_reference);
+    if (body.notes !== undefined) updates.notes = getString(body.notes);
+
+    if (Object.keys(updates).length === 0) {
+      return Response.json({ error: "No valid fields to update" }, { status: 400 });
+    }
+
+    const admin = createAdminClient();
+    const { data: updatedPayment, error } = await admin
+      .from("finance_payments")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error || !updatedPayment) {
+      console.error("Finance payment update error:", error);
+      return Response.json({ error: "Failed to update payment" }, { status: 500 });
+    }
+
+    const monthKey = normalizeMonthKey(updatedPayment.payment_date.slice(0, 7));
+    const response = await buildDashboardResponse(monthKey);
+    return Response.json({ message: "Payment updated", ...response });
+  } catch (error) {
+    console.error("Finance patch error:", error);
+    return Response.json({ error: "Internal server error" }, { status: 500 });
+  }
+}

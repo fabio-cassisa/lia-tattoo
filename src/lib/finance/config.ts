@@ -1,4 +1,5 @@
 import type {
+  FinanceContextSettingsRow,
   FinanceCurrency,
   FinancePaymentMethod,
   FinanceWorkContext,
@@ -26,7 +27,7 @@ export const FINANCE_CONTEXT_FEE_DEFAULTS: Record<
   number
 > = {
   malmo_studio: 30,
-  copenhagen_studio: 40,
+  copenhagen_studio: 30,
   guest_spot: 40,
   private_home: 0,
 };
@@ -42,6 +43,24 @@ export const FINANCE_PAYMENT_METHOD_LABELS: Record<
   revolut: "Revolut",
   swish: "Swish",
 };
+
+export const FINANCE_CURRENCY_OPTIONS: FinanceCurrency[] = ["SEK", "DKK", "EUR"];
+
+export const FINANCE_PAYMENT_METHOD_OPTIONS: FinancePaymentMethod[] = [
+  "cash",
+  "card",
+  "bank_transfer",
+  "paypal",
+  "revolut",
+  "swish",
+];
+
+export const FINANCE_WORK_CONTEXT_OPTIONS: FinanceWorkContext[] = [
+  "malmo_studio",
+  "copenhagen_studio",
+  "guest_spot",
+  "private_home",
+];
 
 export const CARD_INVOICE_PAYMENT_METHODS: FinancePaymentMethod[] = ["card"];
 
@@ -63,4 +82,34 @@ export function calculateNetAmount(
   feePercentage: number
 ): number {
   return Math.round((grossAmount - calculateFeeAmount(grossAmount, feePercentage)) * 100) / 100;
+}
+
+export function getContextCurrencyDefault(
+  context: FinanceWorkContext,
+  contextSettings?: FinanceContextSettingsRow[]
+): FinanceCurrency {
+  return (
+    contextSettings?.find((item) => item.context === context)?.default_currency ??
+    FINANCE_CONTEXT_CURRENCY_DEFAULTS[context]
+  );
+}
+
+export function getContextFeeDefault(
+  context: FinanceWorkContext,
+  contextSettings?: FinanceContextSettingsRow[]
+): number {
+  return (
+    contextSettings?.find((item) => item.context === context)?.default_fee_percentage ??
+    FINANCE_CONTEXT_FEE_DEFAULTS[context]
+  );
+}
+
+export function getContextLabel(
+  context: FinanceWorkContext,
+  contextSettings?: FinanceContextSettingsRow[]
+): string {
+  return (
+    contextSettings?.find((item) => item.context === context)?.label ??
+    FINANCE_CONTEXT_LABELS[context]
+  );
 }
