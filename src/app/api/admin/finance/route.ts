@@ -32,6 +32,8 @@ import type {
   FinanceProjectWithPayments,
 } from "@/lib/finance/types";
 
+export const dynamic = "force-dynamic";
+
 async function requireAuth() {
   const supabase = await createServerSupabaseClient();
   const {

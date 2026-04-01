@@ -49,7 +49,9 @@ export default function AdminSettingsPage() {
   const fetchSettings = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/admin/finance/settings");
+      const response = await fetch("/api/admin/finance/settings", {
+        cache: "no-store",
+      });
       if (response.status === 401) {
         router.push("/admin/login");
         return;

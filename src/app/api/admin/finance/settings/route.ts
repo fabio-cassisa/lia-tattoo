@@ -6,6 +6,8 @@ import type {
 } from "@/lib/supabase/database.types";
 import type { FinanceSettingsResponse } from "@/lib/finance/types";
 
+export const dynamic = "force-dynamic";
+
 async function requireAuth() {
   const supabase = await createServerSupabaseClient();
   const {

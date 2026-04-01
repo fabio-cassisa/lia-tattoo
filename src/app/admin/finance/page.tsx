@@ -104,7 +104,9 @@ export default function AdminFinancePage() {
   const fetchDashboard = useCallback(async (monthKey: string) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/admin/finance?month=${monthKey}`);
+      const response = await fetch(`/api/admin/finance?month=${monthKey}`, {
+        cache: "no-store",
+      });
       if (response.status === 401) {
         router.push("/admin/login");
         return;
