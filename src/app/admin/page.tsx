@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   getDefaultDepositAmount,
   getDepositCurrency,
 } from "@/lib/bookings/deposit";
+import {
+  AdminShell,
+  AdminMetricCard,
+  AdminSurface,
+} from "@/components/admin/AdminShell";
+import { AdminAlert, AdminButton } from "@/components/admin/AdminPrimitives";
 import type {
   BookingStatus,
   BookingLocation,
@@ -177,11 +182,6 @@ export default function AdminDashboard() {
     }
   }
 
-  async function handleLogout() {
-    await fetch("/api/admin/auth", { method: "DELETE" });
-    router.push("/admin/login");
-  }
-
   const pendingCount = bookings.filter((b) => b.status === "pending").length;
   const depositPaidCount = bookings.filter((b) => b.status === "deposit_paid").length;
 
@@ -226,81 +226,37 @@ export default function AdminDashboard() {
   );
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-4 sm:py-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 sm:mb-6">
-        <div>
-          <h1 className="text-base sm:text-lg tracking-wider text-foreground">
-            liagiorgi.one.ttt
-          </h1>
-          <p className="text-[10px] sm:text-xs text-foreground-muted tracking-wider uppercase">
-            Booking Dashboard
-          </p>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="text-sm text-foreground-muted hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-end"
-        >
-          Sign out
-        </button>
-      </div>
-
-      {/* Admin nav */}
-      <div className="flex gap-2 mb-4 sm:mb-6">
-        <span className="px-3 py-1.5 text-xs rounded-full bg-[var(--ink-900)] text-[var(--sabbia-50)]">
-          Bookings
-        </span>
-        <Link
-          href="/admin/portfolio"
-          className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)] transition-colors"
-        >
-          Portfolio
-        </Link>
-        <Link
-          href="/admin/insights"
-          className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)] transition-colors"
-        >
-          Creative Coach
-        </Link>
-      </div>
+    <AdminShell
+      title="Bookings"
+      description="Review requests quickly, keep deposits visible, and move each tattoo from inquiry to confirmed session without admin headaches."
+      activeTab="bookings"
+      maxWidth="wide"
+      actions={<AdminButton variant="secondary" onClick={fetchBookings}>Refresh</AdminButton>}
+    >
 
       {/* Error */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm mb-4">
-          {error}
-          <button onClick={() => setError("")} className="ml-2 underline">
-            dismiss
-          </button>
+        <div className="mb-4">
+          <AdminAlert>
+            {error}
+            <button onClick={() => setError("")} className="ml-2 underline">
+              dismiss
+            </button>
+          </AdminAlert>
         </div>
       )}
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 sm:mb-6">
-        <div className="bg-white border border-[var(--sabbia-200)] rounded p-3">
-          <p className="text-xs text-foreground-muted">Pending</p>
-          <p className={`text-xl font-medium tabular-nums ${pendingCount > 0 ? "text-yellow-700" : "text-foreground"}`}>
-            {pendingCount}
-          </p>
-        </div>
-        <div className="bg-white border border-[var(--sabbia-200)] rounded p-3">
-          <p className="text-xs text-foreground-muted">Confirmed</p>
-          <p className={`text-xl font-medium tabular-nums ${depositPaidCount > 0 ? "text-blue-700" : "text-foreground"}`}>
-            {depositPaidCount}
-          </p>
-        </div>
-        <div className="bg-white border border-[var(--sabbia-200)] rounded p-3">
-          <p className="text-xs text-foreground-muted">This week</p>
-          <p className="text-xl font-medium tabular-nums text-foreground">{thisWeekCount}</p>
-        </div>
-        <div className="bg-white border border-[var(--sabbia-200)] rounded p-3">
-          <p className="text-xs text-foreground-muted">This month</p>
-          <p className="text-xl font-medium tabular-nums text-foreground">{thisMonthCount}</p>
-        </div>
+        <AdminMetricCard label="Pending" value={pendingCount} tone={pendingCount > 0 ? "warning" : "default"} />
+        <AdminMetricCard label="Confirmed" value={depositPaidCount} tone={depositPaidCount > 0 ? "accent" : "default"} />
+        <AdminMetricCard label="This week" value={thisWeekCount} />
+        <AdminMetricCard label="This month" value={thisMonthCount} />
       </div>
 
       {/* Traffic sources */}
       {sortedSources.length > 0 && bookings.length > 0 && (
-        <div className="bg-white border border-[var(--sabbia-200)] rounded p-3 mb-4 sm:mb-6">
+        <AdminSurface className="mb-4 sm:mb-6">
           <p className="text-xs text-foreground-muted mb-2">Traffic sources</p>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             {sortedSources.map(([source, count]) => (
@@ -313,18 +269,13 @@ export default function AdminDashboard() {
               </div>
             ))}
           </div>
-        </div>
+        </AdminSurface>
       )}
 
       {/* Refresh row */}
       <div className="flex items-center justify-between mb-4 text-sm text-foreground-muted">
         <span>{bookings.length} total bookings</span>
-        <button
-          onClick={fetchBookings}
-          className="text-xs hover:text-foreground transition-colors"
-        >
-          Refresh
-        </button>
+        <span>Tap a request to open the detail panel</span>
       </div>
 
       {/* Status filter tabs — horizontally scrollable on mobile */}
@@ -352,7 +303,7 @@ export default function AdminDashboard() {
       {/* Main content: list + detail */}
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Booking list */}
-        <div className="flex-1 min-w-0">
+        <AdminSurface className="flex-1 min-w-0">
           {loading ? (
             <p className="text-sm text-foreground-muted py-8 text-center">
               Loading...
@@ -413,7 +364,7 @@ export default function AdminDashboard() {
               ))}
             </div>
           )}
-        </div>
+        </AdminSurface>
 
         {/* Detail panel — overlay on mobile, sidebar on desktop */}
         {selectedBooking && (
@@ -753,6 +704,6 @@ export default function AdminDashboard() {
           </>
         )}
       </div>
-    </div>
+    </AdminShell>
   );
 }

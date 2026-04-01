@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AdminShell } from "@/components/admin/AdminShell";
+import { AdminAlert } from "@/components/admin/AdminPrimitives";
 
 // ── Types ────────────────────────────────────────────────
 
@@ -512,55 +513,22 @@ export default function AdminInsights() {
   }
 
   return (
-    <div className="min-h-screen p-4 sm:p-8 max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 sm:mb-6">
-        <div>
-          <h1 className="font-display text-2xl sm:text-3xl font-normal text-ink-900">
-            CREATIVE COACH
-          </h1>
-          <p className="text-sm text-foreground-muted">
-            Your Instagram + booking insights
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            document.cookie = "sb-access-token=; path=/; max-age=0";
-            document.cookie = "sb-refresh-token=; path=/; max-age=0";
-            router.push("/admin/login");
-          }}
-          className="text-sm text-foreground-muted hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-end"
-        >
-          Sign out
-        </button>
-      </div>
-
-      {/* Admin nav */}
-      <div className="flex gap-2 mb-4 sm:mb-6">
-        <Link
-          href="/admin"
-          className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)] transition-colors"
-        >
-          Bookings
-        </Link>
-        <Link
-          href="/admin/portfolio"
-          className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)] transition-colors"
-        >
-          Portfolio
-        </Link>
-        <span className="px-3 py-1.5 text-xs rounded-full bg-[var(--ink-900)] text-[var(--sabbia-50)]">
-          Creative Coach
-        </span>
-      </div>
+    <AdminShell
+      title="Creative Coach"
+      description="Instagram and booking signals in one place, translated into actions Lia can actually use instead of spreadsheet archaeology."
+      activeTab="insights"
+      maxWidth="medium"
+    >
 
       {/* Error */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm mb-4">
-          {error}
-          <button onClick={() => setError("")} className="ml-2 underline">
-            dismiss
-          </button>
+        <div className="mb-4">
+          <AdminAlert>
+            {error}
+            <button onClick={() => setError("")} className="ml-2 underline">
+              dismiss
+            </button>
+          </AdminAlert>
         </div>
       )}
 
@@ -575,7 +543,7 @@ export default function AdminInsights() {
             </svg>
           </div>
 
-          <h2 className="font-display text-xl font-normal text-ink-900 mb-2">
+          <h2 className="text-xl font-semibold tracking-[-0.01em] text-ink-900 mb-2">
             INSTAGRAM NOT CONNECTED
           </h2>
           <p className="text-sm text-foreground-muted max-w-md mx-auto mb-8">
@@ -778,6 +746,6 @@ export default function AdminInsights() {
           )}
         </>
       )}
-    </div>
+    </AdminShell>
   );
 }

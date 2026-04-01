@@ -12,7 +12,7 @@ export default function AdminLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-background text-foreground min-h-screen">
+      <body className="min-h-screen bg-background text-foreground font-sans">
         {children}
       </body>
     </html>

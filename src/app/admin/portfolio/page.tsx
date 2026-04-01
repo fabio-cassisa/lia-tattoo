@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { processImageForUpload, formatFileSize } from "@/lib/image-processing";
+import { AdminShell, AdminSurface } from "@/components/admin/AdminShell";
+import { AdminAlert } from "@/components/admin/AdminPrimitives";
 
 type PortfolioImage = {
   id: string;
@@ -244,60 +245,26 @@ export default function AdminPortfolio() {
       ? images
       : images.filter((img) => img.category === categoryFilter);
 
-  async function handleLogout() {
-    await fetch("/api/admin/auth", { method: "DELETE" });
-    router.push("/admin/login");
-  }
-
   return (
-    <div className="max-w-5xl mx-auto px-4 py-4 sm:py-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 sm:mb-6">
-        <div>
-          <h1 className="text-base sm:text-lg tracking-wider text-foreground">
-            liagiorgi.one.ttt
-          </h1>
-          <p className="text-[10px] sm:text-xs text-foreground-muted tracking-wider uppercase">
-            Portfolio Manager
-          </p>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="text-sm text-foreground-muted hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-end"
-        >
-          Sign out
-        </button>
-      </div>
-
-      {/* Admin nav */}
-      <div className="flex gap-2 mb-6">
-        <Link
-          href="/admin"
-          className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)] transition-colors"
-        >
-          Bookings
-        </Link>
-        <span className="px-3 py-1.5 text-xs rounded-full bg-[var(--ink-900)] text-[var(--sabbia-50)]">
-          Portfolio
-        </span>
-        <Link
-          href="/admin/insights"
-          className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)] transition-colors"
-        >
-          Creative Coach
-        </Link>
-      </div>
+    <AdminShell
+      title="Portfolio"
+      description="Upload, sort, and curate Lia’s work in one place so the public site stays fresh without turning admin into a chore."
+      activeTab="portfolio"
+      maxWidth="wide"
+    >
 
       {/* Error */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm mb-4">
-          {error}
-          <button onClick={() => setError("")} className="ml-2 underline">dismiss</button>
+        <div className="mb-4">
+          <AdminAlert>
+            {error}
+            <button onClick={() => setError("")} className="ml-2 underline">dismiss</button>
+          </AdminAlert>
         </div>
       )}
 
       {/* Upload section */}
-      <div className="bg-white border border-[var(--sabbia-200)] rounded p-4 sm:p-5 mb-6">
+      <AdminSurface className="mb-6">
         <p className="text-sm font-medium text-foreground mb-3">Upload images</p>
 
         {/* Category selector */}
@@ -397,7 +364,7 @@ export default function AdminPortfolio() {
             <p><span className="font-medium text-foreground">Auto-optimization:</span> Large images resized & compressed</p>
           </div>
         </div>
-      </div>
+      </AdminSurface>
 
       {/* Filter tabs */}
       <div className="flex gap-2 mb-4">
@@ -549,6 +516,6 @@ export default function AdminPortfolio() {
           ))}
         </div>
       )}
-    </div>
+    </AdminShell>
   );
 }
