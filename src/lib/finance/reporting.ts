@@ -1,4 +1,8 @@
-import { calculateFeeAmount, calculateNetAmount } from "@/lib/finance/config";
+import {
+  calculateFeeAmount,
+  calculateNetAmount,
+  calculateProcessorFeeAmount,
+} from "@/lib/finance/config";
 import type {
   FinanceCurrency,
   FinancePaymentRow,
@@ -9,8 +13,10 @@ import type {
   FinanceComparison,
   FinanceContextFeeSummary,
   FinanceInvoiceReminder,
+  FinanceMonthlyTrendPoint,
   FinancePaymentDerived,
   FinanceProjectWithPayments,
+  FinanceWeeklySummary,
 } from "@/lib/finance/types";
 
 type ResolvedExchangeRates = {
@@ -48,11 +54,20 @@ export function getPaymentMonthKey(paymentDate: string): string {
 
 export function derivePayment(payment: FinancePaymentRow): FinancePaymentDerived {
   const fee_amount = calculateFeeAmount(payment.gross_amount, payment.fee_percentage);
-  const net_amount = calculateNetAmount(payment.gross_amount, payment.fee_percentage);
+  const processor_fee_amount = calculateProcessorFeeAmount(
+    payment.gross_amount,
+    payment.processor_fee_percentage
+  );
+  const net_amount = calculateNetAmount(
+    payment.gross_amount,
+    payment.fee_percentage,
+    payment.processor_fee_percentage
+  );
 
   return {
     ...payment,
     fee_amount,
+    processor_fee_amount,
     net_amount,
   };
 }
@@ -200,7 +215,8 @@ export function convertAmount(
 }
 
 export function getNetTotalsByCurrency(
-  payments: FinancePaymentDerived[]
+  payments: FinancePaymentDerived[],
+  field: "currency" | "reporting_currency" = "reporting_currency"
 ): Record<FinanceCurrency, number> {
   const totals: Record<FinanceCurrency, number> = {
     SEK: 0,
@@ -209,14 +225,17 @@ export function getNetTotalsByCurrency(
   };
 
   for (const payment of payments) {
-    totals[payment.currency] = roundMoney(totals[payment.currency] + payment.net_amount);
+    const currency = payment[field];
+    totals[currency] = roundMoney(totals[currency] + payment.net_amount);
   }
 
   return totals;
 }
 
 export function getFeeTotalsByCurrency(
-  payments: FinancePaymentDerived[]
+  payments: FinancePaymentDerived[],
+  field: "currency" | "reporting_currency" = "reporting_currency",
+  amountField: "fee_amount" | "processor_fee_amount" = "fee_amount"
 ): Record<FinanceCurrency, number> {
   const totals: Record<FinanceCurrency, number> = {
     SEK: 0,
@@ -225,7 +244,8 @@ export function getFeeTotalsByCurrency(
   };
 
   for (const payment of payments) {
-    totals[payment.currency] = roundMoney(totals[payment.currency] + payment.fee_amount);
+    const currency = payment[field];
+    totals[currency] = roundMoney(totals[currency] + payment[amountField]);
   }
 
   return totals;
@@ -243,17 +263,21 @@ export function getFeeTotalsByContext(
         continue;
       }
 
-      const key = `${project.work_context}:${payment.currency}`;
+      const key = `${project.work_context}:${payment.reporting_currency}`;
       const current = summaryMap.get(key) ?? {
         work_context: project.work_context,
-        currency: payment.currency,
+        reporting_currency: payment.reporting_currency,
         fee_total: 0,
+        processor_fee_total: 0,
         gross_total: 0,
         net_total: 0,
         entry_count: 0,
       };
 
       current.fee_total = roundMoney(current.fee_total + payment.fee_amount);
+      current.processor_fee_total = roundMoney(
+        current.processor_fee_total + payment.processor_fee_amount
+      );
       current.gross_total = roundMoney(current.gross_total + payment.gross_amount);
       current.net_total = roundMoney(current.net_total + payment.net_amount);
       current.entry_count += 1;
@@ -264,21 +288,118 @@ export function getFeeTotalsByContext(
 
   return [...summaryMap.values()].sort((a, b) => {
     if (a.work_context === b.work_context) {
-      return a.currency.localeCompare(b.currency);
+      return a.reporting_currency.localeCompare(b.reporting_currency);
     }
 
     return a.work_context.localeCompare(b.work_context);
   });
 }
 
+export function getWeekKey(dateString: string): string {
+  const date = new Date(`${dateString}T00:00:00`);
+  const day = date.getDay() || 7;
+  date.setDate(date.getDate() + 4 - day);
+  const yearStart = new Date(date.getFullYear(), 0, 1);
+  const week = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${date.getFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+export function getWeekLabel(weekKey: string): string {
+  return weekKey.replace("-W", " week ");
+}
+
+export function buildWeeklySummary(
+  payments: FinancePaymentDerived[],
+  primaryCurrency: FinanceCurrency,
+  rates: ResolvedExchangeRates
+): FinanceWeeklySummary[] {
+  const weekMap = new Map<string, FinanceWeeklySummary>();
+
+  for (const payment of payments) {
+    const weekKey = getWeekKey(payment.payment_date);
+    const current = weekMap.get(weekKey) ?? {
+      week_key: weekKey,
+      label: getWeekLabel(weekKey),
+      month_entry_count: 0,
+      net_total: 0,
+      studio_fee_total: 0,
+      processor_fee_total: 0,
+    };
+
+    current.month_entry_count += 1;
+    current.net_total = roundMoney(
+      current.net_total + convertAmount(payment.net_amount, payment.reporting_currency, primaryCurrency, rates)
+    );
+    current.studio_fee_total = roundMoney(
+      current.studio_fee_total + convertAmount(payment.fee_amount, payment.reporting_currency, primaryCurrency, rates)
+    );
+    current.processor_fee_total = roundMoney(
+      current.processor_fee_total + convertAmount(payment.processor_fee_amount, payment.currency, primaryCurrency, rates)
+    );
+
+    weekMap.set(weekKey, current);
+  }
+
+  return [...weekMap.values()].sort((a, b) => a.week_key.localeCompare(b.week_key));
+}
+
+export function buildMonthlyTrend(
+  projects: FinanceProjectWithPayments[],
+  rates: ResolvedExchangeRates,
+  primaryCurrency: FinanceCurrency,
+  monthsToInclude = 6
+): FinanceMonthlyTrendPoint[] {
+  const monthMap = new Map<string, FinanceMonthlyTrendPoint>();
+
+  for (const project of projects) {
+    for (const payment of project.payments) {
+      const month = getPaymentMonthKey(payment.payment_date);
+      const current = monthMap.get(month) ?? {
+        month,
+        label: formatTrendMonth(month),
+        net_total: 0,
+        studio_fee_total: 0,
+        processor_fee_total: 0,
+        invoice_count: 0,
+      };
+
+      current.net_total = roundMoney(
+        current.net_total + convertAmount(payment.net_amount, payment.reporting_currency, primaryCurrency, rates)
+      );
+      current.studio_fee_total = roundMoney(
+        current.studio_fee_total + convertAmount(payment.fee_amount, payment.reporting_currency, primaryCurrency, rates)
+      );
+      current.processor_fee_total = roundMoney(
+        current.processor_fee_total + convertAmount(payment.processor_fee_amount, payment.currency, primaryCurrency, rates)
+      );
+      if (payment.invoice_needed) current.invoice_count += 1;
+
+      monthMap.set(month, current);
+    }
+  }
+
+  return [...monthMap.values()]
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .slice(-monthsToInclude);
+}
+
+function formatTrendMonth(monthKey: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    month: "short",
+    year: "2-digit",
+  }).format(new Date(`${monthKey}-01T00:00:00`));
+}
+
 export function getApproxTotal(
   payments: FinancePaymentDerived[],
   currency: FinanceCurrency,
-  rates: ResolvedExchangeRates
+  rates: ResolvedExchangeRates,
+  field: "currency" | "reporting_currency" = "reporting_currency"
 ): number {
   return roundMoney(
     payments.reduce(
-      (sum, payment) => sum + convertAmount(payment.net_amount, payment.currency, currency, rates),
+      (sum, payment) =>
+        sum + convertAmount(payment.net_amount, payment[field], currency, rates),
       0
     )
   );

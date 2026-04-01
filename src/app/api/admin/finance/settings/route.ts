@@ -116,6 +116,11 @@ export async function PATCH(request: Request) {
       if (getBoolean(body.settings.card_invoice_default) !== null) {
         settingsUpdates.card_invoice_default = getBoolean(body.settings.card_invoice_default);
       }
+      if (getNumber(body.settings.card_processor_fee_percentage) !== null) {
+        settingsUpdates.card_processor_fee_percentage = getNumber(
+          body.settings.card_processor_fee_percentage
+        );
+      }
 
       if (Object.keys(settingsUpdates).length > 0) {
         const { error } = await admin

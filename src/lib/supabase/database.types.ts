@@ -190,6 +190,7 @@ export type FinanceSettingsRow = {
   fallback_dkk_to_eur: number | null;
   fallback_eur_to_sek: number | null;
   card_invoice_default: boolean;
+  card_processor_fee_percentage: number;
 };
 
 export type FinanceSettingsInsert = {
@@ -201,6 +202,7 @@ export type FinanceSettingsInsert = {
   fallback_dkk_to_eur?: number | null;
   fallback_eur_to_sek?: number | null;
   card_invoice_default?: boolean;
+  card_processor_fee_percentage?: number;
 };
 
 export type FinanceProjectRow = {
@@ -235,8 +237,10 @@ export type FinancePaymentRow = {
   payment_date: string;
   gross_amount: number;
   currency: FinanceCurrency;
+  reporting_currency: FinanceCurrency;
   payment_method: FinancePaymentMethod;
   fee_percentage: number;
+  processor_fee_percentage: number;
   invoice_needed: boolean;
   invoice_done: boolean;
   invoice_reference: string | null;
@@ -249,8 +253,10 @@ export type FinancePaymentInsert = {
   payment_date: string;
   gross_amount: number;
   currency: FinanceCurrency;
+  reporting_currency: FinanceCurrency;
   payment_method: FinancePaymentMethod;
   fee_percentage?: number;
+  processor_fee_percentage?: number;
   invoice_needed?: boolean;
   invoice_done?: boolean;
   invoice_reference?: string | null;

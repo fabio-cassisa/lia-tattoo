@@ -63,6 +63,7 @@ export const FINANCE_WORK_CONTEXT_OPTIONS: FinanceWorkContext[] = [
 ];
 
 export const CARD_INVOICE_PAYMENT_METHODS: FinancePaymentMethod[] = ["card"];
+export const DEFAULT_CARD_PROCESSOR_FEE_PERCENTAGE = 1.95;
 
 export function paymentMethodNeedsInvoiceByDefault(
   method: FinancePaymentMethod
@@ -77,11 +78,24 @@ export function calculateFeeAmount(
   return Math.round(grossAmount * (feePercentage / 100) * 100) / 100;
 }
 
+export function calculateProcessorFeeAmount(
+  grossAmount: number,
+  processorFeePercentage: number
+): number {
+  return Math.round(grossAmount * (processorFeePercentage / 100) * 100) / 100;
+}
+
 export function calculateNetAmount(
   grossAmount: number,
-  feePercentage: number
+  feePercentage: number,
+  processorFeePercentage = 0
 ): number {
-  return Math.round((grossAmount - calculateFeeAmount(grossAmount, feePercentage)) * 100) / 100;
+  return Math.round(
+    (grossAmount -
+      calculateFeeAmount(grossAmount, feePercentage) -
+      calculateProcessorFeeAmount(grossAmount, processorFeePercentage)) *
+      100
+  ) / 100;
 }
 
 export function getContextCurrencyDefault(

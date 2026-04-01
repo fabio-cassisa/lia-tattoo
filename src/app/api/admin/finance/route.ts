@@ -5,6 +5,8 @@ import {
   filterProjectsForMonth,
   buildProjectsWithPayments,
   buildInvoiceReminders,
+  buildMonthlyTrend,
+  buildWeeklySummary,
   getNetTotalsByCurrency,
   getFeeTotalsByCurrency,
   getFeeTotalsByContext,
@@ -14,6 +16,7 @@ import {
   normalizeMonthKey,
 } from "@/lib/finance/reporting";
 import {
+  DEFAULT_CARD_PROCESSOR_FEE_PERCENTAGE,
   getContextCurrencyDefault,
   getContextFeeDefault,
   paymentMethodNeedsInvoiceByDefault,
@@ -131,11 +134,30 @@ async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboar
     project.payments.filter((payment) => payment.payment_date.startsWith(monthKey))
   );
   const invoiceReminders = buildInvoiceReminders(monthlyProjects);
-  const netTotals = getNetTotalsByCurrency(monthlyPayments);
-  const feeTotals = getFeeTotalsByCurrency(monthlyPayments);
+  const netTotals = getNetTotalsByCurrency(monthlyPayments, "reporting_currency");
+  const feeTotals = getFeeTotalsByCurrency(
+    monthlyPayments,
+    "reporting_currency",
+    "fee_amount"
+  );
+  const processorFeeTotals = getFeeTotalsByCurrency(
+    monthlyPayments,
+    "currency",
+    "processor_fee_amount"
+  );
   const feeTotalsByContext = getFeeTotalsByContext(monthlyProjects, monthKey);
 
   const rates = await resolveExchangeRates(settings);
+  const weekly = buildWeeklySummary(
+    monthlyPayments,
+    settings.reporting_currency_primary,
+    rates
+  );
+  const monthlyTrend = buildMonthlyTrend(
+    projectsWithPayments,
+    rates,
+    settings.reporting_currency_primary
+  );
   const approxPrimaryAmount = getApproxTotal(
     monthlyPayments,
     settings.reporting_currency_primary,
@@ -163,9 +185,12 @@ async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboar
     summary: {
       month: monthKey,
       entry_count: monthlyPayments.length,
+      month_total: approxPrimaryAmount,
+      week_total: weekly.at(-1)?.net_total ?? 0,
       open_invoice_count: invoiceReminders.length,
-      net_totals: netTotals,
-      fee_totals: feeTotals,
+      net_totals_by_reporting_currency: netTotals,
+      studio_fee_totals_by_reporting_currency: feeTotals,
+      processor_fee_totals_by_payment_currency: processorFeeTotals,
       fee_totals_by_context: feeTotalsByContext,
       approx_primary: {
         currency: settings.reporting_currency_primary,
@@ -182,6 +207,8 @@ async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboar
         previousPrimaryAmount,
         previousMonth
       ),
+      weekly,
+      monthly_trend: monthlyTrend,
     },
     context_settings: contextSettings,
     settings,
@@ -258,9 +285,9 @@ export async function POST(request: NextRequest) {
     const grossAmount = getNumber(body.gross_amount);
     const paymentMethod = body.payment_method;
 
-    if (!clientName || !projectLabel || !isFinanceWorkContext(workContext)) {
+    if (!isFinanceWorkContext(workContext)) {
       return Response.json(
-        { error: "Client name, project label, and work context are required" },
+        { error: "Work context is required" },
         { status: 400 }
       );
     }
@@ -279,6 +306,15 @@ export async function POST(request: NextRequest) {
     const feePercentage =
       getNumber(body.fee_percentage) ??
       getContextFeeDefault(workContext, contextSettings);
+    const reportingCurrency = isCurrency(body.reporting_currency)
+      ? body.reporting_currency
+      : getContextCurrencyDefault(workContext, contextSettings);
+    const processorFeePercentage =
+      getNumber(body.processor_fee_percentage) ??
+      (paymentMethod === "card"
+        ? settings.card_processor_fee_percentage ??
+          DEFAULT_CARD_PROCESSOR_FEE_PERCENTAGE
+        : 0);
     const invoiceNeeded =
       getBoolean(body.invoice_needed) ??
       (settings.card_invoice_default
@@ -288,8 +324,8 @@ export async function POST(request: NextRequest) {
 
     const projectInsert: FinanceProjectInsert = {
       booking_id: getString(body.booking_id),
-      client_name: clientName,
-      project_label: projectLabel,
+      client_name: clientName ?? "Walk-in / direct client",
+      project_label: projectLabel ?? "Tattoo session",
       session_date: getString(body.session_date),
       work_context: workContext,
       context_label: getString(body.context_label),
@@ -313,8 +349,10 @@ export async function POST(request: NextRequest) {
       payment_date: paymentDate,
       gross_amount: grossAmount,
       currency,
+      reporting_currency: reportingCurrency,
       payment_method: paymentMethod,
       fee_percentage: feePercentage,
+      processor_fee_percentage: processorFeePercentage,
       invoice_needed: invoiceNeeded,
       invoice_done: invoiceDone,
       invoice_reference: getString(body.invoice_reference),
@@ -359,8 +397,12 @@ export async function PATCH(request: NextRequest) {
     if (getString(body.payment_date) !== null) updates.payment_date = getString(body.payment_date);
     if (getNumber(body.gross_amount) !== null) updates.gross_amount = getNumber(body.gross_amount);
     if (isCurrency(body.currency)) updates.currency = body.currency;
+    if (isCurrency(body.reporting_currency)) updates.reporting_currency = body.reporting_currency;
     if (isPaymentMethod(body.payment_method)) updates.payment_method = body.payment_method;
     if (getNumber(body.fee_percentage) !== null) updates.fee_percentage = getNumber(body.fee_percentage);
+    if (getNumber(body.processor_fee_percentage) !== null) {
+      updates.processor_fee_percentage = getNumber(body.processor_fee_percentage);
+    }
     if (getBoolean(body.invoice_needed) !== null) updates.invoice_needed = getBoolean(body.invoice_needed);
     if (getBoolean(body.invoice_done) !== null) updates.invoice_done = getBoolean(body.invoice_done);
     if (body.invoice_reference !== undefined) updates.invoice_reference = getString(body.invoice_reference);

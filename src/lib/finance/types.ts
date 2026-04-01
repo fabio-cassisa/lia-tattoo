@@ -23,6 +23,7 @@ export type FinanceBookingOption = {
 
 export type FinancePaymentDerived = FinancePaymentRow & {
   fee_amount: number;
+  processor_fee_amount: number;
   net_amount: number;
 };
 
@@ -51,23 +52,47 @@ export type FinanceComparison = {
 
 export type FinanceContextFeeSummary = {
   work_context: FinanceWorkContext;
-  currency: FinanceCurrency;
+  reporting_currency: FinanceCurrency;
   fee_total: number;
+  processor_fee_total: number;
   gross_total: number;
   net_total: number;
   entry_count: number;
 };
 
+export type FinanceWeeklySummary = {
+  week_key: string;
+  label: string;
+  month_entry_count: number;
+  net_total: number;
+  studio_fee_total: number;
+  processor_fee_total: number;
+};
+
+export type FinanceMonthlyTrendPoint = {
+  month: string;
+  label: string;
+  net_total: number;
+  studio_fee_total: number;
+  processor_fee_total: number;
+  invoice_count: number;
+};
+
 export type FinanceDashboardSummary = {
   month: string;
   entry_count: number;
+  month_total: number;
+  week_total: number;
   open_invoice_count: number;
-  net_totals: Record<FinanceCurrency, number>;
-  fee_totals: Record<FinanceCurrency, number>;
+  net_totals_by_reporting_currency: Record<FinanceCurrency, number>;
+  studio_fee_totals_by_reporting_currency: Record<FinanceCurrency, number>;
+  processor_fee_totals_by_payment_currency: Record<FinanceCurrency, number>;
   fee_totals_by_context: FinanceContextFeeSummary[];
   approx_primary: FinanceApproxTotal;
   approx_secondary: FinanceApproxTotal;
   comparison: FinanceComparison;
+  weekly: FinanceWeeklySummary[];
+  monthly_trend: FinanceMonthlyTrendPoint[];
 };
 
 export type FinanceDashboardResponse = {

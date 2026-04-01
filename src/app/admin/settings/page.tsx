@@ -35,6 +35,7 @@ type SettingsDraft = Pick<
   | "fallback_dkk_to_eur"
   | "fallback_eur_to_sek"
   | "card_invoice_default"
+  | "card_processor_fee_percentage"
 >;
 
 export default function AdminSettingsPage() {
@@ -71,6 +72,7 @@ export default function AdminSettingsPage() {
         fallback_dkk_to_eur: data.settings.fallback_dkk_to_eur,
         fallback_eur_to_sek: data.settings.fallback_eur_to_sek,
         card_invoice_default: data.settings.card_invoice_default,
+        card_processor_fee_percentage: data.settings.card_processor_fee_percentage,
       });
       setError("");
     } catch (err) {
@@ -271,7 +273,7 @@ export default function AdminSettingsPage() {
             <AdminSurface>
               <AdminSectionHeading
                 title="Reporting behavior"
-                description="Keep per-currency totals honest, then control how the approximate normalized view behaves on top."
+                description="Bucket the dashboard by studio context first, then use approximate converted totals only as a helpful overview on top."
               />
 
               <div className="space-y-4">
@@ -329,6 +331,13 @@ export default function AdminSettingsPage() {
                   />
                   Use live exchange rates for approximate normalized totals
                 </label>
+
+                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4 text-sm text-foreground-muted">
+                  <p className="font-medium text-foreground">Bucketing rule</p>
+                  <p className="mt-2">
+                    Sweden studio work is bucketed into SEK, Copenhagen studio work into DKK, and guest/private contexts follow their context default even if the client paid in another currency.
+                  </p>
+                </div>
 
                 <div className="grid gap-4 sm:grid-cols-3">
                   <label className="text-sm text-foreground-muted">
@@ -406,6 +415,25 @@ export default function AdminSettingsPage() {
                   Card / SumUp payments default to “invoice needed”
                 </label>
 
+                <label className="text-sm text-foreground-muted">
+                  SumUp / card processor fee %
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={settings.card_processor_fee_percentage}
+                    onChange={(event) =>
+                      updateSettings(
+                        "card_processor_fee_percentage",
+                        Number(event.target.value)
+                      )
+                    }
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                  />
+                </label>
+
                 <p>
                   This keeps the admin honest without forcing Lia into fake certainty. She can still override the reminder per payment when the real-world situation differs.
                 </p>
@@ -415,6 +443,7 @@ export default function AdminSettingsPage() {
                   <ul className="mt-2 space-y-2">
                     <li>Malmö / Studio Diamant: 30%</li>
                     <li>Copenhagen / Good Morning Tattoo: 30%</li>
+                    <li>Card / SumUp processor fee: 1.95%</li>
                     <li>Guest spot: configurable, often 40% or 50%</li>
                     <li>Private / home: often 0%</li>
                   </ul>
