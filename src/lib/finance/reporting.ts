@@ -92,13 +92,6 @@ function getMonthlyInvoicedPayments(projects: FinanceProjectWithPayments[], mont
     .filter((payment) => payment.invoice_done && getPaymentMonthKey(payment.payment_date) === monthKey);
 }
 
-function getMonthlyTaxReserveRate(
-  simulation: FinanceTaxSummary["simulations"]["italy"] | FinanceTaxSummary["simulations"]["sweden"]
-) {
-  if (simulation.invoiced_revenue <= 0) return 0;
-  return (simulation.social_contributions + simulation.income_tax) / simulation.invoiced_revenue;
-}
-
 function getMonthlyVariableExpenses(
   expenses: FinanceVariableExpenseRow[],
   monthKey: string
@@ -119,7 +112,7 @@ function getMonthlyVariableExpenseTotal(
   );
 }
 
-function getMonthlyFixedCostReserve(
+function getMonthlyFrameworkFixedReserve(
   fixedCosts: FinanceFixedCostRow[],
   framework: FinanceTaxFramework,
   monthKey: string,
@@ -133,7 +126,7 @@ function getMonthlyFixedCostReserve(
       .filter(
         (cost) =>
           cost.is_active &&
-          cost.framework === framework &&
+          (cost.framework === framework || cost.framework === null) &&
           !cost.already_counted_in_tax_model &&
           cost.annual_amount !== null
       )
@@ -155,12 +148,26 @@ function getMonthlyFixedCostReserve(
   );
 }
 
+function getMissingFixedCostCount(
+  fixedCosts: FinanceFixedCostRow[],
+  framework: FinanceTaxFramework
+) {
+  return fixedCosts.filter(
+    (cost) =>
+      cost.is_active &&
+      (cost.framework === framework || cost.framework === null) &&
+      !cost.already_counted_in_tax_model &&
+      cost.annual_amount === null
+  ).length;
+}
+
 function buildKeepScenario(
   key: "italy_current" | "italy_standard" | "sweden",
   label: string,
   framework: FinanceTaxFramework,
   active: boolean,
   monthlyPayments: FinancePaymentDerived[],
+  monthlyInvoicedPayments: FinancePaymentDerived[],
   annualSimulation: FinanceTaxSummary["simulations"]["italy"] | FinanceTaxSummary["simulations"]["sweden"],
   fixedCosts: FinanceFixedCostRow[],
   variableExpenses: FinanceVariableExpenseRow[],
@@ -169,8 +176,20 @@ function buildKeepScenario(
   rates: ResolvedExchangeRates,
   notes: string[]
 ) {
-  const invoicedGross = roundMoney(
+  const grossCharged = roundMoney(
     monthlyPayments.reduce(
+      (total, payment) => total + convertAmount(payment.gross_amount, payment.currency, currency, rates),
+      0
+    )
+  );
+  const cashReceived = roundMoney(
+    monthlyPayments.reduce(
+      (total, payment) => total + convertAmount(payment.net_amount, payment.reporting_currency, currency, rates),
+      0
+    )
+  );
+  const invoicedGross = roundMoney(
+    monthlyInvoicedPayments.reduce(
       (total, payment) => total + convertAmount(payment.gross_amount, payment.currency, currency, rates),
       0
     )
@@ -189,9 +208,22 @@ function buildKeepScenario(
       0
     )
   );
-  const reserveRate = getMonthlyTaxReserveRate(annualSimulation);
-  const taxReserve = roundMoney(invoicedGross * reserveRate);
-  const fixedCostReserve = getMonthlyFixedCostReserve(
+  const incomeTaxReserve = roundMoney(
+    invoicedGross *
+      (annualSimulation.invoiced_revenue <= 0
+        ? 0
+        : annualSimulation.income_tax / annualSimulation.invoiced_revenue)
+  );
+  const variableSocialReserve = roundMoney(
+    invoicedGross *
+      (annualSimulation.invoiced_revenue <= 0
+        ? 0
+        : annualSimulation.variable_social_contributions / annualSimulation.invoiced_revenue)
+  );
+  const fixedSocialReserve = roundMoney(
+    convertAmount(annualSimulation.fixed_social_contributions / 12, annualSimulation.currency, currency, rates)
+  );
+  const fixedObligationReserve = getMonthlyFrameworkFixedReserve(
     fixedCosts,
     framework,
     monthKey,
@@ -199,6 +231,7 @@ function buildKeepScenario(
     rates
   );
   const variableExpenseReserve = getMonthlyVariableExpenseTotal(variableExpenses, currency, rates);
+  const excludedPaymentCount = Math.max(0, monthlyPayments.length - monthlyInvoicedPayments.length);
 
   return {
     key,
@@ -206,20 +239,25 @@ function buildKeepScenario(
     framework,
     active,
     currency,
-    invoiced_payment_count: monthlyPayments.length,
+    payment_count: monthlyPayments.length,
+    invoiced_payment_count: monthlyInvoicedPayments.length,
+    excluded_payment_count: excludedPaymentCount,
+    gross_charged: grossCharged,
+    cash_received: cashReceived,
     invoiced_gross: invoicedGross,
+    excluded_gross: roundMoney(grossCharged - invoicedGross),
     studio_fees: studioFees,
     processor_fees: processorFees,
-    tax_reserve: taxReserve,
-    fixed_cost_reserve: fixedCostReserve,
+    income_tax_reserve: incomeTaxReserve,
+    fixed_social_reserve: fixedSocialReserve,
+    variable_social_reserve: variableSocialReserve,
+    social_reserve: roundMoney(fixedSocialReserve + variableSocialReserve),
+    fixed_obligation_reserve: fixedObligationReserve,
     variable_expense_reserve: variableExpenseReserve,
-    estimated_keep: roundMoney(
-      invoicedGross - studioFees - processorFees - taxReserve - fixedCostReserve - variableExpenseReserve
+    estimated_disposable: roundMoney(
+      cashReceived - incomeTaxReserve - fixedSocialReserve - variableSocialReserve - fixedObligationReserve - variableExpenseReserve
     ),
-    reserve_rate: roundMoney(reserveRate * 100),
-    missing_fixed_cost_count: fixedCosts.filter(
-      (cost) => cost.is_active && cost.framework === framework && cost.annual_amount === null
-    ).length,
+    missing_fixed_cost_count: getMissingFixedCostCount(fixedCosts, framework),
     notes,
   };
 }
@@ -269,15 +307,22 @@ export function getSwedenTaxSettings(settings: FinanceSettingsRow): FinanceSwede
 function calculateItalyInpsContribution(
   taxableProfit: number,
   settings: FinanceItalyTaxSettings
-): number {
-  const baseContribution = settings.inps_fixed_annual_contribution;
+): { fixedContribution: number; variableContribution: number; totalContribution: number } {
+  const baseContribution = settings.apply_forfettario_inps_reduction
+    ? settings.inps_fixed_annual_contribution * 0.65
+    : settings.inps_fixed_annual_contribution;
   const excessTaxableIncome = Math.max(0, taxableProfit - settings.inps_min_taxable_income);
-  const variableContribution = excessTaxableIncome * (settings.inps_variable_rate / 100);
+  const rawVariableContribution = excessTaxableIncome * (settings.inps_variable_rate / 100);
+  const variableContribution = settings.apply_forfettario_inps_reduction
+    ? rawVariableContribution * 0.65
+    : rawVariableContribution;
   const totalContribution = baseContribution + variableContribution;
 
-  return roundMoney(
-    settings.apply_forfettario_inps_reduction ? totalContribution * 0.65 : totalContribution
-  );
+  return {
+    fixedContribution: roundMoney(baseContribution),
+    variableContribution: roundMoney(variableContribution),
+    totalContribution: roundMoney(totalContribution),
+  };
 }
 
 function buildItalyTaxSimulation(
@@ -293,9 +338,9 @@ function buildItalyTaxSimulation(
     ? settings.startup_tax_rate
     : settings.standard_tax_rate;
   const incomeTax = roundMoney(
-    Math.max(0, taxableProfit - socialContributions) * (substituteTaxRate / 100)
+    Math.max(0, taxableProfit - socialContributions.totalContribution) * (substituteTaxRate / 100)
   );
-  const netIncome = roundMoney(invoicedRevenue - socialContributions - incomeTax);
+  const netIncome = roundMoney(invoicedRevenue - socialContributions.totalContribution - incomeTax);
 
   return {
     framework: "italy" as const,
@@ -305,12 +350,14 @@ function buildItalyTaxSimulation(
     invoiced_payment_count: invoicedPayments.length,
     invoiced_revenue: invoicedRevenue,
     taxable_profit: taxableProfit,
-    social_contributions: socialContributions,
+    fixed_social_contributions: socialContributions.fixedContribution,
+    variable_social_contributions: socialContributions.variableContribution,
+    social_contributions: socialContributions.totalContribution,
     income_tax: incomeTax,
     net_income: netIncome,
     effective_tax_rate:
       invoicedRevenue > 0
-        ? roundMoney(((socialContributions + incomeTax) / invoicedRevenue) * 100)
+        ? roundMoney(((socialContributions.totalContribution + incomeTax) / invoicedRevenue) * 100)
         : 0,
     notes: [
       `${settings.inps_regime === "commercianti" ? "Commercianti" : "Artigiani"} INPS base`,
@@ -349,6 +396,8 @@ function buildSwedenTaxSimulation(
     invoiced_payment_count: invoicedPayments.length,
     invoiced_revenue: invoicedRevenue,
     taxable_profit: taxableProfit,
+    fixed_social_contributions: 0,
+    variable_social_contributions: socialContributions,
     social_contributions: socialContributions,
     income_tax: incomeTax,
     net_income: netIncome,
@@ -451,6 +500,9 @@ export function buildKeepSummary(
   rates: ResolvedExchangeRates,
   monthKey: string
 ): FinanceKeepSummary {
+  const monthlyPayments = projects
+    .flatMap((project) => project.payments)
+    .filter((payment) => getPaymentMonthKey(payment.payment_date) === monthKey);
   const monthlyInvoicedPayments = getMonthlyInvoicedPayments(projects, monthKey);
   const monthlyVariableExpenses = getMonthlyVariableExpenses(variableExpenses, monthKey);
   const taxSummary = buildTaxSummary(projects, settings, rates, monthKey);
@@ -469,27 +521,48 @@ export function buildKeepSummary(
     rates
   );
   const swedenSimulation = taxSummary.simulations.sweden;
+  const activeCashflow = buildKeepScenario(
+    taxSummary.actual_framework === "sweden" ? "sweden" : "italy_current",
+    taxSummary.actual_framework === "sweden"
+      ? swedenSimulation.label
+      : "Current month cashflow",
+    taxSummary.actual_framework,
+    true,
+    monthlyPayments,
+    monthlyInvoicedPayments,
+    taxSummary.actual_framework === "sweden" ? swedenSimulation : currentItalySimulation,
+    fixedCosts,
+    monthlyVariableExpenses,
+    monthKey,
+    primaryCurrency,
+    rates,
+    [
+      "Cash received uses all monthly payments after studio split and payment fees",
+      "Income tax reserve only applies to payments marked invoice done",
+    ]
+  );
+  const excludedGrossTotal = roundMoney(
+    monthlyPayments.reduce((total, payment) => {
+      if (payment.invoice_done) return total;
+      return total + convertAmount(payment.gross_amount, payment.currency, primaryCurrency, rates);
+    }, 0)
+  );
 
   return {
     month: monthKey,
     currency: primaryCurrency,
+    payment_count: monthlyPayments.length,
     invoiced_payment_count: monthlyInvoicedPayments.length,
-    excluded_payment_count:
-      projects
-        .flatMap((project) => project.payments)
-        .filter((payment) => getPaymentMonthKey(payment.payment_date) === monthKey).length -
-      monthlyInvoicedPayments.length,
-    variable_expense_total: getMonthlyVariableExpenseTotal(
-      monthlyVariableExpenses,
-      primaryCurrency,
-      rates
-    ),
+    excluded_payment_count: Math.max(0, monthlyPayments.length - monthlyInvoicedPayments.length),
+    excluded_gross_total: excludedGrossTotal,
+    active_cashflow: activeCashflow,
     scenarios: {
       italy_current: buildKeepScenario(
         "italy_current",
         currentItalySimulation.label,
         "italy",
         taxSummary.actual_framework === "italy",
+        monthlyPayments,
         monthlyInvoicedPayments,
         currentItalySimulation,
         fixedCosts,
@@ -507,6 +580,7 @@ export function buildKeepSummary(
         italyStandardSimulation.label,
         "italy",
         false,
+        monthlyPayments,
         monthlyInvoicedPayments,
         italyStandardSimulation,
         fixedCosts,
@@ -523,6 +597,7 @@ export function buildKeepSummary(
         swedenSimulation.label,
         "sweden",
         taxSummary.actual_framework === "sweden",
+        monthlyPayments,
         monthlyInvoicedPayments,
         swedenSimulation,
         fixedCosts,

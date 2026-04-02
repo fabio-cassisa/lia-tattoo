@@ -107,6 +107,8 @@ export type FinanceTaxSimulationInput = {
   invoiced_payment_count: number;
   invoiced_revenue: number;
   taxable_profit: number;
+  fixed_social_contributions: number;
+  variable_social_contributions: number;
   social_contributions: number;
   income_tax: number;
   net_income: number;
@@ -162,15 +164,22 @@ export type FinanceKeepScenarioSummary = {
   framework: FinanceTaxFramework;
   active: boolean;
   currency: FinanceCurrency;
+  payment_count: number;
   invoiced_payment_count: number;
+  excluded_payment_count: number;
+  gross_charged: number;
+  cash_received: number;
   invoiced_gross: number;
+  excluded_gross: number;
   studio_fees: number;
   processor_fees: number;
-  tax_reserve: number;
-  fixed_cost_reserve: number;
+  income_tax_reserve: number;
+  fixed_social_reserve: number;
+  variable_social_reserve: number;
+  social_reserve: number;
+  fixed_obligation_reserve: number;
   variable_expense_reserve: number;
-  estimated_keep: number;
-  reserve_rate: number;
+  estimated_disposable: number;
   missing_fixed_cost_count: number;
   notes: string[];
 };
@@ -178,9 +187,11 @@ export type FinanceKeepScenarioSummary = {
 export type FinanceKeepSummary = {
   month: string;
   currency: FinanceCurrency;
+  payment_count: number;
   invoiced_payment_count: number;
   excluded_payment_count: number;
-  variable_expense_total: number;
+  excluded_gross_total: number;
+  active_cashflow: FinanceKeepScenarioSummary;
   scenarios: {
     italy_current: FinanceKeepScenarioSummary;
     italy_standard: FinanceKeepScenarioSummary;

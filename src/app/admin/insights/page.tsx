@@ -51,6 +51,19 @@ type InsightsResponse = {
   generatedAt: string;
 };
 
+type FinanceCoachSnapshot = {
+  month: string;
+  currency: string;
+  cashReceived: number;
+  disposableEstimate: number;
+  incomeTaxReserve: number;
+  socialReserve: number;
+  fixedObligations: number;
+  variableCosts: number;
+  openInvoices: number;
+  excludedGross: number;
+};
+
 type CoachLocale = "en" | "it" | "sv";
 
 // ── i18n strings (inlined to avoid server import) ───────
@@ -243,6 +256,14 @@ function formatDate(iso: string): string {
   });
 }
 
+function formatMoneyCompact(amount: number, currency: string): string {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
@@ -419,6 +440,7 @@ export default function AdminInsights() {
   const router = useRouter();
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
   const [insights, setInsights] = useState<InsightsResponse | null>(null);
+  const [financePulse, setFinancePulse] = useState<FinanceCoachSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -460,6 +482,37 @@ export default function AdminInsights() {
     }
   }, []);
 
+  const fetchFinancePulse = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/finance");
+      if (res.status === 401) {
+        router.push("/admin/login");
+        return;
+      }
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const keepSummary = data?.summary?.keep_summary;
+      const activeCashflow = keepSummary?.active_cashflow;
+      if (!keepSummary || !activeCashflow) return;
+
+      setFinancePulse({
+        month: data.month,
+        currency: keepSummary.currency,
+        cashReceived: activeCashflow.cash_received,
+        disposableEstimate: activeCashflow.estimated_disposable,
+        incomeTaxReserve: activeCashflow.income_tax_reserve,
+        socialReserve: activeCashflow.social_reserve,
+        fixedObligations: activeCashflow.fixed_obligation_reserve,
+        variableCosts: activeCashflow.variable_expense_reserve,
+        openInvoices: data?.summary?.open_invoice_count ?? 0,
+        excludedGross: keepSummary.excluded_gross_total,
+      });
+    } catch {
+      // Silent — coach should still work without finance pulse
+    }
+  }, [router]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -471,7 +524,7 @@ export default function AdminInsights() {
         return;
       }
       // Re-fetch insights with fresh data
-      await Promise.all([fetchStatus(), fetchInsights()]);
+      await Promise.all([fetchStatus(), fetchInsights(), fetchFinancePulse()]);
     } catch {
       setError("Refresh failed");
     } finally {
@@ -490,10 +543,10 @@ export default function AdminInsights() {
   };
 
   useEffect(() => {
-    Promise.all([fetchStatus(), fetchInsights()]).finally(() =>
+    Promise.all([fetchStatus(), fetchInsights(), fetchFinancePulse()]).finally(() =>
       setLoading(false),
     );
-  }, [fetchStatus, fetchInsights]);
+  }, [fetchStatus, fetchInsights, fetchFinancePulse]);
 
   // Filter dismissed cards
   const visibleInsights = insights?.insights.filter((c) => !dismissed.has(c.id)) ?? [];
@@ -675,6 +728,51 @@ export default function AdminInsights() {
               <span>{insights.summary.portfolioCount} portfolio items</span>
               <span>Avg engagement: {insights.summary.avgEngagementRate}</span>
               <span>This week: {insights.summary.bookingsThisWeek} bookings</span>
+            </div>
+          )}
+
+          {financePulse && (
+            <div className="mb-6 rounded-2xl border border-[var(--sabbia-200)] bg-white/90 p-4 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                    Business pulse
+                  </p>
+                  <h2 className="mt-2 text-base font-semibold tracking-[-0.01em] text-ink-900">
+                    Creative Coach now sees the money pressure too
+                  </h2>
+                </div>
+                <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-[11px] text-foreground-muted">
+                  {financePulse.month}
+                </span>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <div className="rounded-xl bg-[var(--sabbia-50)]/80 px-3 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-foreground-muted">Cash received</p>
+                  <p className="mt-1 text-lg font-medium text-foreground">{formatMoneyCompact(financePulse.cashReceived, financePulse.currency)}</p>
+                </div>
+                <div className="rounded-xl bg-[var(--sabbia-50)]/80 px-3 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-foreground-muted">Disposable</p>
+                  <p className="mt-1 text-lg font-medium text-foreground">{formatMoneyCompact(financePulse.disposableEstimate, financePulse.currency)}</p>
+                </div>
+                <div className="rounded-xl bg-[var(--sabbia-50)]/80 px-3 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-foreground-muted">Tax + social</p>
+                  <p className="mt-1 text-lg font-medium text-foreground">{formatMoneyCompact(financePulse.incomeTaxReserve + financePulse.socialReserve, financePulse.currency)}</p>
+                </div>
+                <div className="rounded-xl bg-[var(--sabbia-50)]/80 px-3 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-foreground-muted">Fixed + variable</p>
+                  <p className="mt-1 text-lg font-medium text-foreground">{formatMoneyCompact(financePulse.fixedObligations + financePulse.variableCosts, financePulse.currency)}</p>
+                </div>
+                <div className="rounded-xl bg-[var(--sabbia-50)]/80 px-3 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-foreground-muted">Open invoice drag</p>
+                  <p className="mt-1 text-lg font-medium text-foreground">{formatMoneyCompact(financePulse.excludedGross, financePulse.currency)}</p>
+                </div>
+              </div>
+
+              <p className="mt-4 text-sm text-foreground-muted">
+                This helps the coach judge timing: if disposable money is tight or too much gross is still not invoiced, pushing booking reminders or high-conversion content matters more than generic engagement vanity.
+              </p>
             </div>
           )}
 

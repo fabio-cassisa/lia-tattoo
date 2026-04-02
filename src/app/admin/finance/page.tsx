@@ -246,6 +246,82 @@ function CollapsibleFinanceSection({
   );
 }
 
+type MoneyFlowSegment = {
+  label: string;
+  value: number;
+  color: string;
+};
+
+function MoneyFlowBar({
+  title,
+  total,
+  currency,
+  segments,
+  note,
+}: {
+  title: string;
+  total: number;
+  currency: FinanceCurrency;
+  segments: MoneyFlowSegment[];
+  note?: string;
+}) {
+  const visibleSegments = segments.filter((segment) => segment.value > 0);
+
+  return (
+    <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">{title}</p>
+        <span className="text-sm font-medium text-foreground">{formatMoney(total, currency)}</span>
+      </div>
+
+      {visibleSegments.length > 0 ? (
+        <>
+          <div className="mt-4 flex h-4 overflow-hidden rounded-full bg-[var(--sabbia-100)]">
+            {visibleSegments.map((segment) => (
+              <div
+                key={segment.label}
+                className="h-full"
+                style={{
+                  backgroundColor: segment.color,
+                  flexGrow: segment.value,
+                  flexBasis: 0,
+                }}
+              />
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {visibleSegments.map((segment) => (
+              <div
+                key={segment.label}
+                className="rounded-xl bg-[var(--sabbia-50)]/80 px-3 py-2 text-xs text-foreground-muted"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <span
+                      className="block h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: segment.color }}
+                    />
+                    {segment.label}
+                  </span>
+                  <span>{formatPercent(total > 0 ? (segment.value / total) * 100 : 0)}</span>
+                </div>
+                <p className="mt-1 font-medium text-foreground">
+                  {formatMoney(segment.value, currency)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="mt-4 text-sm text-foreground-muted">No money flow to visualize for this month yet.</p>
+      )}
+
+      {note ? <p className="mt-3 text-xs text-foreground-muted">{note}</p> : null}
+    </div>
+  );
+}
+
 export default function AdminFinancePage() {
   const router = useRouter();
   const [month, setMonth] = useState(DEFAULT_MONTH);
@@ -872,7 +948,7 @@ export default function AdminFinancePage() {
         </div>
       ) : null}
 
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-7">
         <AdminMetricCard
           label="This week"
           value={
@@ -884,6 +960,20 @@ export default function AdminFinancePage() {
             loading || !summary
               ? ""
               : `${summary.weekly.at(-1)?.label ?? "No payments this week"}`
+          }
+        />
+        <AdminMetricCard
+          label="Cash received"
+          tone="success"
+          value={
+            loading || !keepSummary
+              ? "..."
+              : formatMoney(keepSummary.active_cashflow.cash_received, keepSummary.currency)
+          }
+          detail={
+            loading || !keepSummary
+              ? ""
+              : `${keepSummary.payment_count} payment${keepSummary.payment_count === 1 ? "" : "s"} this month after studio split and payment fees`
           }
         />
         <AdminMetricCard
@@ -906,19 +996,16 @@ export default function AdminFinancePage() {
           detail="Raw processor fees stay in EUR because Lia's SumUp account settles through Italy."
         />
         <AdminMetricCard
-          label={`Approx ${summary?.approx_secondary.currency ?? "EUR"}`}
+          label="Payment fees"
           value={
-            loading || !summary
+            loading || !keepSummary
               ? "..."
-              : formatMoney(
-                  summary.approx_secondary.amount,
-                  summary.approx_secondary.currency
-                )
+              : formatMoney(keepSummary.active_cashflow.processor_fees, keepSummary.currency)
           }
           detail={
-            loading || !summary
+            loading || !keepSummary
               ? ""
-              : `${summary.approx_secondary.source} exchange rates`
+              : "SumUp/card fees only hit payment methods that actually use them."
           }
         />
         <AdminMetricCard
@@ -932,16 +1019,16 @@ export default function AdminFinancePage() {
           }
         />
         <AdminMetricCard
-          label="Net take-home"
+          label="Disposable estimate"
           value={
-            loading || !summary
+            loading || !keepSummary
               ? "..."
-              : formatMoney(summary.month_total, summary.approx_primary.currency)
+              : formatMoney(keepSummary.active_cashflow.estimated_disposable, keepSummary.currency)
           }
           detail={
-            loading || !summary
+            loading || !keepSummary
               ? ""
-              : `${formatMonthLabel(month)} in ${summary.approx_primary.currency}`
+              : `${formatMonthLabel(month)} after reserve + fixed + variable costs`
           }
         />
         <AdminMetricCard
@@ -965,27 +1052,160 @@ export default function AdminFinancePage() {
       <div className="mb-6">
         <AdminSurface>
           <AdminSectionHeading
-            title="Estimated keep from invoiced work"
-            description="This is the practical answer Lia needs first: from invoiced work this month, roughly how much remains after studio fees, SumUp drag, tax reserve, and fixed-cost reserve under the active model and the projections."
+            title="Cashflow and Disposable Money"
+            description="Use all monthly cash received as the real base. Then reserve income tax only on invoiced payments, add mandatory social/fixed obligations, and subtract materials so Lia can see what is truly disposable."
           />
 
           {loading || !summary || !keepSummary ? (
-            <p className="text-sm text-foreground-muted">Loading keep estimate...</p>
+            <p className="text-sm text-foreground-muted">Loading cashflow summary...</p>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
-                  Current month invoiced base
-                </p>
-                <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
-                  {keepSummary.invoiced_payment_count} invoiced payment{keepSummary.invoiced_payment_count === 1 ? "" : "s"}
+              <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                        Current month disposable estimate
+                      </p>
+                      <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
+                        {formatMoney(keepSummary.active_cashflow.estimated_disposable, keepSummary.currency)}
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] text-foreground-muted shadow-sm">
+                      {FINANCE_TAX_FRAMEWORK_LABELS[keepSummary.active_cashflow.framework]} reserve view
+                    </span>
+                  </div>
+
+                  <div className="mt-3 grid gap-x-4 gap-y-2 text-xs text-foreground-muted sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Gross charged</span>
+                      <span>{formatMoney(keepSummary.active_cashflow.gross_charged, keepSummary.currency)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Studio split</span>
+                      <span>{formatMoney(keepSummary.active_cashflow.studio_fees, keepSummary.currency)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Payment fees</span>
+                      <span>{formatMoney(keepSummary.active_cashflow.processor_fees, keepSummary.currency)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Cash received</span>
+                      <span>{formatMoney(keepSummary.active_cashflow.cash_received, keepSummary.currency)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Income tax reserve</span>
+                      <span>{formatMoney(keepSummary.active_cashflow.income_tax_reserve, keepSummary.currency)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>INPS / social reserve</span>
+                      <span>{formatMoney(keepSummary.active_cashflow.social_reserve, keepSummary.currency)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Fixed obligations</span>
+                      <span>{formatMoney(keepSummary.active_cashflow.fixed_obligation_reserve, keepSummary.currency)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Variable costs</span>
+                      <span>{formatMoney(keepSummary.active_cashflow.variable_expense_reserve, keepSummary.currency)}</span>
+                    </div>
+                  </div>
                 </div>
-                <p className="mt-2 text-xs text-foreground-muted">
-                  {keepSummary.excluded_payment_count} payment{keepSummary.excluded_payment_count === 1 ? "" : "s"} excluded because invoice is not done yet.
-                </p>
-                <p className="mt-1 text-xs text-foreground-muted">
-                  Variable expenses this month: {formatMoney(keepSummary.variable_expense_total, keepSummary.currency)}
-                </p>
+
+                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm">
+                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                    Invoicing impact
+                  </p>
+                  <div className="mt-3 grid gap-2 text-xs text-foreground-muted">
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Invoiced payments</span>
+                      <span>{keepSummary.invoiced_payment_count}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Not invoiced yet</span>
+                      <span>{keepSummary.excluded_payment_count}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Gross excluded from % tax</span>
+                      <span>{formatMoney(keepSummary.excluded_gross_total, keepSummary.currency)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Income tax sees</span>
+                      <span>{formatMoney(keepSummary.active_cashflow.invoiced_gross, keepSummary.currency)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Fixed social reserve</span>
+                      <span>{formatMoney(keepSummary.active_cashflow.fixed_social_reserve, keepSummary.currency)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Variable social reserve</span>
+                      <span>{formatMoney(keepSummary.active_cashflow.variable_social_reserve, keepSummary.currency)}</span>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs text-foreground-muted">
+                    Non-invoiced money still counts as cash received, but it stays outside the percentage-based income-tax reserve until invoice is done. Fixed social obligations and other business costs still reduce what is truly disposable.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                <MoneyFlowBar
+                  title="Where cash leaves the payment"
+                  total={keepSummary.active_cashflow.gross_charged}
+                  currency={keepSummary.currency}
+                  segments={[
+                    {
+                      label: "Studio split",
+                      value: keepSummary.active_cashflow.studio_fees,
+                      color: "var(--trad-red-500)",
+                    },
+                    {
+                      label: "Payment fees",
+                      value: keepSummary.active_cashflow.processor_fees,
+                      color: "var(--blush-300)",
+                    },
+                    {
+                      label: "Cash received",
+                      value: keepSummary.active_cashflow.cash_received,
+                      color: "var(--ink-900)",
+                    },
+                  ]}
+                  note="This split uses all monthly payments. Studio share and processor drag leave first; the rest is the actual cash pool Lia has in hand."
+                />
+
+                <MoneyFlowBar
+                  title="Where cash stops being disposable"
+                  total={keepSummary.active_cashflow.cash_received}
+                  currency={keepSummary.currency}
+                  segments={[
+                    {
+                      label: "Income tax reserve",
+                      value: keepSummary.active_cashflow.income_tax_reserve,
+                      color: "var(--trad-red-500)",
+                    },
+                    {
+                      label: "INPS / social reserve",
+                      value: keepSummary.active_cashflow.social_reserve,
+                      color: "var(--ink-700)",
+                    },
+                    {
+                      label: "Fixed obligations",
+                      value: keepSummary.active_cashflow.fixed_obligation_reserve,
+                      color: "var(--sabbia-400)",
+                    },
+                    {
+                      label: "Variable costs",
+                      value: keepSummary.active_cashflow.variable_expense_reserve,
+                      color: "var(--blush-300)",
+                    },
+                    {
+                      label: "Still disposable",
+                      value: Math.max(0, keepSummary.active_cashflow.estimated_disposable),
+                      color: "var(--accent)",
+                    },
+                  ]}
+                  note="Income tax still only sees invoiced work. Fixed social and business obligations still reduce what is safe to treat as disposable."
+                />
               </div>
 
               <div className="grid gap-4 xl:grid-cols-3">
@@ -1007,46 +1227,46 @@ export default function AdminFinancePage() {
                       </span>
                     </div>
 
-                    <div className="mt-4 text-xl font-medium text-foreground sm:text-2xl">
-                      {formatMoney(scenario.estimated_keep, scenario.currency)}
+                    <div className="mt-3 text-xl font-medium text-foreground sm:text-2xl">
+                      {formatMoney(scenario.estimated_disposable, scenario.currency)}
                     </div>
 
-                    <div className="mt-4 space-y-2 text-xs text-foreground-muted">
+                    <div className="mt-3 grid gap-x-4 gap-y-2 text-xs text-foreground-muted sm:grid-cols-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Cash received</span>
+                        <span>{formatMoney(scenario.cash_received, scenario.currency)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Income tax reserve</span>
+                        <span>{formatMoney(scenario.income_tax_reserve, scenario.currency)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>INPS / social reserve</span>
+                        <span>{formatMoney(scenario.social_reserve, scenario.currency)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Fixed obligations</span>
+                        <span>{formatMoney(scenario.fixed_obligation_reserve, scenario.currency)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Variable costs</span>
+                        <span>{formatMoney(scenario.variable_expense_reserve, scenario.currency)}</span>
+                      </div>
                       <div className="flex items-center justify-between gap-3">
                         <span>Invoiced gross</span>
                         <span>{formatMoney(scenario.invoiced_gross, scenario.currency)}</span>
                       </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span>Studio fees</span>
-                        <span>{formatMoney(scenario.studio_fees, scenario.currency)}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span>Processor fees</span>
-                        <span>{formatMoney(scenario.processor_fees, scenario.currency)}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span>Tax reserve</span>
-                        <span>{formatMoney(scenario.tax_reserve, scenario.currency)}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span>Fixed-cost reserve</span>
-                        <span>{formatMoney(scenario.fixed_cost_reserve, scenario.currency)}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span>Variable expenses</span>
-                        <span>{formatMoney(scenario.variable_expense_reserve, scenario.currency)}</span>
-                      </div>
                     </div>
 
-                    <p className="mt-4 text-xs text-foreground-muted">
-                      Reserve rate {formatPercent(scenario.reserve_rate)}
+                    <p className="mt-3 text-xs text-foreground-muted">
                       {scenario.missing_fixed_cost_count > 0
-                        ? ` · ${scenario.missing_fixed_cost_count} fixed cost amount${scenario.missing_fixed_cost_count === 1 ? "" : "s"} still missing`
-                        : ""}
+                        ? `${scenario.missing_fixed_cost_count} fixed cost amount${scenario.missing_fixed_cost_count === 1 ? " is" : "s are"} still missing`
+                        : "All active fixed-cost rows in this model have amounts."}
                     </p>
                   </div>
                 ))}
               </div>
+
             </div>
           )}
         </AdminSurface>
@@ -1509,7 +1729,7 @@ export default function AdminFinancePage() {
                 <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4 md:col-span-2 xl:col-span-4">
                   <p className="text-sm font-medium text-foreground">Card payment helper</p>
                   <p className="mt-1 text-sm text-foreground-muted">
-                    Keep tax and SumUp tied to the actual charged amount. If Lia later uses a different local base to calculate the studio share, set that separately here.
+                    Keep tax and SumUp tied to the actual charged amount. If Lia later settles the studio split from a different rounded local amount, set that custom split amount separately here.
                   </p>
 
                   <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -1543,7 +1763,7 @@ export default function AdminFinancePage() {
                     </label>
 
                     <label className="text-sm text-foreground-muted">
-                      Studio fee base
+                      Amount used for studio split
                       <input
                         type="number"
                         min="0"
@@ -1552,14 +1772,14 @@ export default function AdminFinancePage() {
                         onChange={(event) =>
                           updateForm("studio_fee_base_amount", event.target.value)
                         }
-                        placeholder="Optional local base"
+                        placeholder="Optional custom split amount"
                         className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
                         style={{ fontSize: "16px" }}
                       />
                     </label>
 
                     <label className="text-sm text-foreground-muted">
-                      Studio fee base currency
+                      Split amount currency
                       <select
                         value={form.studio_fee_base_currency}
                         onChange={(event) =>
@@ -1578,7 +1798,7 @@ export default function AdminFinancePage() {
                   </div>
 
                   <p className="mt-3 text-xs text-foreground-muted">
-                    Example: client sticker price is `2000 SEK`, Lia charges `185 EUR`, then later pays the studio using whatever local rounded base she decides. Tax and SumUp follow `185 EUR`; studio share follows the local base if you fill it here.
+                    Example: client sticker price is `2000 SEK`, Lia charges `185 EUR`, then later pays the studio using a rounded local base like `2000 SEK`. Tax and SumUp follow `185 EUR`; the studio percentage follows the custom split amount only if you fill it here.
                   </p>
                 </div>
               ) : null}
@@ -1913,16 +2133,44 @@ export default function AdminFinancePage() {
           ) : (
             <div className="space-y-4">
               <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
-                  Estimated yearly net after Italy model
-                </p>
-                <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
-                  {formatMoney(italySimulation.net_income, italySimulation.currency)}
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                      Estimated yearly net after Italy model
+                    </p>
+                    <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
+                      {formatMoney(italySimulation.net_income, italySimulation.currency)}
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] text-foreground-muted shadow-sm">
+                    Effective rate {formatPercent(italySimulation.effective_tax_rate)}
+                  </span>
                 </div>
-                <p className="mt-2 text-xs text-foreground-muted">
-                  Revenue {formatMoney(italySimulation.invoiced_revenue, italySimulation.currency)} · social contributions {formatMoney(italySimulation.social_contributions, italySimulation.currency)} · tax {formatMoney(italySimulation.income_tax, italySimulation.currency)}
-                </p>
+
+                  <div className="mt-3 grid gap-x-4 gap-y-2 text-xs text-foreground-muted sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="flex items-center justify-between gap-3 sm:block xl:flex">
+                      <span>Revenue</span>
+                      <span>{formatMoney(italySimulation.invoiced_revenue, italySimulation.currency)}</span>
+                    </div>
+                  <div className="flex items-center justify-between gap-3 sm:block xl:flex">
+                    <span>Taxable profit</span>
+                    <span>{formatMoney(italySimulation.taxable_profit, italySimulation.currency)}</span>
+                  </div>
+                    <div className="flex items-center justify-between gap-3 sm:block xl:flex">
+                      <span>Fixed INPS</span>
+                      <span>{formatMoney(italySimulation.fixed_social_contributions, italySimulation.currency)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 sm:block xl:flex">
+                      <span>Variable INPS</span>
+                      <span>{formatMoney(italySimulation.variable_social_contributions, italySimulation.currency)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 sm:block xl:flex">
+                      <span>Income tax</span>
+                      <span>{formatMoney(italySimulation.income_tax, italySimulation.currency)}</span>
+                    </div>
+                </div>
               </div>
+
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl bg-white p-4 shadow-sm">
                   <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
@@ -1932,7 +2180,7 @@ export default function AdminFinancePage() {
                     {italySimulation.invoiced_payment_count} invoiced payment{italySimulation.invoiced_payment_count === 1 ? "" : "s"} in {taxSummary.tax_year}
                   </p>
                   <p className="mt-1 text-sm text-foreground-muted">
-                    Taxable profit {formatMoney(italySimulation.taxable_profit, italySimulation.currency)} · effective rate {formatPercent(italySimulation.effective_tax_rate)}
+                    Deposit-free, invoiced-only yearly base.
                   </p>
                 </div>
                 <div className="rounded-2xl bg-white p-4 shadow-sm">
@@ -1967,15 +2215,34 @@ export default function AdminFinancePage() {
             <div className="space-y-4">
               <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
                 <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
-                    Estimated yearly net after Sweden model
-                  </p>
-                  <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
-                    {formatMoney(swedenSimulation.net_income, swedenSimulation.currency)}
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                        Estimated yearly net after Sweden model
+                      </p>
+                      <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
+                        {formatMoney(swedenSimulation.net_income, swedenSimulation.currency)}
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] text-foreground-muted shadow-sm">
+                      Effective rate {formatPercent(swedenSimulation.effective_tax_rate)}
+                    </span>
                   </div>
-                  <p className="mt-2 text-xs text-foreground-muted">
-                    Revenue {formatMoney(swedenSimulation.invoiced_revenue, swedenSimulation.currency)} · social contributions {formatMoney(swedenSimulation.social_contributions, swedenSimulation.currency)} · tax {formatMoney(swedenSimulation.income_tax, swedenSimulation.currency)}
-                  </p>
+
+                  <div className="mt-3 grid gap-x-4 gap-y-2 text-xs text-foreground-muted sm:grid-cols-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Revenue</span>
+                      <span>{formatMoney(swedenSimulation.invoiced_revenue, swedenSimulation.currency)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Social reserve</span>
+                      <span>{formatMoney(swedenSimulation.variable_social_contributions, swedenSimulation.currency)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 sm:col-span-2">
+                      <span>Income tax</span>
+                      <span>{formatMoney(swedenSimulation.income_tax, swedenSimulation.currency)}</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="rounded-2xl bg-white p-4 shadow-sm">
@@ -2011,7 +2278,7 @@ export default function AdminFinancePage() {
                     Sweden assumptions
                   </p>
                   <p className="mt-2 font-medium text-foreground">
-                    Effective rate {formatPercent(swedenSimulation.effective_tax_rate)}
+                    Invoiced-only comparison model
                   </p>
                   <p className="mt-1 text-sm text-foreground-muted">{swedenSimulation.notes.join(" · ")}</p>
                 </div>
