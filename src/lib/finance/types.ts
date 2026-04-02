@@ -22,8 +22,11 @@ export type FinanceBookingOption = {
 };
 
 export type FinancePaymentDerived = FinancePaymentRow & {
+  gross_amount_reporting: number;
   fee_amount: number;
+  processor_fee_currency: FinanceCurrency;
   processor_fee_amount: number;
+  processor_fee_amount_reporting: number;
   net_amount: number;
 };
 
@@ -86,7 +89,8 @@ export type FinanceDashboardSummary = {
   open_invoice_count: number;
   net_totals_by_reporting_currency: Record<FinanceCurrency, number>;
   studio_fee_totals_by_reporting_currency: Record<FinanceCurrency, number>;
-  processor_fee_totals_by_payment_currency: Record<FinanceCurrency, number>;
+  processor_fee_totals_by_processor_currency: Record<FinanceCurrency, number>;
+  processor_fee_approx_totals_by_reporting_currency: Record<FinanceCurrency, number>;
   fee_totals_by_context: FinanceContextFeeSummary[];
   approx_primary: FinanceApproxTotal;
   approx_secondary: FinanceApproxTotal;

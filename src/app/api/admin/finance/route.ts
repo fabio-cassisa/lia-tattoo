@@ -127,8 +127,9 @@ function buildBookingOptions(
 async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboardResponse> {
   const admin = createAdminClient();
   const { contextSettings, settings, projects, payments, bookings } = await loadFinanceBase(admin);
+  const rates = await resolveExchangeRates(settings);
 
-  const projectsWithPayments = buildProjectsWithPayments(projects, payments);
+  const projectsWithPayments = buildProjectsWithPayments(projects, payments, rates);
   const monthlyProjects = filterProjectsForMonth(projectsWithPayments, monthKey);
   const monthlyPayments = monthlyProjects.flatMap((project) =>
     project.payments.filter((payment) => payment.payment_date.startsWith(monthKey))
@@ -142,12 +143,15 @@ async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboar
   );
   const processorFeeTotals = getFeeTotalsByCurrency(
     monthlyPayments,
-    "currency",
+    "processor_fee_currency",
     "processor_fee_amount"
   );
+  const processorFeeApproxTotals = getFeeTotalsByCurrency(
+    monthlyPayments,
+    "reporting_currency",
+    "processor_fee_amount_reporting"
+  );
   const feeTotalsByContext = getFeeTotalsByContext(monthlyProjects, monthKey);
-
-  const rates = await resolveExchangeRates(settings);
   const weekly = buildWeeklySummary(
     monthlyPayments,
     settings.reporting_currency_primary,
@@ -190,7 +194,8 @@ async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboar
       open_invoice_count: invoiceReminders.length,
       net_totals_by_reporting_currency: netTotals,
       studio_fee_totals_by_reporting_currency: feeTotals,
-      processor_fee_totals_by_payment_currency: processorFeeTotals,
+      processor_fee_totals_by_processor_currency: processorFeeTotals,
+      processor_fee_approx_totals_by_reporting_currency: processorFeeApproxTotals,
       fee_totals_by_context: feeTotalsByContext,
       approx_primary: {
         currency: settings.reporting_currency_primary,

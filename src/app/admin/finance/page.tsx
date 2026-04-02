@@ -58,6 +58,8 @@ type FinanceFormState = {
 
 const DEFAULT_MONTH = normalizeMonthKey();
 const REPORTING_CURRENCIES: FinanceCurrency[] = ["SEK", "DKK", "EUR"];
+const ITALY_PREVIEW_RATE = 0.05;
+const DAY_IN_MS = 86400000;
 
 function formatMoney(amount: number, currency: FinanceCurrency): string {
   return new Intl.NumberFormat("en-GB", {
@@ -78,6 +80,45 @@ function formatDelta(percentDelta: number | null): string {
   if (percentDelta === null) return "new month";
   if (percentDelta === 0) return "flat vs last month";
   return `${percentDelta > 0 ? "+" : ""}${percentDelta}% vs last month`;
+}
+
+function roundAmount(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function getOwnerPayoutLabel(workContext: FinanceWorkContext): string {
+  switch (workContext) {
+    case "malmo_studio":
+      return "Pay Diamant owner";
+    case "copenhagen_studio":
+      return "Pay Good Morning";
+    case "guest_spot":
+      return "Guest-spot fee reserve";
+    case "private_home":
+      return "Private / home fee reserve";
+  }
+}
+
+function getInvoiceAgeDays(paymentDate: string): number {
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const paymentTime = new Date(`${paymentDate}T00:00:00`).getTime();
+  return Math.max(0, Math.floor((todayStart - paymentTime) / DAY_IN_MS));
+}
+
+function getInvoiceAgeLabel(ageDays: number): string {
+  if (ageDays >= 14) return `${ageDays}d old · urgent`;
+  if (ageDays >= 7) return `${ageDays}d old · due soon`;
+  if (ageDays >= 3) return `${ageDays}d old · watch it`;
+  if (ageDays === 0) return "today";
+  return `${ageDays}d old`;
+}
+
+function getInvoiceAgeTone(ageDays: number): string {
+  if (ageDays >= 14) return "bg-red-100 text-red-700";
+  if (ageDays >= 7) return "bg-amber-100 text-amber-700";
+  if (ageDays >= 3) return "bg-yellow-100 text-yellow-700";
+  return "bg-[var(--sabbia-100)] text-foreground-muted";
 }
 
 function buildDefaultFormState(
@@ -171,7 +212,10 @@ export default function AdminFinancePage() {
 
   const summary = dashboard?.summary;
   const bookings = dashboard?.bookings ?? [];
-  const invoiceReminders = dashboard?.invoice_reminders ?? [];
+  const invoiceReminders = useMemo(
+    () => dashboard?.invoice_reminders ?? [],
+    [dashboard?.invoice_reminders]
+  );
   const previousMonth = useMemo(() => getPreviousMonthKey(month), [month]);
 
   const monthlyProjects = useMemo(
@@ -190,7 +234,7 @@ export default function AdminFinancePage() {
         return (
           summary.net_totals_by_reporting_currency[currency] > 0 ||
           summary.studio_fee_totals_by_reporting_currency[currency] > 0 ||
-          summary.processor_fee_totals_by_payment_currency[currency] > 0
+          summary.processor_fee_approx_totals_by_reporting_currency[currency] > 0
         );
       }),
     [summary]
@@ -200,6 +244,49 @@ export default function AdminFinancePage() {
     const points = summary?.monthly_trend ?? [];
     return points.reduce((max, point) => Math.max(max, point.net_total), 0);
   }, [summary?.monthly_trend]);
+
+  const ownerPayoutRows = useMemo(() => {
+    if (!summary || !dashboard) return [];
+
+    return summary.fee_totals_by_context
+      .filter((row) => row.fee_total > 0)
+      .map((row) => ({
+        ...row,
+        label: getOwnerPayoutLabel(row.work_context),
+        contextLabel: getContextLabel(row.work_context, dashboard.context_settings),
+      }));
+  }, [dashboard, summary]);
+
+  const italyPreview = useMemo(() => {
+    if (!summary) return null;
+
+    const approxTaxPrimary = roundAmount(summary.month_total * ITALY_PREVIEW_RATE);
+    const approxTaxSecondary = roundAmount(
+      summary.approx_secondary.amount * ITALY_PREVIEW_RATE
+    );
+
+    return {
+      rate: ITALY_PREVIEW_RATE,
+      primaryTax: approxTaxPrimary,
+      primaryAfterTax: roundAmount(summary.month_total - approxTaxPrimary),
+      secondaryTax: approxTaxSecondary,
+      secondaryAfterTax: roundAmount(summary.approx_secondary.amount - approxTaxSecondary),
+    };
+  }, [summary]);
+
+  const invoiceReminderGroups = useMemo(
+    () =>
+      invoiceReminders.map((payment) => {
+        const ageDays = getInvoiceAgeDays(payment.payment_date);
+        return {
+          ...payment,
+          ageDays,
+          ageLabel: getInvoiceAgeLabel(ageDays),
+          ageTone: getInvoiceAgeTone(ageDays),
+        };
+      }),
+    [invoiceReminders]
+  );
 
   function resetForm(nextMonth = month, nextDashboard = dashboard) {
     setForm(buildDefaultFormState(nextDashboard, nextMonth));
@@ -384,9 +471,9 @@ export default function AdminFinancePage() {
             </span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-foreground-muted">Card fees paid in {currency}</span>
+            <span className="text-foreground-muted">Approx card-fee impact</span>
             <span className="text-foreground">
-              {formatMoney(summary.processor_fee_totals_by_payment_currency[currency], currency)}
+              {formatMoney(summary.processor_fee_approx_totals_by_reporting_currency[currency], currency)}
             </span>
           </div>
         </div>
@@ -460,7 +547,7 @@ export default function AdminFinancePage() {
         </div>
       ) : null}
 
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <AdminMetricCard
           label="Net take-home"
           value={
@@ -496,6 +583,15 @@ export default function AdminFinancePage() {
               : `${formatMoney(summary.studio_fee_totals_by_reporting_currency.SEK, "SEK")} · ${formatMoney(summary.studio_fee_totals_by_reporting_currency.DKK, "DKK")} · ${formatMoney(summary.studio_fee_totals_by_reporting_currency.EUR, "EUR")}`
           }
           detail="Native fee buckets by studio/context, not by whichever currency the client happened to use."
+        />
+        <AdminMetricCard
+          label="SumUp fees"
+          value={
+            loading || !summary
+              ? "..."
+              : formatMoney(summary.processor_fee_totals_by_processor_currency.EUR, "EUR")
+          }
+          detail="Raw processor fees stay in EUR because Lia's SumUp account settles through Italy."
         />
         <AdminMetricCard
           label={`Approx ${summary?.approx_secondary.currency ?? "EUR"}`}
@@ -901,6 +997,121 @@ export default function AdminFinancePage() {
         </AdminSurface>
       </div>
 
+      <div className="mb-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <AdminSurface>
+          <AdminSectionHeading
+            title="Owner payouts"
+            description="This is the operational bit Lia actually needs at month end: who gets paid, in which local currency, and roughly how much processor drag hit that bucket."
+          />
+
+          {loading ? (
+            <p className="text-sm text-foreground-muted">Loading payout summary...</p>
+          ) : ownerPayoutRows.length > 0 ? (
+            <div className="space-y-3">
+              {ownerPayoutRows.map((row) => (
+                <div
+                  key={`${row.work_context}:${row.reporting_currency}:owner-payout`}
+                  className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-foreground">{row.label}</p>
+                      <p className="mt-1 text-xs text-foreground-muted">
+                        {row.contextLabel} · {row.entry_count} payment{row.entry_count === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <p className="text-sm font-medium text-foreground">
+                      {formatMoney(row.fee_total, row.reporting_currency)}
+                    </p>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs text-foreground-muted sm:grid-cols-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Gross handled</span>
+                      <span>{formatMoney(row.gross_total, row.reporting_currency)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Approx SumUp drag</span>
+                      <span>{formatMoney(row.processor_fee_total, row.reporting_currency)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-foreground-muted">
+              No owner payouts accumulated for {formatMonthLabel(month)} yet.
+            </p>
+          )}
+        </AdminSurface>
+
+        <AdminSurface>
+          <AdminSectionHeading
+            title="Italy 5% Preview"
+            description="Planning-only view for Lia’s current Italian setup. This is intentionally a rough comparison layer, not a source of tax truth."
+          />
+
+          {loading || !summary || !italyPreview ? (
+            <p className="text-sm text-foreground-muted">Loading planning preview...</p>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                  Approx after Italian 5% preview
+                </p>
+                <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
+                  {formatMoney(
+                    italyPreview.primaryAfterTax,
+                    summary.approx_primary.currency
+                  )}
+                </div>
+                <p className="mt-2 text-xs text-foreground-muted">
+                  Approx tax reserve {formatMoney(
+                    italyPreview.primaryTax,
+                    summary.approx_primary.currency
+                  )}
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl bg-white p-4 shadow-sm">
+                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                    {summary.approx_primary.currency} planning view
+                  </p>
+                  <p className="mt-2 font-medium text-foreground">
+                    {formatMoney(summary.month_total, summary.approx_primary.currency)} real net
+                  </p>
+                  <p className="mt-1 text-sm text-foreground-muted">
+                    {formatMoney(
+                      italyPreview.primaryAfterTax,
+                      summary.approx_primary.currency
+                    )} after preview reserve
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-white p-4 shadow-sm">
+                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                    {summary.approx_secondary.currency} planning view
+                  </p>
+                  <p className="mt-2 font-medium text-foreground">
+                    {formatMoney(
+                      summary.approx_secondary.amount,
+                      summary.approx_secondary.currency
+                    )} real net
+                  </p>
+                  <p className="mt-1 text-sm text-foreground-muted">
+                    {formatMoney(
+                      italyPreview.secondaryAfterTax,
+                      summary.approx_secondary.currency
+                    )} after preview reserve
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-2xl bg-[var(--sabbia-50)] px-4 py-3 text-xs text-foreground-muted">
+                Side thought: this is the right place for future Sweden scenarios too. Keep simulations separate from the real ledger or the dashboard becomes an expensive hallucination.
+              </div>
+            </div>
+          )}
+        </AdminSurface>
+      </div>
+
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
           <AdminSurface>
@@ -919,7 +1130,7 @@ export default function AdminFinancePage() {
                       <th className="px-4 py-3 font-medium">Context</th>
                       <th className="px-4 py-3 font-medium">Gross</th>
                       <th className="px-4 py-3 font-medium">Studio fee</th>
-                      <th className="px-4 py-3 font-medium">Card fee</th>
+                      <th className="px-4 py-3 font-medium">Card fee impact</th>
                       <th className="px-4 py-3 font-medium">Take-home</th>
                     </tr>
                   </thead>
@@ -963,7 +1174,7 @@ export default function AdminFinancePage() {
           <AdminSurface>
             <AdminSectionHeading
               title="Projects this month"
-              description="Each payment shows gross, studio fee, card fee, and take-home so Lia doesn’t need to mentally reverse-engineer every line."
+              description="Each payment shows studio-settlement numbers in the local bucket plus the raw SumUp fee in EUR, so the money trail matches reality."
             />
 
             {loading ? (
@@ -1013,16 +1224,16 @@ export default function AdminFinancePage() {
                               </div>
                               <div className="grid gap-1 text-right text-xs sm:min-w-48">
                                 <p className="text-foreground-muted">
-                                  Gross {formatMoney(payment.gross_amount, payment.currency)}
+                                  Gross {formatMoney(payment.gross_amount_reporting, payment.reporting_currency)}
                                 </p>
                                 <p className="text-foreground-muted">
-                                  Studio fee {formatMoney(payment.fee_amount, payment.currency)}
+                                  Studio fee {formatMoney(payment.fee_amount, payment.reporting_currency)}
                                 </p>
                                 <p className="text-foreground-muted">
-                                  Card fee {formatMoney(payment.processor_fee_amount, payment.currency)}
+                                  Card fee {formatMoney(payment.processor_fee_amount, payment.processor_fee_currency)}
                                 </p>
                                 <p className="font-medium text-foreground">
-                                  Take-home {formatMoney(payment.net_amount, payment.currency)}
+                                  Take-home {formatMoney(payment.net_amount, payment.reporting_currency)}
                                 </p>
                               </div>
                             </div>
@@ -1113,30 +1324,35 @@ export default function AdminFinancePage() {
           <AdminSurface>
             <AdminSectionHeading
               title="Invoice reminders"
-              description="Card payments should nudge Lia to invoice without locking her into some bureaucratic pantomime."
+              description="Card payments should still nudge Lia to invoice, now with simple age-based urgency instead of a polite little graveyard."
             />
 
             {loading ? (
               <p className="text-sm text-foreground-muted">Loading reminders...</p>
-            ) : invoiceReminders.length > 0 ? (
+            ) : invoiceReminderGroups.length > 0 ? (
               <div className="space-y-3">
-                {invoiceReminders.map((payment) => (
+                {invoiceReminderGroups.map((payment) => (
                   <div
                     key={payment.id}
                     className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm"
                   >
-                    <p className="font-medium text-foreground">{payment.client_name}</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-medium text-foreground">{payment.client_name}</p>
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] ${payment.ageTone}`}>
+                        {payment.ageLabel}
+                      </span>
+                    </div>
                     <p className="mt-1 text-xs text-foreground-muted">
                       {payment.project_label} · {payment.payment_date} · {FINANCE_PAYMENT_METHOD_LABELS[payment.payment_method]}
                     </p>
                     <div className="mt-2 grid gap-1 text-xs text-foreground-muted">
-                      <p>Gross {formatMoney(payment.gross_amount, payment.currency)}</p>
-                      <p>Studio fee {formatMoney(payment.fee_amount, payment.currency)}</p>
-                      <p>Card fee {formatMoney(payment.processor_fee_amount, payment.currency)}</p>
+                      <p>Gross {formatMoney(payment.gross_amount_reporting, payment.reporting_currency)}</p>
+                      <p>Studio fee {formatMoney(payment.fee_amount, payment.reporting_currency)}</p>
+                      <p>Card fee {formatMoney(payment.processor_fee_amount, payment.processor_fee_currency)}</p>
                     </div>
                     <div className="mt-3 flex items-center justify-between gap-3">
                       <span className="text-xs text-foreground-muted">
-                        Take-home {formatMoney(payment.net_amount, payment.currency)}
+                        Take-home {formatMoney(payment.net_amount, payment.reporting_currency)}
                       </span>
                       <AdminButton
                         variant="secondary"

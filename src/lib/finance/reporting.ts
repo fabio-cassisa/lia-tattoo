@@ -1,6 +1,5 @@
 import {
   calculateFeeAmount,
-  calculateNetAmount,
   calculateProcessorFeeAmount,
 } from "@/lib/finance/config";
 import type {
@@ -27,6 +26,8 @@ type ResolvedExchangeRates = {
   dkk_to_eur: number;
 };
 
+const CARD_PROCESSOR_CURRENCY: FinanceCurrency = "EUR";
+
 const DEFAULT_EUR_TO_SEK = 11.6;
 const DEFAULT_EUR_TO_DKK = 7.46;
 
@@ -52,35 +53,59 @@ export function getPaymentMonthKey(paymentDate: string): string {
   return paymentDate.slice(0, 7);
 }
 
-export function derivePayment(payment: FinancePaymentRow): FinancePaymentDerived {
-  const fee_amount = calculateFeeAmount(payment.gross_amount, payment.fee_percentage);
+export function derivePayment(
+  payment: FinancePaymentRow,
+  rates?: ResolvedExchangeRates
+): FinancePaymentDerived {
+  const gross_amount_reporting = rates
+    ? convertAmount(payment.gross_amount, payment.currency, payment.reporting_currency, rates)
+    : payment.gross_amount;
+  const fee_amount = calculateFeeAmount(gross_amount_reporting, payment.fee_percentage);
+  const processor_fee_currency: FinanceCurrency =
+    payment.payment_method === "card" ? CARD_PROCESSOR_CURRENCY : payment.currency;
+  const gross_amount_processor =
+    processor_fee_currency === payment.currency
+      ? payment.gross_amount
+      : rates
+        ? convertAmount(payment.gross_amount, payment.currency, processor_fee_currency, rates)
+        : payment.gross_amount;
   const processor_fee_amount = calculateProcessorFeeAmount(
-    payment.gross_amount,
+    gross_amount_processor,
     payment.processor_fee_percentage
   );
-  const net_amount = calculateNetAmount(
-    payment.gross_amount,
-    payment.fee_percentage,
-    payment.processor_fee_percentage
+  const processor_fee_amount_reporting = rates
+    ? convertAmount(
+        processor_fee_amount,
+        processor_fee_currency,
+        payment.reporting_currency,
+        rates
+      )
+    : processor_fee_amount;
+  const net_amount = roundMoney(
+    gross_amount_reporting - fee_amount - processor_fee_amount_reporting
   );
 
   return {
     ...payment,
+    gross_amount_reporting,
     fee_amount,
+    processor_fee_currency,
     processor_fee_amount,
+    processor_fee_amount_reporting,
     net_amount,
   };
 }
 
 export function buildProjectsWithPayments(
   projects: FinanceProjectRow[],
-  payments: FinancePaymentRow[]
+  payments: FinancePaymentRow[],
+  rates?: ResolvedExchangeRates
 ): FinanceProjectWithPayments[] {
   const paymentsByProject = new Map<string, FinancePaymentDerived[]>();
 
   for (const payment of payments) {
     const list = paymentsByProject.get(payment.project_id) ?? [];
-    list.push(derivePayment(payment));
+    list.push(derivePayment(payment, rates));
     paymentsByProject.set(payment.project_id, list);
   }
 
@@ -234,8 +259,8 @@ export function getNetTotalsByCurrency(
 
 export function getFeeTotalsByCurrency(
   payments: FinancePaymentDerived[],
-  field: "currency" | "reporting_currency" = "reporting_currency",
-  amountField: "fee_amount" | "processor_fee_amount" = "fee_amount"
+  field: "currency" | "reporting_currency" | "processor_fee_currency" = "reporting_currency",
+  amountField: "fee_amount" | "processor_fee_amount" | "processor_fee_amount_reporting" = "fee_amount"
 ): Record<FinanceCurrency, number> {
   const totals: Record<FinanceCurrency, number> = {
     SEK: 0,
@@ -276,9 +301,9 @@ export function getFeeTotalsByContext(
 
       current.fee_total = roundMoney(current.fee_total + payment.fee_amount);
       current.processor_fee_total = roundMoney(
-        current.processor_fee_total + payment.processor_fee_amount
+        current.processor_fee_total + payment.processor_fee_amount_reporting
       );
-      current.gross_total = roundMoney(current.gross_total + payment.gross_amount);
+      current.gross_total = roundMoney(current.gross_total + payment.gross_amount_reporting);
       current.net_total = roundMoney(current.net_total + payment.net_amount);
       current.entry_count += 1;
 
@@ -334,7 +359,13 @@ export function buildWeeklySummary(
       current.studio_fee_total + convertAmount(payment.fee_amount, payment.reporting_currency, primaryCurrency, rates)
     );
     current.processor_fee_total = roundMoney(
-      current.processor_fee_total + convertAmount(payment.processor_fee_amount, payment.currency, primaryCurrency, rates)
+      current.processor_fee_total +
+        convertAmount(
+          payment.processor_fee_amount,
+          payment.processor_fee_currency,
+          primaryCurrency,
+          rates
+        )
     );
 
     weekMap.set(weekKey, current);
@@ -370,7 +401,13 @@ export function buildMonthlyTrend(
         current.studio_fee_total + convertAmount(payment.fee_amount, payment.reporting_currency, primaryCurrency, rates)
       );
       current.processor_fee_total = roundMoney(
-        current.processor_fee_total + convertAmount(payment.processor_fee_amount, payment.currency, primaryCurrency, rates)
+        current.processor_fee_total +
+          convertAmount(
+            payment.processor_fee_amount,
+            payment.processor_fee_currency,
+            primaryCurrency,
+            rates
+          )
       );
       if (payment.invoice_needed) current.invoice_count += 1;
 
