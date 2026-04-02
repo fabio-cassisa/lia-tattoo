@@ -4,11 +4,16 @@ import type {
   BookingType,
   FinanceContextSettingsRow,
   FinanceCurrency,
+  FinanceFixedCostCategory,
+  FinanceFixedCostCadence,
+  FinanceFixedCostRow,
   FinanceItalyInpsRegime,
   FinancePaymentRow,
   FinanceSettingsRow,
   FinanceProjectRow,
   FinanceTaxFramework,
+  FinanceVariableExpenseCategory,
+  FinanceVariableExpenseRow,
   FinanceWorkContext,
 } from "@/lib/supabase/database.types";
 
@@ -130,6 +135,70 @@ export type FinanceSwedenTaxSettings = {
   state_tax_rate: number;
 };
 
+export type FinanceFixedCostDraft = FinanceFixedCostRow;
+
+export type FinanceFixedCostSummary = {
+  annual_total_primary: number;
+  annual_total_eur: number;
+  configured_count: number;
+  missing_amount_count: number;
+  due_soon: Array<{
+    id: string;
+    label: string;
+    currency: FinanceCurrency;
+    amount: number | null;
+    due_month: number;
+    cadence: FinanceFixedCostCadence;
+    category: FinanceFixedCostCategory;
+    missing_amount: boolean;
+  }>;
+};
+
+export type FinanceKeepScenarioKey = "italy_current" | "italy_standard" | "sweden";
+
+export type FinanceKeepScenarioSummary = {
+  key: FinanceKeepScenarioKey;
+  label: string;
+  framework: FinanceTaxFramework;
+  active: boolean;
+  currency: FinanceCurrency;
+  invoiced_payment_count: number;
+  invoiced_gross: number;
+  studio_fees: number;
+  processor_fees: number;
+  tax_reserve: number;
+  fixed_cost_reserve: number;
+  variable_expense_reserve: number;
+  estimated_keep: number;
+  reserve_rate: number;
+  missing_fixed_cost_count: number;
+  notes: string[];
+};
+
+export type FinanceKeepSummary = {
+  month: string;
+  currency: FinanceCurrency;
+  invoiced_payment_count: number;
+  excluded_payment_count: number;
+  variable_expense_total: number;
+  scenarios: {
+    italy_current: FinanceKeepScenarioSummary;
+    italy_standard: FinanceKeepScenarioSummary;
+    sweden: FinanceKeepScenarioSummary;
+  };
+};
+
+export type FinanceVariableExpenseSummary = {
+  month_total_primary: number;
+  month_total_eur: number;
+  entry_count: number;
+  by_category: Array<{
+    category: FinanceVariableExpenseCategory;
+    total_primary: number;
+    entry_count: number;
+  }>;
+};
+
 export type FinanceTaxSummary = {
   tax_year: number;
   tax_base_months: string[];
@@ -164,6 +233,9 @@ export type FinanceDashboardSummary = {
   weekly: FinanceWeeklySummary[];
   monthly_trend: FinanceMonthlyTrendPoint[];
   monthly_context_payouts: FinanceMonthlyContextPayout[];
+  fixed_costs: FinanceFixedCostSummary;
+  variable_expenses: FinanceVariableExpenseSummary;
+  keep_summary: FinanceKeepSummary;
   tax_summary: FinanceTaxSummary;
 };
 
@@ -172,6 +244,8 @@ export type FinanceDashboardResponse = {
   summary: FinanceDashboardSummary;
   context_settings: FinanceContextSettingsRow[];
   settings: FinanceSettingsRow;
+  fixed_costs: FinanceFixedCostRow[];
+  variable_expenses: FinanceVariableExpenseRow[];
   bookings: FinanceBookingOption[];
   projects: FinanceProjectWithPayments[];
   invoice_reminders: FinanceInvoiceReminder[];
@@ -180,4 +254,5 @@ export type FinanceDashboardResponse = {
 export type FinanceSettingsResponse = {
   context_settings: FinanceContextSettingsRow[];
   settings: FinanceSettingsRow;
+  fixed_costs: FinanceFixedCostRow[];
 };

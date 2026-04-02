@@ -5,8 +5,11 @@ import {
   filterProjectsForMonth,
   buildProjectsWithPayments,
   buildInvoiceReminders,
+  buildFixedCostSummary,
+  buildKeepSummary,
   buildMonthlyContextPayouts,
   buildMonthlyTrend,
+  buildVariableExpenseSummary,
   buildWeeklySummary,
   buildTaxSummary,
   getNetTotalsByCurrency,
@@ -29,6 +32,7 @@ import type {
   FinancePaymentMethod,
   FinanceProjectInsert,
   FinanceSettingsRow,
+  FinanceVariableExpenseInsert,
   FinanceWorkContext,
 } from "@/lib/supabase/database.types";
 import type {
@@ -52,6 +56,8 @@ async function loadFinanceBase(admin = createAdminClient()) {
   const [
     contextResult,
     settingsResult,
+    fixedCostsResult,
+    variableExpensesResult,
     projectsResult,
     paymentsResult,
     bookingsResult,
@@ -61,6 +67,16 @@ async function loadFinanceBase(admin = createAdminClient()) {
       .select("*")
       .order("sort_order", { ascending: true }),
     admin.from("finance_settings").select("*").eq("scope", "default").single(),
+    admin
+      .from("finance_fixed_costs")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
+    admin
+      .from("finance_variable_expenses")
+      .select("*")
+      .order("expense_date", { ascending: false })
+      .order("created_at", { ascending: false }),
     admin
       .from("finance_projects")
       .select("*")
@@ -81,6 +97,8 @@ async function loadFinanceBase(admin = createAdminClient()) {
 
   if (contextResult.error) throw contextResult.error;
   if (settingsResult.error) throw settingsResult.error;
+  if (fixedCostsResult.error) throw fixedCostsResult.error;
+  if (variableExpensesResult.error) throw variableExpensesResult.error;
   if (projectsResult.error) throw projectsResult.error;
   if (paymentsResult.error) throw paymentsResult.error;
   if (bookingsResult.error) throw bookingsResult.error;
@@ -88,6 +106,8 @@ async function loadFinanceBase(admin = createAdminClient()) {
   return {
     contextSettings: contextResult.data ?? [],
     settings: settingsResult.data as FinanceSettingsRow,
+    fixedCosts: fixedCostsResult.data ?? [],
+    variableExpenses: variableExpensesResult.data ?? [],
     projects: projectsResult.data ?? [],
     payments: paymentsResult.data ?? [],
     bookings: (bookingsResult.data ?? []) as Pick<
@@ -130,7 +150,15 @@ function buildBookingOptions(
 
 async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboardResponse> {
   const admin = createAdminClient();
-  const { contextSettings, settings, projects, payments, bookings } = await loadFinanceBase(admin);
+  const {
+    contextSettings,
+    settings,
+    fixedCosts,
+    variableExpenses,
+    projects,
+    payments,
+    bookings,
+  } = await loadFinanceBase(admin);
   const rates = await resolveExchangeRates(settings);
 
   const projectsWithPayments = buildProjectsWithPayments(projects, payments, rates);
@@ -177,6 +205,26 @@ async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboar
     settings.reporting_currency_secondary,
     rates
   );
+  const fixedCostsSummary = buildFixedCostSummary(
+    fixedCosts,
+    settings.reporting_currency_primary,
+    rates,
+    monthKey
+  );
+  const variableExpensesSummary = buildVariableExpenseSummary(
+    variableExpenses,
+    settings.reporting_currency_primary,
+    rates,
+    monthKey
+  );
+  const keepSummary = buildKeepSummary(
+    projectsWithPayments,
+    settings,
+    fixedCosts,
+    variableExpenses,
+    rates,
+    monthKey
+  );
   const taxSummary = buildTaxSummary(projectsWithPayments, settings, rates, monthKey);
 
   const previousMonth = getPreviousMonthKey(monthKey);
@@ -221,10 +269,15 @@ async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboar
       weekly,
       monthly_trend: monthlyTrend,
       monthly_context_payouts: monthlyContextPayouts,
+      fixed_costs: fixedCostsSummary,
+      variable_expenses: variableExpensesSummary,
+      keep_summary: keepSummary,
       tax_summary: taxSummary,
     },
     context_settings: contextSettings,
     settings,
+    fixed_costs: fixedCosts,
+    variable_expenses: variableExpenses,
     bookings: buildBookingOptions(bookings, projectsWithPayments),
     projects: monthlyProjects,
     invoice_reminders: invoiceReminders,
@@ -290,6 +343,48 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const admin = createAdminClient();
+    const entryType = getString(body.entry_type) ?? "payment";
+
+    if (entryType === "variable_expense") {
+      const expenseDate = getString(body.expense_date);
+      const label = getString(body.label);
+      const category = getString(body.category);
+      const amount = getNumber(body.amount);
+
+      if (!expenseDate || !label || !category || amount === null) {
+        return Response.json(
+          { error: "Expense date, label, category, and amount are required" },
+          { status: 400 }
+        );
+      }
+
+      if (!["needles", "ink", "supplies", "equipment", "travel", "other"].includes(category)) {
+        return Response.json({ error: "Invalid expense category" }, { status: 400 });
+      }
+
+      const { settings } = await loadFinanceBase(admin);
+      const expenseInsert: FinanceVariableExpenseInsert = {
+        expense_date: expenseDate,
+        label,
+        category: category as FinanceVariableExpenseInsert["category"],
+        amount,
+        currency: isCurrency(body.currency) ? body.currency : settings.reporting_currency_primary,
+        notes: getString(body.notes),
+      };
+
+      const { error: expenseError } = await admin
+        .from("finance_variable_expenses")
+        .insert(expenseInsert);
+
+      if (expenseError) {
+        console.error("Finance variable expense create error:", expenseError);
+        return Response.json({ error: "Failed to create expense" }, { status: 500 });
+      }
+
+      const monthKey = normalizeMonthKey(expenseDate.slice(0, 7));
+      const response = await buildDashboardResponse(monthKey);
+      return Response.json({ message: "Expense created", ...response });
+    }
 
     const clientName = getString(body.client_name);
     const projectLabel = getString(body.project_label);
@@ -365,6 +460,10 @@ export async function POST(request: NextRequest) {
       reporting_currency: reportingCurrency,
       payment_method: paymentMethod,
       fee_percentage: feePercentage,
+      studio_fee_base_amount: getNumber(body.studio_fee_base_amount),
+      studio_fee_base_currency: isCurrency(body.studio_fee_base_currency)
+        ? body.studio_fee_base_currency
+        : null,
       processor_fee_percentage: processorFeePercentage,
       invoice_needed: invoiceNeeded,
       invoice_done: invoiceDone,
@@ -400,9 +499,41 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const id = getString(body.id);
+    const entryType = getString(body.entry_type) ?? "payment";
 
     if (!id) {
       return Response.json({ error: "Payment ID is required" }, { status: 400 });
+    }
+
+    if (entryType === "variable_expense") {
+      const action = getString(body.action) ?? "update";
+      const admin = createAdminClient();
+
+      if (action === "delete") {
+        const { data: existingExpense, error: existingExpenseError } = await admin
+          .from("finance_variable_expenses")
+          .select("expense_date")
+          .eq("id", id)
+          .single();
+
+        if (existingExpenseError || !existingExpense) {
+          return Response.json({ error: "Expense not found" }, { status: 404 });
+        }
+
+        const { error: deleteError } = await admin
+          .from("finance_variable_expenses")
+          .delete()
+          .eq("id", id);
+
+        if (deleteError) {
+          console.error("Finance variable expense delete error:", deleteError);
+          return Response.json({ error: "Failed to delete expense" }, { status: 500 });
+        }
+
+        const monthKey = normalizeMonthKey(existingExpense.expense_date.slice(0, 7));
+        const response = await buildDashboardResponse(monthKey);
+        return Response.json({ message: "Expense deleted", ...response });
+      }
     }
 
     const updates: Record<string, unknown> = {};

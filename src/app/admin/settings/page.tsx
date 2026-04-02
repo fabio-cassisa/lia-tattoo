@@ -27,6 +27,9 @@ import {
   DEFAULT_SWEDEN_STATE_TAX_RATE,
   DEFAULT_SWEDEN_STATE_TAX_THRESHOLD,
   DEFAULT_SWEDEN_TAX_LABEL,
+  FINANCE_FIXED_COST_CADENCE_LABELS,
+  FINANCE_FIXED_COST_CADENCE_OPTIONS,
+  FINANCE_FIXED_COST_CATEGORY_LABELS,
   FINANCE_ITALY_INPS_REGIME_LABELS,
   FINANCE_ITALY_INPS_REGIME_OPTIONS,
   FINANCE_TAX_FRAMEWORK_LABELS,
@@ -37,12 +40,13 @@ import {
 import type {
   FinanceContextSettingsRow,
   FinanceCurrency,
+  FinanceFixedCostCadence,
   FinanceItalyInpsRegime,
   FinanceSettingsRow,
   FinanceTaxFramework,
   FinanceWorkContext,
 } from "@/lib/supabase/database.types";
-import type { FinanceSettingsResponse } from "@/lib/finance/types";
+import type { FinanceFixedCostDraft, FinanceSettingsResponse } from "@/lib/finance/types";
 
 type ContextDraft = FinanceContextSettingsRow;
 
@@ -78,6 +82,7 @@ export default function AdminSettingsPage() {
   const router = useRouter();
   const [contexts, setContexts] = useState<ContextDraft[]>([]);
   const [settings, setSettings] = useState<SettingsDraft | null>(null);
+  const [fixedCosts, setFixedCosts] = useState<FinanceFixedCostDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -100,6 +105,7 @@ export default function AdminSettingsPage() {
 
       const data = (await response.json()) as FinanceSettingsResponse;
       setContexts(data.context_settings);
+      setFixedCosts(data.fixed_costs);
       setSettings({
         reporting_currency_primary: data.settings.reporting_currency_primary,
         reporting_currency_secondary: data.settings.reporting_currency_secondary,
@@ -173,6 +179,26 @@ export default function AdminSettingsPage() {
     setSettings((current) => (current ? { ...current, [key]: value } : current));
   }
 
+  function updateFixedCost(id: string, key: keyof FinanceFixedCostDraft, value: unknown) {
+    setFixedCosts((current) =>
+      current.map((item) => (item.id === id ? { ...item, [key]: value } : item))
+    );
+  }
+
+  function updateFixedCostDueMonth(id: string, month: number, checked: boolean) {
+    setFixedCosts((current) =>
+      current.map((item) => {
+        if (item.id !== id) return item;
+
+        const nextDueMonths = checked
+          ? [...new Set([...item.due_months, month])].sort((a, b) => a - b)
+          : item.due_months.filter((value) => value !== month);
+
+        return { ...item, due_months: nextDueMonths };
+      })
+    );
+  }
+
   async function handleSave() {
     if (!settings) return;
     setSaving(true);
@@ -193,6 +219,7 @@ export default function AdminSettingsPage() {
             is_active: context.is_active,
           })),
           settings,
+          fixed_costs: fixedCosts,
         }),
       });
 
@@ -833,6 +860,147 @@ export default function AdminSettingsPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </AdminSurface>
+
+            <AdminSurface>
+              <AdminSectionHeading
+                title="Fixed business costs"
+                description="Keep statutory and recurring overhead standardized here. Missing amounts stay visible but excluded from totals until you know them."
+              />
+
+              <div className="space-y-4 text-sm text-foreground-muted">
+                {fixedCosts.map((cost) => (
+                  <div
+                    key={cost.id}
+                    className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4"
+                  >
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                      <label className="text-sm text-foreground-muted">
+                        Label
+                        <input
+                          value={cost.label}
+                          onChange={(event) => updateFixedCost(cost.id, "label", event.target.value)}
+                          className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                          style={{ fontSize: "16px" }}
+                        />
+                      </label>
+
+                      <div className="text-sm text-foreground-muted">
+                        Category
+                        <div className="mt-1 rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-foreground">
+                          {FINANCE_FIXED_COST_CATEGORY_LABELS[cost.category]}
+                        </div>
+                      </div>
+
+                      <label className="text-sm text-foreground-muted">
+                        Annual amount
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={cost.annual_amount ?? ""}
+                          onChange={(event) =>
+                            updateFixedCost(
+                              cost.id,
+                              "annual_amount",
+                              event.target.value ? Number(event.target.value) : null
+                            )
+                          }
+                          placeholder="Amount pending"
+                          className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                          style={{ fontSize: "16px" }}
+                        />
+                      </label>
+
+                      <label className="text-sm text-foreground-muted">
+                        Cadence
+                        <select
+                          value={cost.cadence}
+                          onChange={(event) =>
+                            updateFixedCost(
+                              cost.id,
+                              "cadence",
+                              event.target.value as FinanceFixedCostCadence
+                            )
+                          }
+                          className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                          style={{ fontSize: "16px" }}
+                        >
+                          {FINANCE_FIXED_COST_CADENCE_OPTIONS.map((cadence) => (
+                            <option key={cadence} value={cadence}>
+                              {FINANCE_FIXED_COST_CADENCE_LABELS[cadence]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <label className="text-sm text-foreground-muted">
+                        Notes
+                        <input
+                          value={cost.notes ?? ""}
+                          onChange={(event) =>
+                            updateFixedCost(cost.id, "notes", event.target.value || null)
+                          }
+                          className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                          style={{ fontSize: "16px" }}
+                        />
+                      </label>
+
+                      <div className="text-sm text-foreground-muted">
+                        Due months
+                        <div className="mt-1 grid grid-cols-4 gap-2 rounded-xl border border-[var(--sabbia-200)] bg-white p-3 text-xs text-foreground-muted sm:grid-cols-6">
+                          {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+                            <label key={month} className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={cost.due_months.includes(month)}
+                                onChange={(event) =>
+                                  updateFixedCostDueMonth(cost.id, month, event.target.checked)
+                                }
+                              />
+                              {String(month).padStart(2, "0")}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-end gap-3">
+                        <label className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-foreground">
+                          <input
+                            type="checkbox"
+                            checked={cost.already_counted_in_tax_model}
+                            onChange={(event) =>
+                              updateFixedCost(
+                                cost.id,
+                                "already_counted_in_tax_model",
+                                event.target.checked
+                              )
+                            }
+                          />
+                          Already counted in tax model
+                        </label>
+                        <label className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-foreground">
+                          <input
+                            type="checkbox"
+                            checked={cost.is_active}
+                            onChange={(event) =>
+                              updateFixedCost(cost.id, "is_active", event.target.checked)
+                            }
+                          />
+                          Active
+                        </label>
+                      </div>
+                    </div>
+
+                    <p className="mt-3 text-xs text-foreground-muted">
+                      {cost.framework ? `${FINANCE_TAX_FRAMEWORK_LABELS[cost.framework]} model` : "Shared"} · {cost.currency}
+                      {cost.annual_amount === null ? " · amount pending" : ""}
+                    </p>
+                  </div>
+                ))}
               </div>
             </AdminSurface>
           </div>

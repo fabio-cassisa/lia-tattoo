@@ -48,6 +48,23 @@ export type FinanceTaxFramework = "italy" | "sweden";
 
 export type FinanceItalyInpsRegime = "artigiani" | "commercianti";
 
+export type FinanceFixedCostCategory =
+  | "statutory"
+  | "software"
+  | "professional"
+  | "insurance"
+  | "other";
+
+export type FinanceFixedCostCadence = "monthly" | "quarterly" | "annual";
+
+export type FinanceVariableExpenseCategory =
+  | "needles"
+  | "ink"
+  | "supplies"
+  | "equipment"
+  | "travel"
+  | "other";
+
 export type BookingRow = {
   id: string;
   created_at: string;
@@ -247,6 +264,58 @@ export type FinanceSettingsInsert = {
   sweden_preview_fixed_monthly_cost?: number;
 };
 
+export type FinanceFixedCostRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  label: string;
+  category: FinanceFixedCostCategory;
+  framework: FinanceTaxFramework | null;
+  currency: FinanceCurrency;
+  cadence: FinanceFixedCostCadence;
+  annual_amount: number | null;
+  due_months: number[];
+  notes: string | null;
+  already_counted_in_tax_model: boolean;
+  sort_order: number;
+  is_active: boolean;
+};
+
+export type FinanceFixedCostInsert = {
+  label: string;
+  category: FinanceFixedCostCategory;
+  framework?: FinanceTaxFramework | null;
+  currency?: FinanceCurrency;
+  cadence?: FinanceFixedCostCadence;
+  annual_amount?: number | null;
+  due_months?: number[];
+  notes?: string | null;
+  already_counted_in_tax_model?: boolean;
+  sort_order?: number;
+  is_active?: boolean;
+};
+
+export type FinanceVariableExpenseRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  expense_date: string;
+  label: string;
+  category: FinanceVariableExpenseCategory;
+  amount: number;
+  currency: FinanceCurrency;
+  notes: string | null;
+};
+
+export type FinanceVariableExpenseInsert = {
+  expense_date: string;
+  label: string;
+  category: FinanceVariableExpenseCategory;
+  amount: number;
+  currency?: FinanceCurrency;
+  notes?: string | null;
+};
+
 export type FinanceProjectRow = {
   id: string;
   created_at: string;
@@ -282,6 +351,8 @@ export type FinancePaymentRow = {
   reporting_currency: FinanceCurrency;
   payment_method: FinancePaymentMethod;
   fee_percentage: number;
+  studio_fee_base_amount: number | null;
+  studio_fee_base_currency: FinanceCurrency | null;
   processor_fee_percentage: number;
   invoice_needed: boolean;
   invoice_done: boolean;
@@ -300,6 +371,8 @@ export type FinancePaymentInsert = {
   reporting_currency: FinanceCurrency;
   payment_method: FinancePaymentMethod;
   fee_percentage?: number;
+  studio_fee_base_amount?: number | null;
+  studio_fee_base_currency?: FinanceCurrency | null;
   processor_fee_percentage?: number;
   invoice_needed?: boolean;
   invoice_done?: boolean;
@@ -364,6 +437,18 @@ export type Database = {
         Row: FinancePaymentRow;
         Insert: FinancePaymentInsert;
         Update: Partial<FinancePaymentRow>;
+        Relationships: [];
+      };
+      finance_fixed_costs: {
+        Row: FinanceFixedCostRow;
+        Insert: FinanceFixedCostInsert;
+        Update: Partial<FinanceFixedCostRow>;
+        Relationships: [];
+      };
+      finance_variable_expenses: {
+        Row: FinanceVariableExpenseRow;
+        Insert: FinanceVariableExpenseInsert;
+        Update: Partial<FinanceVariableExpenseRow>;
         Relationships: [];
       };
     };

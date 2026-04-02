@@ -1,9 +1,12 @@
 import type {
   FinanceContextSettingsRow,
   FinanceCurrency,
+  FinanceFixedCostCadence,
+  FinanceFixedCostCategory,
   FinanceItalyInpsRegime,
   FinancePaymentMethod,
   FinanceTaxFramework,
+  FinanceVariableExpenseCategory,
   FinanceWorkContext,
 } from "@/lib/supabase/database.types";
 
@@ -89,13 +92,64 @@ export const DEFAULT_ITALY_STANDARD_TAX_RATE = 15;
 export const DEFAULT_ITALY_PROFITABILITY_COEFFICIENT = 67;
 export const DEFAULT_ITALY_INPS_REGIME: FinanceItalyInpsRegime = "artigiani";
 export const DEFAULT_ITALY_INPS_MIN_TAXABLE_INCOME = 18555;
-export const DEFAULT_ITALY_INPS_FIXED_ANNUAL_CONTRIBUTION = 4460.64;
+export const DEFAULT_ITALY_ACTUAL_INPS_FIXED_ANNUAL_CONTRIBUTION = 2902.08;
+export const DEFAULT_ITALY_INPS_FIXED_ANNUAL_CONTRIBUTION =
+  DEFAULT_ITALY_ACTUAL_INPS_FIXED_ANNUAL_CONTRIBUTION;
 export const DEFAULT_ITALY_INPS_VARIABLE_RATE = 24;
 export const DEFAULT_SWEDEN_TAX_LABEL = "Sweden comparison setup";
 export const DEFAULT_SWEDEN_SELF_EMPLOYMENT_CONTRIBUTION_RATE = 28.97;
 export const DEFAULT_SWEDEN_MUNICIPAL_TAX_RATE = 32.41;
 export const DEFAULT_SWEDEN_STATE_TAX_THRESHOLD = 625800;
 export const DEFAULT_SWEDEN_STATE_TAX_RATE = 20;
+
+export const FINANCE_FIXED_COST_CATEGORY_LABELS: Record<FinanceFixedCostCategory, string> = {
+  statutory: "Statutory",
+  software: "Software",
+  professional: "Professional",
+  insurance: "Insurance",
+  other: "Other",
+};
+
+export const FINANCE_FIXED_COST_CADENCE_LABELS: Record<FinanceFixedCostCadence, string> = {
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+  annual: "Annual",
+};
+
+export const FINANCE_FIXED_COST_CATEGORY_OPTIONS: FinanceFixedCostCategory[] = [
+  "statutory",
+  "software",
+  "professional",
+  "insurance",
+  "other",
+];
+
+export const FINANCE_FIXED_COST_CADENCE_OPTIONS: FinanceFixedCostCadence[] = [
+  "monthly",
+  "quarterly",
+  "annual",
+];
+
+export const FINANCE_VARIABLE_EXPENSE_CATEGORY_LABELS: Record<
+  FinanceVariableExpenseCategory,
+  string
+> = {
+  needles: "Needles",
+  ink: "Ink",
+  supplies: "Supplies",
+  equipment: "Equipment",
+  travel: "Travel",
+  other: "Other",
+};
+
+export const FINANCE_VARIABLE_EXPENSE_CATEGORY_OPTIONS: FinanceVariableExpenseCategory[] = [
+  "needles",
+  "ink",
+  "supplies",
+  "equipment",
+  "travel",
+  "other",
+];
 
 export function paymentMethodNeedsInvoiceByDefault(
   method: FinancePaymentMethod

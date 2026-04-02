@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -17,6 +18,8 @@ import {
   DEFAULT_CARD_PROCESSOR_FEE_PERCENTAGE,
   FINANCE_CURRENCY_OPTIONS,
   FINANCE_TAX_FRAMEWORK_LABELS,
+  FINANCE_VARIABLE_EXPENSE_CATEGORY_LABELS,
+  FINANCE_VARIABLE_EXPENSE_CATEGORY_OPTIONS,
   FINANCE_PAYMENT_METHOD_LABELS,
   FINANCE_PAYMENT_METHOD_OPTIONS,
   FINANCE_WORK_CONTEXT_OPTIONS,
@@ -28,6 +31,7 @@ import { getPreviousMonthKey, normalizeMonthKey } from "@/lib/finance/reporting"
 import type {
   FinanceCurrency,
   FinancePaymentMethod,
+  FinanceVariableExpenseCategory,
   FinanceWorkContext,
 } from "@/lib/supabase/database.types";
 import type {
@@ -49,12 +53,23 @@ type FinanceFormState = {
   reporting_currency: FinanceCurrency;
   payment_method: FinancePaymentMethod;
   fee_percentage: string;
+  studio_fee_base_amount: string;
+  studio_fee_base_currency: FinanceCurrency;
   processor_fee_percentage: string;
   invoice_needed: boolean;
   invoice_done: boolean;
   invoice_reference: string;
   project_notes: string;
   payment_notes: string;
+};
+
+type VariableExpenseFormState = {
+  expense_date: string;
+  label: string;
+  category: FinanceVariableExpenseCategory;
+  amount: string;
+  currency: FinanceCurrency;
+  notes: string;
 };
 
 const DEFAULT_MONTH = normalizeMonthKey();
@@ -191,6 +206,8 @@ function buildDefaultFormState(
     reporting_currency: currency,
     payment_method: "cash",
     fee_percentage: String(feePercentage),
+    studio_fee_base_amount: "",
+    studio_fee_base_currency: currency,
     processor_fee_percentage: "0",
     invoice_needed: false,
     invoice_done: false,
@@ -205,6 +222,30 @@ function getTrendBarHeight(value: number, maxValue: number): string {
   return `${Math.max(10, (value / maxValue) * 100)}%`;
 }
 
+function CollapsibleFinanceSection({
+  title,
+  description,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  description: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  return (
+    <details className="rounded-3xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm" open={defaultOpen}>
+      <summary className="cursor-pointer list-none">
+        <div className="pr-8">
+          <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
+          <p className="mt-1 text-sm text-foreground-muted">{description}</p>
+        </div>
+      </summary>
+      <div className="mt-4">{children}</div>
+    </details>
+  );
+}
+
 export default function AdminFinancePage() {
   const router = useRouter();
   const [month, setMonth] = useState(DEFAULT_MONTH);
@@ -214,10 +255,19 @@ export default function AdminFinancePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [sessionTotalAmount, setSessionTotalAmount] = useState("");
   const [form, setForm] = useState<FinanceFormState>(
     buildDefaultFormState(null, DEFAULT_MONTH)
   );
+  const [expenseForm, setExpenseForm] = useState<VariableExpenseFormState>({
+    expense_date: `${DEFAULT_MONTH}-01`,
+    label: "",
+    category: "supplies",
+    amount: "",
+    currency: "EUR",
+    notes: "",
+  });
 
   const fetchDashboard = useCallback(
     async (monthKey: string) => {
@@ -272,6 +322,11 @@ export default function AdminFinancePage() {
       })),
     [dashboard?.projects, month]
   );
+  const monthlyVariableExpenses = useMemo(
+    () =>
+      (dashboard?.variable_expenses ?? []).filter((expense) => expense.expense_date.startsWith(month)),
+    [dashboard?.variable_expenses, month]
+  );
 
   const selectedBooking = useMemo(
     () => bookings.find((booking) => booking.id === form.booking_id) ?? null,
@@ -294,6 +349,9 @@ export default function AdminFinancePage() {
     selectedBookingCurrency === form.currency;
 
   const taxSummary = summary?.tax_summary ?? null;
+  const fixedCostSummary = summary?.fixed_costs ?? null;
+  const keepSummary = summary?.keep_summary ?? null;
+  const variableExpenseSummary = summary?.variable_expenses ?? null;
   const italySimulation = taxSummary?.simulations.italy ?? null;
   const swedenSimulation = taxSummary?.simulations.sweden ?? null;
 
@@ -422,6 +480,17 @@ export default function AdminFinancePage() {
     setSessionTotalAmount("");
   }
 
+  function resetExpenseForm(nextDashboard = dashboard, nextMonth = month) {
+    setExpenseForm({
+      expense_date: `${nextMonth}-01`,
+      label: "",
+      category: "supplies",
+      amount: "",
+      currency: nextDashboard?.settings.reporting_currency_primary ?? "EUR",
+      notes: "",
+    });
+  }
+
   function applyBookingPrefill(bookingId: string) {
     if (!dashboard) return;
 
@@ -461,6 +530,7 @@ export default function AdminFinancePage() {
         );
         next.currency = defaultCurrency;
         next.reporting_currency = defaultCurrency;
+        next.studio_fee_base_currency = defaultCurrency;
         next.fee_percentage = String(
           getContextFeeDefault(workContext, dashboard.context_settings)
         );
@@ -469,6 +539,7 @@ export default function AdminFinancePage() {
       if (key === "payment_method" && dashboard) {
         const method = value as FinancePaymentMethod;
         const needsInvoice = method === "card" && dashboard.settings.card_invoice_default;
+        const actualFramework = dashboard.settings.active_tax_framework ?? "italy";
         next.invoice_needed = needsInvoice;
         next.invoice_done = needsInvoice ? next.invoice_done : false;
         next.processor_fee_percentage =
@@ -478,6 +549,11 @@ export default function AdminFinancePage() {
                   DEFAULT_CARD_PROCESSOR_FEE_PERCENTAGE
               )
             : "0";
+
+        if (method === "card") {
+          next.currency = actualFramework === "italy" ? "EUR" : next.reporting_currency;
+          next.studio_fee_base_currency = next.reporting_currency;
+        }
       }
 
       if (key === "invoice_needed" && !value) {
@@ -505,6 +581,12 @@ export default function AdminFinancePage() {
           project_label: form.project_label || null,
           gross_amount: Number(form.gross_amount),
           fee_percentage: Number(form.fee_percentage),
+          studio_fee_base_amount: form.studio_fee_base_amount
+            ? Number(form.studio_fee_base_amount)
+            : null,
+          studio_fee_base_currency: form.studio_fee_base_amount
+            ? form.studio_fee_base_currency
+            : null,
           processor_fee_percentage: Number(form.processor_fee_percentage),
           invoice_reference: form.invoice_reference || null,
           project_notes: form.project_notes || null,
@@ -530,6 +612,73 @@ export default function AdminFinancePage() {
       setSuccess("Finance entry saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create finance entry");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleCreateExpense(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch("/api/admin/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entry_type: "variable_expense",
+          expense_date: expenseForm.expense_date,
+          label: expenseForm.label,
+          category: expenseForm.category,
+          amount: Number(expenseForm.amount),
+          currency: expenseForm.currency,
+          notes: expenseForm.notes || null,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create expense");
+      }
+
+      setDashboard(data as FinanceDashboardResponse);
+      setShowExpenseForm(false);
+      resetExpenseForm(data as FinanceDashboardResponse, month);
+      setSuccess("Expense added.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create expense");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteExpense(id: string) {
+    setSaving(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch("/api/admin/finance", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entry_type: "variable_expense",
+          action: "delete",
+          id,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete expense");
+      }
+
+      setDashboard(data as FinanceDashboardResponse);
+      setSuccess("Expense removed.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete expense");
     } finally {
       setSaving(false);
     }
@@ -797,6 +946,395 @@ export default function AdminFinancePage() {
         />
       </div>
 
+      <div className="mb-6">
+        <AdminSurface>
+          <AdminSectionHeading
+            title="Estimated keep from invoiced work"
+            description="This is the practical answer Lia needs first: from invoiced work this month, roughly how much remains after studio fees, SumUp drag, tax reserve, and fixed-cost reserve under the active model and the projections."
+          />
+
+          {loading || !summary || !keepSummary ? (
+            <p className="text-sm text-foreground-muted">Loading keep estimate...</p>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                  Current month invoiced base
+                </p>
+                <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
+                  {keepSummary.invoiced_payment_count} invoiced payment{keepSummary.invoiced_payment_count === 1 ? "" : "s"}
+                </div>
+                <p className="mt-2 text-xs text-foreground-muted">
+                  {keepSummary.excluded_payment_count} payment{keepSummary.excluded_payment_count === 1 ? "" : "s"} excluded because invoice is not done yet.
+                </p>
+                <p className="mt-1 text-xs text-foreground-muted">
+                  Variable expenses this month: {formatMoney(keepSummary.variable_expense_total, keepSummary.currency)}
+                </p>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-3">
+                {Object.values(keepSummary.scenarios).map((scenario) => (
+                  <div
+                    key={scenario.key}
+                    className={`rounded-2xl border p-4 ${scenario.active ? "border-[var(--ink-900)] bg-white shadow-sm" : "border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80"}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                          {scenario.active ? "Active model" : "Projection"}
+                        </p>
+                        <p className="mt-2 font-medium text-foreground">{scenario.label}</p>
+                      </div>
+                      <span className="rounded-full bg-white px-2.5 py-1 text-[11px] text-foreground-muted shadow-sm">
+                        {FINANCE_TAX_FRAMEWORK_LABELS[scenario.framework]}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 text-xl font-medium text-foreground sm:text-2xl">
+                      {formatMoney(scenario.estimated_keep, scenario.currency)}
+                    </div>
+
+                    <div className="mt-4 space-y-2 text-xs text-foreground-muted">
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Invoiced gross</span>
+                        <span>{formatMoney(scenario.invoiced_gross, scenario.currency)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Studio fees</span>
+                        <span>{formatMoney(scenario.studio_fees, scenario.currency)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Processor fees</span>
+                        <span>{formatMoney(scenario.processor_fees, scenario.currency)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Tax reserve</span>
+                        <span>{formatMoney(scenario.tax_reserve, scenario.currency)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Fixed-cost reserve</span>
+                        <span>{formatMoney(scenario.fixed_cost_reserve, scenario.currency)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Variable expenses</span>
+                        <span>{formatMoney(scenario.variable_expense_reserve, scenario.currency)}</span>
+                      </div>
+                    </div>
+
+                    <p className="mt-4 text-xs text-foreground-muted">
+                      Reserve rate {formatPercent(scenario.reserve_rate)}
+                      {scenario.missing_fixed_cost_count > 0
+                        ? ` · ${scenario.missing_fixed_cost_count} fixed cost amount${scenario.missing_fixed_cost_count === 1 ? "" : "s"} still missing`
+                        : ""}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </AdminSurface>
+      </div>
+
+      <div className="mb-6">
+        <AdminSurface>
+          <AdminSectionHeading
+            title="Fixed business costs"
+            description="Recurring overhead stays standardized here. Missing amounts stay visible so totals remain honest instead of pretending the unknowns do not exist."
+          />
+
+          {loading || !summary || !fixedCostSummary ? (
+            <p className="text-sm text-foreground-muted">Loading fixed cost reserve...</p>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                    Configured annual reserve
+                  </p>
+                  <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
+                    {formatMoney(fixedCostSummary.annual_total_primary, summary.approx_primary.currency)}
+                  </div>
+                  <p className="mt-2 text-xs text-foreground-muted">
+                    {fixedCostSummary.configured_count} cost line{fixedCostSummary.configured_count === 1 ? "" : "s"} with known amounts
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm">
+                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                    Missing data
+                  </p>
+                  <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
+                    {fixedCostSummary.missing_amount_count}
+                  </div>
+                  <p className="mt-2 text-xs text-foreground-muted">
+                    Missing fixed-cost amount{fixedCostSummary.missing_amount_count === 1 ? "" : "s"}. They stay excluded from totals until filled in.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm">
+                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                    Due this month
+                  </p>
+                  <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
+                    {fixedCostSummary.due_soon.length}
+                  </div>
+                  <p className="mt-2 text-xs text-foreground-muted">
+                    Obligation{fixedCostSummary.due_soon.length === 1 ? "" : "s"} scheduled in {formatMonthLabel(month)}
+                  </p>
+                </div>
+              </div>
+
+              {fixedCostSummary.due_soon.length > 0 ? (
+                <div className="space-y-3">
+                  {fixedCostSummary.due_soon.map((cost) => (
+                    <div
+                      key={cost.id}
+                      className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-foreground">{cost.label}</p>
+                          <p className="mt-1 text-xs text-foreground-muted">
+                            {cost.cadence} cost due in this month
+                          </p>
+                        </div>
+                        <p className="text-sm font-medium text-foreground">
+                          {cost.amount === null ? "Amount pending" : formatMoney(cost.amount, cost.currency)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </AdminSurface>
+      </div>
+
+      <div className="mb-6">
+        <AdminSurface>
+          <AdminSectionHeading
+            title="Variable business expenses"
+            description="Track flexible work costs like needles, ink, supplies, and travel by month. They reduce the keep estimate without forcing Lia into item-by-item accounting hell."
+            action={
+              <AdminButton
+                variant={showExpenseForm ? "ghost" : "secondary"}
+                onClick={() => {
+                  setShowExpenseForm((current) => !current);
+                  if (!showExpenseForm) resetExpenseForm();
+                }}
+              >
+                {showExpenseForm ? "Hide expense form" : "Add expense"}
+              </AdminButton>
+            }
+          />
+
+          {showExpenseForm ? (
+            <form className="grid gap-4" onSubmit={handleCreateExpense}>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <label className="text-sm text-foreground-muted">
+                  Expense date
+                  <input
+                    type="date"
+                    value={expenseForm.expense_date}
+                    onChange={(event) =>
+                      setExpenseForm((current) => ({ ...current, expense_date: event.target.value }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                    required
+                  />
+                </label>
+
+                <label className="text-sm text-foreground-muted">
+                  Label
+                  <input
+                    value={expenseForm.label}
+                    onChange={(event) =>
+                      setExpenseForm((current) => ({ ...current, label: event.target.value }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                    placeholder="Example: cartridge needles"
+                    required
+                  />
+                </label>
+
+                <label className="text-sm text-foreground-muted">
+                  Category
+                  <select
+                    value={expenseForm.category}
+                    onChange={(event) =>
+                      setExpenseForm((current) => ({
+                        ...current,
+                        category: event.target.value as FinanceVariableExpenseCategory,
+                      }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                  >
+                    {FINANCE_VARIABLE_EXPENSE_CATEGORY_OPTIONS.map((category) => (
+                      <option key={category} value={category}>
+                        {FINANCE_VARIABLE_EXPENSE_CATEGORY_LABELS[category]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="text-sm text-foreground-muted">
+                  Amount
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={expenseForm.amount}
+                    onChange={(event) =>
+                      setExpenseForm((current) => ({ ...current, amount: event.target.value }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                    required
+                  />
+                </label>
+
+                <label className="text-sm text-foreground-muted">
+                  Currency
+                  <select
+                    value={expenseForm.currency}
+                    onChange={(event) =>
+                      setExpenseForm((current) => ({
+                        ...current,
+                        currency: event.target.value as FinanceCurrency,
+                      }))
+                    }
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                  >
+                    {FINANCE_CURRENCY_OPTIONS.map((currency) => (
+                      <option key={currency} value={currency}>
+                        {currency}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <label className="text-sm text-foreground-muted">
+                Notes
+                <input
+                  value={expenseForm.notes}
+                  onChange={(event) =>
+                    setExpenseForm((current) => ({ ...current, notes: event.target.value }))
+                  }
+                  className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                  style={{ fontSize: "16px" }}
+                  placeholder="Optional supplier, shop, or context note"
+                />
+              </label>
+
+              <div className="flex flex-wrap gap-3">
+                <AdminButton type="submit" variant="primary" disabled={saving}>
+                  {saving ? "Saving..." : "Save expense"}
+                </AdminButton>
+                <AdminButton
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    resetExpenseForm();
+                    setShowExpenseForm(false);
+                  }}
+                >
+                  Cancel
+                </AdminButton>
+              </div>
+            </form>
+          ) : null}
+
+          {loading || !summary || !variableExpenseSummary ? (
+            <p className="text-sm text-foreground-muted">Loading variable expenses...</p>
+          ) : variableExpenseSummary.entry_count > 0 ? (
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                    Month total
+                  </p>
+                  <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
+                    {formatMoney(variableExpenseSummary.month_total_primary, summary.approx_primary.currency)}
+                  </div>
+                  <p className="mt-2 text-xs text-foreground-muted">
+                    {variableExpenseSummary.entry_count} expense entr{variableExpenseSummary.entry_count === 1 ? "y" : "ies"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {variableExpenseSummary.by_category.map((row) => (
+                  <div
+                    key={row.category}
+                    className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-foreground">
+                          {FINANCE_VARIABLE_EXPENSE_CATEGORY_LABELS[row.category]}
+                        </p>
+                        <p className="mt-1 text-xs text-foreground-muted">
+                          {row.entry_count} entr{row.entry_count === 1 ? "y" : "ies"}
+                        </p>
+                      </div>
+                      <p className="text-sm font-medium text-foreground">
+                        {formatMoney(row.total_primary, summary.approx_primary.currency)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-3">
+                {monthlyVariableExpenses.map((expense) => (
+                  <div
+                    key={expense.id}
+                    className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-foreground">{expense.label}</p>
+                        <p className="mt-1 text-xs text-foreground-muted">
+                          {expense.expense_date} · {FINANCE_VARIABLE_EXPENSE_CATEGORY_LABELS[expense.category]}
+                        </p>
+                        {expense.notes ? (
+                          <p className="mt-1 text-xs text-foreground-muted">{expense.notes}</p>
+                        ) : null}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-foreground">
+                          {formatMoney(expense.amount, expense.currency)}
+                        </p>
+                        <div className="mt-2">
+                          <AdminButton
+                            variant="ghost"
+                            className="!min-h-[32px] !px-3 !py-1 text-xs"
+                            disabled={saving}
+                            onClick={() => handleDeleteExpense(expense.id)}
+                          >
+                            Remove
+                          </AdminButton>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-foreground-muted">
+              No variable expenses logged for {formatMonthLabel(month)} yet.
+            </p>
+          )}
+        </AdminSurface>
+      </div>
+
       {showForm ? (
         <AdminSurface className="mb-6">
           <AdminSectionHeading
@@ -950,21 +1488,83 @@ export default function AdminFinancePage() {
                 </div>
               ) : null}
 
-              <label className="text-sm text-foreground-muted">
-                Payment currency
-                <select
-                  value={form.currency}
-                  onChange={(event) => updateForm("currency", event.target.value as FinanceCurrency)}
-                  className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                  style={{ fontSize: "16px" }}
-                >
-                  {FINANCE_CURRENCY_OPTIONS.map((currency) => (
-                    <option key={currency} value={currency}>
-                      {currency}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {form.payment_method === "card" ? (
+                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4 md:col-span-2 xl:col-span-4">
+                  <p className="text-sm font-medium text-foreground">Card payment helper</p>
+                  <p className="mt-1 text-sm text-foreground-muted">
+                    Keep tax and SumUp tied to the actual charged amount. If Lia later uses a different local base to calculate the studio share, set that separately here.
+                  </p>
+
+                  <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <label className="text-sm text-foreground-muted">
+                      Charged card amount
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form.gross_amount}
+                        onChange={(event) => updateForm("gross_amount", event.target.value)}
+                        className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                        style={{ fontSize: "16px" }}
+                      />
+                    </label>
+
+                    <label className="text-sm text-foreground-muted">
+                      Charge currency
+                      <select
+                        value={form.currency}
+                        onChange={(event) => updateForm("currency", event.target.value as FinanceCurrency)}
+                        className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                        style={{ fontSize: "16px" }}
+                      >
+                        {FINANCE_CURRENCY_OPTIONS.map((currency) => (
+                          <option key={currency} value={currency}>
+                            {currency}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="text-sm text-foreground-muted">
+                      Studio fee base
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form.studio_fee_base_amount}
+                        onChange={(event) =>
+                          updateForm("studio_fee_base_amount", event.target.value)
+                        }
+                        placeholder="Optional local base"
+                        className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                        style={{ fontSize: "16px" }}
+                      />
+                    </label>
+
+                    <label className="text-sm text-foreground-muted">
+                      Studio fee base currency
+                      <select
+                        value={form.studio_fee_base_currency}
+                        onChange={(event) =>
+                          updateForm("studio_fee_base_currency", event.target.value as FinanceCurrency)
+                        }
+                        className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                        style={{ fontSize: "16px" }}
+                      >
+                        {FINANCE_CURRENCY_OPTIONS.map((currency) => (
+                          <option key={currency} value={currency}>
+                            {currency}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <p className="mt-3 text-xs text-foreground-muted">
+                    Example: client sticker price is `2000 SEK`, Lia charges `185 EUR`, then later pays the studio using whatever local rounded base she decides. Tax and SumUp follow `185 EUR`; studio share follows the local base if you fill it here.
+                  </p>
+                </div>
+              ) : null}
 
               <label className="text-sm text-foreground-muted">
                 Reporting bucket
@@ -1159,11 +1759,10 @@ export default function AdminFinancePage() {
       ) : null}
 
       <div className="mb-6 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <AdminSurface>
-          <AdminSectionHeading
-            title="Reporting buckets"
-            description="Top cards show the overview. These buckets show the honest monthly breakdown by studio/context currency."
-          />
+        <CollapsibleFinanceSection
+          title="Reporting buckets"
+          description="Top cards show the overview. These buckets show the honest monthly breakdown by studio/context currency."
+        >
 
           {loading ? (
             <p className="text-sm text-foreground-muted">Loading reporting buckets...</p>
@@ -1189,13 +1788,12 @@ export default function AdminFinancePage() {
               </div>
             </div>
           ) : null}
-        </AdminSurface>
+        </CollapsibleFinanceSection>
 
-        <AdminSurface>
-          <AdminSectionHeading
-            title="Weekly view"
-            description="Quick weekly visibility so month-end math doesn’t hide a dead or unusually strong week."
-          />
+        <CollapsibleFinanceSection
+          title="Weekly view"
+          description="Quick weekly visibility so month-end math doesn’t hide a dead or unusually strong week."
+        >
 
           {loading ? (
             <p className="text-sm text-foreground-muted">Loading weekly summary...</p>
@@ -1239,15 +1837,14 @@ export default function AdminFinancePage() {
               No weekly payments recorded for {formatMonthLabel(month)}.
             </p>
           )}
-        </AdminSurface>
+        </CollapsibleFinanceSection>
       </div>
 
       <div className="mb-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <AdminSurface>
-          <AdminSectionHeading
-            title="Owner payouts"
-            description="This is the operational bit Lia actually needs at month end: who gets paid, in which local currency, and roughly how much processor drag hit that bucket."
-          />
+        <CollapsibleFinanceSection
+          title="Owner payouts"
+          description="This is the operational bit Lia actually needs at month end: who gets paid, in which local currency, and roughly how much processor drag hit that bucket."
+        >
 
           {loading ? (
             <p className="text-sm text-foreground-muted">Loading payout summary...</p>
@@ -1287,13 +1884,12 @@ export default function AdminFinancePage() {
               No owner payouts accumulated for {formatMonthLabel(month)} yet.
             </p>
           )}
-        </AdminSurface>
+        </CollapsibleFinanceSection>
 
-        <AdminSurface>
-          <AdminSectionHeading
-            title={italySimulation?.label ?? "Italy tax model"}
-            description="Yearly tax simulation for the selected year. Only payments marked `invoice_done = true` are included, so non-invoiced deposits stay out of this on purpose."
-          />
+        <CollapsibleFinanceSection
+          title={italySimulation?.label ?? "Italy tax model"}
+          description="Yearly tax simulation for the selected year. Only payments marked `invoice_done = true` are included, so non-invoiced deposits stay out of this on purpose."
+        >
 
           {loading || !summary || !taxSummary || !italySimulation ? (
             <p className="text-sm text-foreground-muted">Loading tax simulation...</p>
@@ -1339,15 +1935,14 @@ export default function AdminFinancePage() {
               </div>
             </div>
           )}
-        </AdminSurface>
+        </CollapsibleFinanceSection>
       </div>
 
       <div className="mb-6">
-        <AdminSurface>
-          <AdminSectionHeading
-            title={swedenSimulation?.label ?? "Sweden tax model"}
-            description="Comparison model for a Sweden setup. It uses the same invoiced-only yearly base, so deposits and non-invoiced cash stay outside the tax math."
-          />
+        <CollapsibleFinanceSection
+          title={swedenSimulation?.label ?? "Sweden tax model"}
+          description="Comparison model for a Sweden setup. It uses the same invoiced-only yearly base, so deposits and non-invoiced cash stay outside the tax math."
+        >
 
           {loading || !summary || !taxSummary || !swedenSimulation || !italySimulation ? (
             <p className="text-sm text-foreground-muted">Loading Sweden simulation...</p>
@@ -1417,26 +2012,25 @@ export default function AdminFinancePage() {
               </div>
             </div>
           )}
-        </AdminSurface>
+        </CollapsibleFinanceSection>
       </div>
 
       <div className="mb-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <AdminSurface>
-          <AdminSectionHeading
-            title="Monthly finance pulse"
-            description="Seasonality in one place: take-home, studio drag, SumUp drag, and open invoice backlog across the last six months."
-            action={
-              <AdminButton
-                variant="secondary"
-                onClick={() =>
-                  downloadCsv(`finance-monthly-pulse-${month}.csv`, monthlyPulseExportRows)
-                }
-                disabled={monthlyPulseExportRows.length === 0}
-              >
-                Export CSV
-              </AdminButton>
-            }
-          />
+        <CollapsibleFinanceSection
+          title="Monthly finance pulse"
+          description="Seasonality in one place: take-home, studio drag, SumUp drag, and open invoice backlog across the last six months."
+        >
+          <div className="mb-4 flex justify-end">
+            <AdminButton
+              variant="secondary"
+              onClick={() =>
+                downloadCsv(`finance-monthly-pulse-${month}.csv`, monthlyPulseExportRows)
+              }
+              disabled={monthlyPulseExportRows.length === 0}
+            >
+              Export CSV
+            </AdminButton>
+          </div>
 
           {loading || !summary ? (
             <p className="text-sm text-foreground-muted">Loading monthly pulse...</p>
@@ -1484,13 +2078,12 @@ export default function AdminFinancePage() {
               Seasonality will show up after a few months of finance entries.
             </p>
           )}
-        </AdminSurface>
+        </CollapsibleFinanceSection>
 
-        <AdminSurface>
-          <AdminSectionHeading
-            title="Backlog trend"
-            description="Simple period-over-period read on invoice backlog so Lia can see if admin debt is shrinking or breeding."
-          />
+        <CollapsibleFinanceSection
+          title="Backlog trend"
+          description="Simple period-over-period read on invoice backlog so Lia can see if admin debt is shrinking or breeding."
+        >
 
           {loading || !summary || !latestTrendPoint ? (
             <p className="text-sm text-foreground-muted">Loading backlog trend...</p>
@@ -1526,26 +2119,25 @@ export default function AdminFinancePage() {
               </div>
             </div>
           )}
-        </AdminSurface>
+        </CollapsibleFinanceSection>
       </div>
 
       <div className="mb-6">
-        <AdminSurface>
-          <AdminSectionHeading
-            title="Owner payout history"
-            description="A six-month view of what each studio owner or context reserve needed per month, with approximate SumUp drag attached to that month’s bucket."
-            action={
-              <AdminButton
-                variant="secondary"
-                onClick={() =>
-                  downloadCsv(`finance-owner-payout-history-${month}.csv`, payoutHistoryExportRows)
-                }
-                disabled={payoutHistoryExportRows.length === 0}
-              >
-                Export CSV
-              </AdminButton>
-            }
-          />
+        <CollapsibleFinanceSection
+          title="Owner payout history"
+          description="A six-month view of what each studio owner or context reserve needed per month, with approximate SumUp drag attached to that month’s bucket."
+        >
+          <div className="mb-4 flex justify-end">
+            <AdminButton
+              variant="secondary"
+              onClick={() =>
+                downloadCsv(`finance-owner-payout-history-${month}.csv`, payoutHistoryExportRows)
+              }
+              disabled={payoutHistoryExportRows.length === 0}
+            >
+              Export CSV
+            </AdminButton>
+          </div>
 
           {loading ? (
             <p className="text-sm text-foreground-muted">Loading payout history...</p>
@@ -1590,16 +2182,15 @@ export default function AdminFinancePage() {
               Owner payout history will start filling out after more months of data.
             </p>
           )}
-        </AdminSurface>
+        </CollapsibleFinanceSection>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
-          <AdminSurface>
-            <AdminSectionHeading
-              title="Studio / context totals"
-              description="Grouped by actual working context and native reporting bucket, so Malmö and Copenhagen stop bleeding into a fake currency view."
-            />
+          <CollapsibleFinanceSection
+            title="Studio / context totals"
+            description="Grouped by actual working context and native reporting bucket, so Malmö and Copenhagen stop bleeding into a fake currency view."
+          >
 
             {loading ? (
               <p className="text-sm text-foreground-muted">Loading studio totals...</p>
@@ -1650,13 +2241,13 @@ export default function AdminFinancePage() {
                 description="Add the first finance entry for this month and the context totals will start behaving like a proper studio tracker."
               />
             )}
-          </AdminSurface>
+          </CollapsibleFinanceSection>
 
-          <AdminSurface>
-            <AdminSectionHeading
-              title="Projects this month"
-              description="Each payment shows studio-settlement numbers in the local bucket plus the raw SumUp fee in EUR, so the money trail matches reality."
-            />
+          <CollapsibleFinanceSection
+            title="Projects this month"
+            description="Each payment shows studio-settlement numbers in the local bucket plus the raw SumUp fee in EUR, so the money trail matches reality."
+            defaultOpen
+          >
 
             {loading ? (
               <p className="text-sm text-foreground-muted">Loading projects...</p>
@@ -1772,15 +2363,14 @@ export default function AdminFinancePage() {
                 }
               />
             )}
-          </AdminSurface>
+          </CollapsibleFinanceSection>
         </div>
 
         <div className="space-y-6">
-          <AdminSurface>
-            <AdminSectionHeading
-              title="Last 6 months"
-              description="Take-home trend in the primary reporting currency, so the direction of travel is obvious at a glance."
-            />
+          <CollapsibleFinanceSection
+            title="Last 6 months"
+            description="Take-home trend in the primary reporting currency, so the direction of travel is obvious at a glance."
+          >
 
             {loading ? (
               <p className="text-sm text-foreground-muted">Loading trend...</p>
@@ -1800,7 +2390,7 @@ export default function AdminFinancePage() {
                 Trend data will appear once there are payments across multiple months.
               </p>
             )}
-          </AdminSurface>
+          </CollapsibleFinanceSection>
 
           <AdminSurface>
             <AdminSectionHeading

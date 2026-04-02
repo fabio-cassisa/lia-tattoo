@@ -54,20 +54,27 @@ function getBoolean(value: unknown): boolean | null {
 }
 
 async function buildSettingsResponse(admin = createAdminClient()): Promise<FinanceSettingsResponse> {
-  const [contextResult, settingsResult] = await Promise.all([
+  const [contextResult, settingsResult, fixedCostsResult] = await Promise.all([
     admin
       .from("finance_context_settings")
       .select("*")
       .order("sort_order", { ascending: true }),
     admin.from("finance_settings").select("*").eq("scope", "default").single(),
+    admin
+      .from("finance_fixed_costs")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
   ]);
 
   if (contextResult.error) throw contextResult.error;
   if (settingsResult.error) throw settingsResult.error;
+  if (fixedCostsResult.error) throw fixedCostsResult.error;
 
   return {
     context_settings: contextResult.data ?? [],
     settings: settingsResult.data as FinanceSettingsRow,
+    fixed_costs: fixedCostsResult.data ?? [],
   };
 }
 
@@ -96,6 +103,7 @@ export async function PATCH(request: Request) {
     const body = (await request.json()) as {
       contexts?: Array<Record<string, unknown>>;
       settings?: Record<string, unknown>;
+      fixed_costs?: Array<Record<string, unknown>>;
     };
 
     const admin = createAdminClient();
@@ -253,6 +261,71 @@ export async function PATCH(request: Request) {
         if (error) {
           console.error("Finance context update error:", error);
           return Response.json({ error: "Failed to update context settings" }, { status: 500 });
+        }
+      }
+    }
+
+    if (body.fixed_costs?.length) {
+      for (const fixedCost of body.fixed_costs) {
+        const id = getString(fixedCost.id);
+        if (!id) continue;
+
+        const updates: Record<string, unknown> = {};
+
+        if (getString(fixedCost.label) !== null) updates.label = getString(fixedCost.label);
+        if (["statutory", "software", "professional", "insurance", "other"].includes(String(fixedCost.category))) {
+          updates.category = fixedCost.category;
+        }
+        if (["italy", "sweden"].includes(String(fixedCost.framework))) {
+          updates.framework = fixedCost.framework;
+        }
+        if (fixedCost.framework === null) {
+          updates.framework = null;
+        }
+        if (isCurrency(fixedCost.currency)) updates.currency = fixedCost.currency;
+        if (["monthly", "quarterly", "annual"].includes(String(fixedCost.cadence))) {
+          updates.cadence = fixedCost.cadence;
+        }
+        if (getNumber(fixedCost.annual_amount) !== null) {
+          updates.annual_amount = getNumber(fixedCost.annual_amount);
+        }
+        if (fixedCost.annual_amount === null || fixedCost.annual_amount === "") {
+          updates.annual_amount = null;
+        }
+        if (Array.isArray(fixedCost.due_months)) {
+          updates.due_months = fixedCost.due_months
+            .map((value) => getNumber(value))
+            .filter((value): value is number => value !== null && value >= 1 && value <= 12)
+            .map((value) => Math.round(value));
+        }
+        if (getString(fixedCost.notes) !== null) updates.notes = getString(fixedCost.notes);
+        if (fixedCost.notes === null || fixedCost.notes === "") {
+          updates.notes = null;
+        }
+        if (getBoolean(fixedCost.already_counted_in_tax_model) !== null) {
+          updates.already_counted_in_tax_model = getBoolean(
+            fixedCost.already_counted_in_tax_model
+          );
+        }
+        if (getNumber(fixedCost.sort_order) !== null) {
+          updates.sort_order = getNumber(fixedCost.sort_order);
+        }
+        if (getBoolean(fixedCost.is_active) !== null) {
+          updates.is_active = getBoolean(fixedCost.is_active);
+        }
+
+        if (Object.keys(updates).length === 0) {
+          continue;
+        }
+
+        const { error } = await admin
+          .from("finance_fixed_costs")
+          .update(updates)
+          .eq("id", id);
+
+        if (error) {
+          console.error("Finance fixed cost update error:", error);
+          return Response.json({ error: "Failed to update fixed costs" }, { status: 500 });
         }
       }
     }

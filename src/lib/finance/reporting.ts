@@ -18,22 +18,27 @@ import {
 } from "@/lib/finance/config";
 import type {
   FinanceCurrency,
+  FinanceFixedCostRow,
   FinancePaymentRow,
   FinanceProjectRow,
   FinanceSettingsRow,
   FinanceTaxFramework,
+  FinanceVariableExpenseRow,
 } from "@/lib/supabase/database.types";
 import type {
   FinanceComparison,
   FinanceContextFeeSummary,
+  FinanceFixedCostSummary,
   FinanceInvoiceReminder,
   FinanceItalyTaxSettings,
+  FinanceKeepSummary,
   FinanceMonthlyContextPayout,
   FinanceMonthlyTrendPoint,
   FinancePaymentDerived,
   FinanceProjectWithPayments,
   FinanceSwedenTaxSettings,
   FinanceTaxSummary,
+  FinanceVariableExpenseSummary,
   FinanceWeeklySummary,
 } from "@/lib/finance/types";
 
@@ -79,6 +84,144 @@ function getInvoicedPayments(projects: FinanceProjectWithPayments[], taxYear: nu
     .filter(
       (payment) => payment.invoice_done && getPaymentMonthKey(payment.payment_date).startsWith(String(taxYear))
     );
+}
+
+function getMonthlyInvoicedPayments(projects: FinanceProjectWithPayments[], monthKey: string) {
+  return projects
+    .flatMap((project) => project.payments)
+    .filter((payment) => payment.invoice_done && getPaymentMonthKey(payment.payment_date) === monthKey);
+}
+
+function getMonthlyTaxReserveRate(
+  simulation: FinanceTaxSummary["simulations"]["italy"] | FinanceTaxSummary["simulations"]["sweden"]
+) {
+  if (simulation.invoiced_revenue <= 0) return 0;
+  return (simulation.social_contributions + simulation.income_tax) / simulation.invoiced_revenue;
+}
+
+function getMonthlyVariableExpenses(
+  expenses: FinanceVariableExpenseRow[],
+  monthKey: string
+) {
+  return expenses.filter((expense) => getPaymentMonthKey(expense.expense_date) === monthKey);
+}
+
+function getMonthlyVariableExpenseTotal(
+  expenses: FinanceVariableExpenseRow[],
+  currency: FinanceCurrency,
+  rates: ResolvedExchangeRates
+) {
+  return roundMoney(
+    expenses.reduce(
+      (total, expense) => total + convertAmount(expense.amount, expense.currency, currency, rates),
+      0
+    )
+  );
+}
+
+function getMonthlyFixedCostReserve(
+  fixedCosts: FinanceFixedCostRow[],
+  framework: FinanceTaxFramework,
+  monthKey: string,
+  currency: FinanceCurrency,
+  rates: ResolvedExchangeRates
+) {
+  const month = Number(monthKey.slice(5, 7));
+
+  return roundMoney(
+    fixedCosts
+      .filter(
+        (cost) =>
+          cost.is_active &&
+          cost.framework === framework &&
+          !cost.already_counted_in_tax_model &&
+          cost.annual_amount !== null
+      )
+      .reduce((total, cost) => {
+        if (cost.cadence === "monthly") {
+          return total + convertAmount((cost.annual_amount ?? 0) / 12, cost.currency, currency, rates);
+        }
+
+        if (cost.cadence === "quarterly") {
+          return total + (cost.due_months.includes(month)
+            ? convertAmount((cost.annual_amount ?? 0) / Math.max(cost.due_months.length, 1), cost.currency, currency, rates)
+            : 0);
+        }
+
+        return total + (cost.due_months.includes(month)
+          ? convertAmount(cost.annual_amount ?? 0, cost.currency, currency, rates)
+          : 0);
+      }, 0)
+  );
+}
+
+function buildKeepScenario(
+  key: "italy_current" | "italy_standard" | "sweden",
+  label: string,
+  framework: FinanceTaxFramework,
+  active: boolean,
+  monthlyPayments: FinancePaymentDerived[],
+  annualSimulation: FinanceTaxSummary["simulations"]["italy"] | FinanceTaxSummary["simulations"]["sweden"],
+  fixedCosts: FinanceFixedCostRow[],
+  variableExpenses: FinanceVariableExpenseRow[],
+  monthKey: string,
+  currency: FinanceCurrency,
+  rates: ResolvedExchangeRates,
+  notes: string[]
+) {
+  const invoicedGross = roundMoney(
+    monthlyPayments.reduce(
+      (total, payment) => total + convertAmount(payment.gross_amount, payment.currency, currency, rates),
+      0
+    )
+  );
+  const studioFees = roundMoney(
+    monthlyPayments.reduce(
+      (total, payment) =>
+        total + convertAmount(payment.fee_amount, payment.reporting_currency, currency, rates),
+      0
+    )
+  );
+  const processorFees = roundMoney(
+    monthlyPayments.reduce(
+      (total, payment) =>
+        total + convertAmount(payment.processor_fee_amount, payment.processor_fee_currency, currency, rates),
+      0
+    )
+  );
+  const reserveRate = getMonthlyTaxReserveRate(annualSimulation);
+  const taxReserve = roundMoney(invoicedGross * reserveRate);
+  const fixedCostReserve = getMonthlyFixedCostReserve(
+    fixedCosts,
+    framework,
+    monthKey,
+    currency,
+    rates
+  );
+  const variableExpenseReserve = getMonthlyVariableExpenseTotal(variableExpenses, currency, rates);
+
+  return {
+    key,
+    label,
+    framework,
+    active,
+    currency,
+    invoiced_payment_count: monthlyPayments.length,
+    invoiced_gross: invoicedGross,
+    studio_fees: studioFees,
+    processor_fees: processorFees,
+    tax_reserve: taxReserve,
+    fixed_cost_reserve: fixedCostReserve,
+    variable_expense_reserve: variableExpenseReserve,
+    estimated_keep: roundMoney(
+      invoicedGross - studioFees - processorFees - taxReserve - fixedCostReserve - variableExpenseReserve
+    ),
+    reserve_rate: roundMoney(reserveRate * 100),
+    missing_fixed_cost_count: fixedCosts.filter(
+      (cost) => cost.is_active && cost.framework === framework && cost.annual_amount === null
+    ).length,
+    notes,
+  };
 }
 
 export function getItalyTaxSettings(settings: FinanceSettingsRow): FinanceItalyTaxSettings {
@@ -259,6 +402,171 @@ export function buildTaxSummary(
   };
 }
 
+export function buildFixedCostSummary(
+  fixedCosts: FinanceFixedCostRow[],
+  primaryCurrency: FinanceCurrency,
+  rates: ResolvedExchangeRates,
+  monthKey: string
+): FinanceFixedCostSummary {
+  const currentMonth = Number(monthKey.slice(5, 7));
+  const activeCosts = fixedCosts.filter((cost) => cost.is_active);
+  const configuredCosts = activeCosts.filter((cost) => cost.annual_amount !== null);
+
+  return {
+    annual_total_primary: roundMoney(
+      configuredCosts.reduce(
+        (total, cost) =>
+          total + convertAmount(cost.annual_amount ?? 0, cost.currency, primaryCurrency, rates),
+        0
+      )
+    ),
+    annual_total_eur: roundMoney(
+      configuredCosts.reduce(
+        (total, cost) => total + convertAmount(cost.annual_amount ?? 0, cost.currency, "EUR", rates),
+        0
+      )
+    ),
+    configured_count: configuredCosts.length,
+    missing_amount_count: activeCosts.filter((cost) => cost.annual_amount === null).length,
+    due_soon: activeCosts
+      .filter((cost) => cost.due_months.includes(currentMonth))
+      .map((cost) => ({
+        id: cost.id,
+        label: cost.label,
+        currency: cost.currency,
+        amount: cost.annual_amount,
+        due_month: currentMonth,
+        cadence: cost.cadence,
+        category: cost.category,
+        missing_amount: cost.annual_amount === null,
+      })),
+  };
+}
+
+export function buildKeepSummary(
+  projects: FinanceProjectWithPayments[],
+  settings: FinanceSettingsRow,
+  fixedCosts: FinanceFixedCostRow[],
+  variableExpenses: FinanceVariableExpenseRow[],
+  rates: ResolvedExchangeRates,
+  monthKey: string
+): FinanceKeepSummary {
+  const monthlyInvoicedPayments = getMonthlyInvoicedPayments(projects, monthKey);
+  const monthlyVariableExpenses = getMonthlyVariableExpenses(variableExpenses, monthKey);
+  const taxSummary = buildTaxSummary(projects, settings, rates, monthKey);
+  const primaryCurrency = settings.reporting_currency_primary;
+  const currentItalySimulation = taxSummary.simulations.italy;
+  const italyStandardSimulation = buildItalyTaxSimulation(
+    getInvoicedPayments(projects, taxSummary.tax_year),
+    {
+      ...taxSummary.italy_settings,
+      is_startup_eligible: false,
+      label: `${taxSummary.italy_settings.label} after 5% period`,
+    },
+    taxSummary.actual_framework,
+    rates
+  );
+  const swedenSimulation = taxSummary.simulations.sweden;
+
+  return {
+    month: monthKey,
+    currency: primaryCurrency,
+    invoiced_payment_count: monthlyInvoicedPayments.length,
+    excluded_payment_count:
+      projects
+        .flatMap((project) => project.payments)
+        .filter((payment) => getPaymentMonthKey(payment.payment_date) === monthKey).length -
+      monthlyInvoicedPayments.length,
+    variable_expense_total: getMonthlyVariableExpenseTotal(
+      monthlyVariableExpenses,
+      primaryCurrency,
+      rates
+    ),
+    scenarios: {
+      italy_current: buildKeepScenario(
+        "italy_current",
+        currentItalySimulation.label,
+        "italy",
+        taxSummary.actual_framework === "italy",
+        monthlyInvoicedPayments,
+        currentItalySimulation,
+        fixedCosts,
+        monthlyVariableExpenses,
+        monthKey,
+        primaryCurrency,
+        rates,
+        [
+          `Reserve rate derived from yearly ${currentItalySimulation.label} simulation`,
+          "Taxes are still based on invoiced gross, even if studio and card fees reduce real cash kept",
+        ]
+      ),
+      italy_standard: buildKeepScenario(
+        "italy_standard",
+        italyStandardSimulation.label,
+        "italy",
+        false,
+        monthlyInvoicedPayments,
+        italyStandardSimulation,
+        fixedCosts,
+        monthlyVariableExpenses,
+        monthKey,
+        primaryCurrency,
+        rates,
+        [
+          "Same invoiced work, but with the standard Italy substitute-tax rate instead of the startup rate",
+        ]
+      ),
+      sweden: buildKeepScenario(
+        "sweden",
+        swedenSimulation.label,
+        "sweden",
+        taxSummary.actual_framework === "sweden",
+        monthlyInvoicedPayments,
+        swedenSimulation,
+        fixedCosts,
+        monthlyVariableExpenses,
+        monthKey,
+        primaryCurrency,
+        rates,
+        [
+          "First Sweden comparison based on a sole-trader style setup",
+          "Will improve later once variable deductible expenses are part of the model",
+        ]
+      ),
+    },
+  };
+}
+
+export function buildVariableExpenseSummary(
+  expenses: FinanceVariableExpenseRow[],
+  primaryCurrency: FinanceCurrency,
+  rates: ResolvedExchangeRates,
+  monthKey: string
+): FinanceVariableExpenseSummary {
+  const monthlyExpenses = getMonthlyVariableExpenses(expenses, monthKey);
+  const categoryMap = new Map<string, { total_primary: number; entry_count: number }>();
+
+  for (const expense of monthlyExpenses) {
+    const current = categoryMap.get(expense.category) ?? { total_primary: 0, entry_count: 0 };
+    current.total_primary = roundMoney(
+      current.total_primary + convertAmount(expense.amount, expense.currency, primaryCurrency, rates)
+    );
+    current.entry_count += 1;
+    categoryMap.set(expense.category, current);
+  }
+
+  return {
+    month_total_primary: getMonthlyVariableExpenseTotal(monthlyExpenses, primaryCurrency, rates),
+    month_total_eur: getMonthlyVariableExpenseTotal(monthlyExpenses, "EUR", rates),
+    entry_count: monthlyExpenses.length,
+    by_category: [...categoryMap.entries()].map(([category, totals]) => ({
+      category: category as FinanceVariableExpenseSummary["by_category"][number]["category"],
+      total_primary: totals.total_primary,
+      entry_count: totals.entry_count,
+    })),
+  };
+}
+
 export function getCurrentMonthKey(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
@@ -288,7 +596,18 @@ export function derivePayment(
   const gross_amount_reporting = rates
     ? convertAmount(payment.gross_amount, payment.currency, payment.reporting_currency, rates)
     : payment.gross_amount;
-  const fee_amount = calculateFeeAmount(gross_amount_reporting, payment.fee_percentage);
+  const studio_fee_base_reporting =
+    payment.studio_fee_base_amount !== null && payment.studio_fee_base_currency !== null
+      ? rates
+        ? convertAmount(
+            payment.studio_fee_base_amount,
+            payment.studio_fee_base_currency,
+            payment.reporting_currency,
+            rates
+          )
+        : payment.studio_fee_base_amount
+      : gross_amount_reporting;
+  const fee_amount = calculateFeeAmount(studio_fee_base_reporting, payment.fee_percentage);
   const processor_fee_currency: FinanceCurrency =
     payment.payment_method === "card" ? CARD_PROCESSOR_CURRENCY : payment.currency;
   const gross_amount_processor =
