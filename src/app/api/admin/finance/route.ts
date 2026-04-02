@@ -410,6 +410,12 @@ export async function PATCH(request: NextRequest) {
     }
     if (getBoolean(body.invoice_needed) !== null) updates.invoice_needed = getBoolean(body.invoice_needed);
     if (getBoolean(body.invoice_done) !== null) updates.invoice_done = getBoolean(body.invoice_done);
+    if (body.invoice_last_nudged_at !== undefined) {
+      updates.invoice_last_nudged_at = getString(body.invoice_last_nudged_at);
+    }
+    if (body.invoice_reminder_note !== undefined) {
+      updates.invoice_reminder_note = getString(body.invoice_reminder_note);
+    }
     if (body.invoice_reference !== undefined) updates.invoice_reference = getString(body.invoice_reference);
     if (body.notes !== undefined) updates.notes = getString(body.notes);
 

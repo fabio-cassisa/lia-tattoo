@@ -191,6 +191,9 @@ export type FinanceSettingsRow = {
   fallback_eur_to_sek: number | null;
   card_invoice_default: boolean;
   card_processor_fee_percentage: number;
+  sweden_preview_label: string;
+  sweden_preview_rate: number;
+  sweden_preview_fixed_monthly_cost: number;
 };
 
 export type FinanceSettingsInsert = {
@@ -203,6 +206,9 @@ export type FinanceSettingsInsert = {
   fallback_eur_to_sek?: number | null;
   card_invoice_default?: boolean;
   card_processor_fee_percentage?: number;
+  sweden_preview_label?: string;
+  sweden_preview_rate?: number;
+  sweden_preview_fixed_monthly_cost?: number;
 };
 
 export type FinanceProjectRow = {
@@ -243,6 +249,8 @@ export type FinancePaymentRow = {
   processor_fee_percentage: number;
   invoice_needed: boolean;
   invoice_done: boolean;
+  invoice_last_nudged_at: string | null;
+  invoice_reminder_note: string | null;
   invoice_reference: string | null;
   notes: string | null;
 };
@@ -259,6 +267,8 @@ export type FinancePaymentInsert = {
   processor_fee_percentage?: number;
   invoice_needed?: boolean;
   invoice_done?: boolean;
+  invoice_last_nudged_at?: string | null;
+  invoice_reminder_note?: string | null;
   invoice_reference?: string | null;
   notes?: string | null;
 };

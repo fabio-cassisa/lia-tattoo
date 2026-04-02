@@ -36,6 +36,9 @@ type SettingsDraft = Pick<
   | "fallback_eur_to_sek"
   | "card_invoice_default"
   | "card_processor_fee_percentage"
+  | "sweden_preview_label"
+  | "sweden_preview_rate"
+  | "sweden_preview_fixed_monthly_cost"
 >;
 
 export default function AdminSettingsPage() {
@@ -73,6 +76,9 @@ export default function AdminSettingsPage() {
         fallback_eur_to_sek: data.settings.fallback_eur_to_sek,
         card_invoice_default: data.settings.card_invoice_default,
         card_processor_fee_percentage: data.settings.card_processor_fee_percentage,
+        sweden_preview_label: data.settings.sweden_preview_label,
+        sweden_preview_rate: data.settings.sweden_preview_rate,
+        sweden_preview_fixed_monthly_cost: data.settings.sweden_preview_fixed_monthly_cost,
       });
       setError("");
     } catch (err) {
@@ -447,6 +453,73 @@ export default function AdminSettingsPage() {
                     <li>Guest spot: configurable, often 40% or 50%</li>
                     <li>Private / home: often 0%</li>
                   </ul>
+                </div>
+              </div>
+            </AdminSurface>
+
+            <AdminSurface>
+              <AdminSectionHeading
+                title="Sweden Preview"
+                description="Keep the Sweden comparison configurable and clearly hypothetical, so it helps decisions without pretending to be legal truth."
+              />
+
+              <div className="space-y-4 text-sm text-foreground-muted">
+                <label className="text-sm text-foreground-muted">
+                  Preview label
+                  <input
+                    value={settings.sweden_preview_label}
+                    onChange={(event) =>
+                      updateSettings("sweden_preview_label", event.target.value)
+                    }
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                  />
+                </label>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="text-sm text-foreground-muted">
+                    Approx rate %
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={settings.sweden_preview_rate}
+                      onChange={(event) =>
+                        updateSettings(
+                          "sweden_preview_rate",
+                          Number(event.target.value)
+                        )
+                      }
+                      className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                      style={{ fontSize: "16px" }}
+                    />
+                  </label>
+
+                  <label className="text-sm text-foreground-muted">
+                    Fixed monthly cost
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={settings.sweden_preview_fixed_monthly_cost}
+                      onChange={(event) =>
+                        updateSettings(
+                          "sweden_preview_fixed_monthly_cost",
+                          Number(event.target.value)
+                        )
+                      }
+                      className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                      style={{ fontSize: "16px" }}
+                    />
+                  </label>
+                </div>
+
+                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4">
+                  <p className="font-medium text-foreground">How to use this</p>
+                  <p className="mt-2">
+                    Treat this as a rough decision-support layer. Use the percentage for broad tax/fee drag and the fixed monthly cost for bookkeeping, insurance, software, or setup overhead you want to pressure-test.
+                  </p>
                 </div>
               </div>
             </AdminSurface>

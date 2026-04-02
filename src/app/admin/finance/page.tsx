@@ -121,6 +121,16 @@ function getInvoiceAgeTone(ageDays: number): string {
   return "bg-[var(--sabbia-100)] text-foreground-muted";
 }
 
+function formatTimestamp(timestamp: string | null): string {
+  if (!timestamp) return "Never nudged";
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(timestamp));
+}
+
 function buildDefaultFormState(
   dashboard: FinanceDashboardResponse | null,
   monthKey: string
@@ -273,6 +283,34 @@ export default function AdminFinancePage() {
       secondaryAfterTax: roundAmount(summary.approx_secondary.amount - approxTaxSecondary),
     };
   }, [summary]);
+
+  const swedenPreview = useMemo(() => {
+    if (!summary || !dashboard) return null;
+
+    const rate = (dashboard.settings.sweden_preview_rate ?? 0) / 100;
+    const fixedPrimary = dashboard.settings.sweden_preview_fixed_monthly_cost ?? 0;
+    const fixedSecondary =
+      summary.approx_primary.currency === summary.approx_secondary.currency || summary.month_total === 0
+        ? fixedPrimary
+        : roundAmount(
+            (fixedPrimary / Math.max(summary.month_total, 1)) * summary.approx_secondary.amount
+          );
+    const variablePrimary = roundAmount(summary.month_total * rate);
+    const variableSecondary = roundAmount(summary.approx_secondary.amount * rate);
+
+    return {
+      label: dashboard.settings.sweden_preview_label || "Sweden preview",
+      rate,
+      fixedPrimary,
+      fixedSecondary,
+      totalPrimaryReserve: roundAmount(variablePrimary + fixedPrimary),
+      totalSecondaryReserve: roundAmount(variableSecondary + fixedSecondary),
+      primaryAfterReserve: roundAmount(summary.month_total - variablePrimary - fixedPrimary),
+      secondaryAfterReserve: roundAmount(
+        summary.approx_secondary.amount - variableSecondary - fixedSecondary
+      ),
+    };
+  }, [dashboard, summary]);
 
   const invoiceReminderGroups = useMemo(
     () =>
@@ -436,6 +474,47 @@ export default function AdminFinancePage() {
       setSuccess(invoiceDone ? "Invoice marked done." : "Invoice reopened.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update payment");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleUpdateReminder(
+    paymentId: string,
+    updates: {
+      invoice_last_nudged_at?: string | null;
+      invoice_reminder_note?: string | null;
+    },
+    successMessage: string
+  ) {
+    setSaving(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch("/api/admin/finance", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: paymentId,
+          ...updates,
+        }),
+      });
+
+      if (response.status === 401) {
+        router.push("/admin/login");
+        return;
+      }
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update reminder");
+      }
+
+      setDashboard(data as FinanceDashboardResponse);
+      setSuccess(successMessage);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update reminder");
     } finally {
       setSaving(false);
     }
@@ -1112,6 +1191,102 @@ export default function AdminFinancePage() {
         </AdminSurface>
       </div>
 
+      <div className="mb-6">
+        <AdminSurface>
+          <AdminSectionHeading
+            title={swedenPreview?.label ?? "Sweden preview"}
+            description="Second planning layer for pressure-testing a Sweden-based setup without contaminating the real monthly ledger."
+          />
+
+          {loading || !summary || !swedenPreview ? (
+            <p className="text-sm text-foreground-muted">Loading Sweden preview...</p>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                    Approx after Sweden reserve
+                  </p>
+                  <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
+                    {formatMoney(
+                      swedenPreview.primaryAfterReserve,
+                      summary.approx_primary.currency
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs text-foreground-muted">
+                    Approx reserve {formatMoney(
+                      swedenPreview.totalPrimaryReserve,
+                      summary.approx_primary.currency
+                    )}
+                    {` · ${roundAmount(swedenPreview.rate * 100)}% variable + ${formatMoney(
+                      swedenPreview.fixedPrimary,
+                      summary.approx_primary.currency
+                    )} fixed`}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-white p-4 shadow-sm">
+                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                    Comparison snapshot
+                  </p>
+                  <div className="mt-3 grid gap-2 text-sm text-foreground-muted">
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Real net</span>
+                      <span className="font-medium text-foreground">
+                        {formatMoney(summary.month_total, summary.approx_primary.currency)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Italy 5% preview</span>
+                      <span className="font-medium text-foreground">
+                        {formatMoney(
+                          italyPreview?.primaryAfterTax ?? summary.month_total,
+                          summary.approx_primary.currency
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>{swedenPreview.label}</span>
+                      <span className="font-medium text-foreground">
+                        {formatMoney(
+                          swedenPreview.primaryAfterReserve,
+                          summary.approx_primary.currency
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl bg-white p-4 shadow-sm">
+                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                    {summary.approx_primary.currency} planning view
+                  </p>
+                  <p className="mt-2 font-medium text-foreground">
+                    {formatMoney(
+                      swedenPreview.primaryAfterReserve,
+                      summary.approx_primary.currency
+                    )} after reserve
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-white p-4 shadow-sm">
+                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                    {summary.approx_secondary.currency} planning view
+                  </p>
+                  <p className="mt-2 font-medium text-foreground">
+                    {formatMoney(
+                      swedenPreview.secondaryAfterReserve,
+                      summary.approx_secondary.currency
+                    )} after reserve
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </AdminSurface>
+      </div>
+
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
           <AdminSurface>
@@ -1349,24 +1524,58 @@ export default function AdminFinancePage() {
                       <p>Gross {formatMoney(payment.gross_amount_reporting, payment.reporting_currency)}</p>
                       <p>Studio fee {formatMoney(payment.fee_amount, payment.reporting_currency)}</p>
                       <p>Card fee {formatMoney(payment.processor_fee_amount, payment.processor_fee_currency)}</p>
+                      <p>Last nudged {formatTimestamp(payment.invoice_last_nudged_at)}</p>
                     </div>
+                    <label className="mt-3 block text-xs text-foreground-muted">
+                      Reminder note
+                      <textarea
+                        defaultValue={payment.invoice_reminder_note ?? ""}
+                        placeholder="Optional note like 'sent on WhatsApp' or 'waiting for VAT details'"
+                        className="mt-1 min-h-[84px] w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm text-foreground"
+                        style={{ fontSize: "16px" }}
+                        onBlur={(event) => {
+                          const nextValue = event.target.value.trim();
+                          if ((payment.invoice_reminder_note ?? "") === nextValue) return;
+                          handleUpdateReminder(
+                            payment.id,
+                            { invoice_reminder_note: nextValue || null },
+                            nextValue ? "Reminder note saved." : "Reminder note cleared."
+                          );
+                        }}
+                      />
+                    </label>
                     <div className="mt-3 flex items-center justify-between gap-3">
                       <span className="text-xs text-foreground-muted">
                         Take-home {formatMoney(payment.net_amount, payment.reporting_currency)}
                       </span>
-                      <AdminButton
-                        variant="secondary"
-                        className="!min-h-[32px] !px-3 !py-1 text-xs"
-                        onClick={() => {
-                          const project = monthlyProjects.find(
-                            (item) => item.id === payment.project_id
-                          );
-                          if (!project) return;
-                          handleToggleInvoiceDone(project, payment.id, true);
-                        }}
-                      >
-                        Mark done
-                      </AdminButton>
+                      <div className="flex flex-wrap gap-2">
+                        <AdminButton
+                          variant="secondary"
+                          className="!min-h-[32px] !px-3 !py-1 text-xs"
+                          onClick={() =>
+                            handleUpdateReminder(
+                              payment.id,
+                              { invoice_last_nudged_at: new Date().toISOString() },
+                              "Reminder marked as nudged."
+                            )
+                          }
+                        >
+                          Nudged today
+                        </AdminButton>
+                        <AdminButton
+                          variant="secondary"
+                          className="!min-h-[32px] !px-3 !py-1 text-xs"
+                          onClick={() => {
+                            const project = monthlyProjects.find(
+                              (item) => item.id === payment.project_id
+                            );
+                            if (!project) return;
+                            handleToggleInvoiceDone(project, payment.id, true);
+                          }}
+                        >
+                          Mark done
+                        </AdminButton>
+                      </div>
                     </div>
                   </div>
                 ))}

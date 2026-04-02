@@ -121,6 +121,17 @@ export async function PATCH(request: Request) {
           body.settings.card_processor_fee_percentage
         );
       }
+      if (getString(body.settings.sweden_preview_label) !== null) {
+        settingsUpdates.sweden_preview_label = getString(body.settings.sweden_preview_label);
+      }
+      if (getNumber(body.settings.sweden_preview_rate) !== null) {
+        settingsUpdates.sweden_preview_rate = getNumber(body.settings.sweden_preview_rate);
+      }
+      if (getNumber(body.settings.sweden_preview_fixed_monthly_cost) !== null) {
+        settingsUpdates.sweden_preview_fixed_monthly_cost = getNumber(
+          body.settings.sweden_preview_fixed_monthly_cost
+        );
+      }
 
       if (Object.keys(settingsUpdates).length > 0) {
         const { error } = await admin
