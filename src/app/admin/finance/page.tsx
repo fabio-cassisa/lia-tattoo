@@ -872,20 +872,7 @@ export default function AdminFinancePage() {
         </div>
       ) : null}
 
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <AdminMetricCard
-          label="Net take-home"
-          value={
-            loading || !summary
-              ? "..."
-              : formatMoney(summary.month_total, summary.approx_primary.currency)
-          }
-          detail={
-            loading || !summary
-              ? ""
-              : `${formatMonthLabel(month)} in ${summary.approx_primary.currency}`
-          }
-        />
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <AdminMetricCard
           label="This week"
           value={
@@ -944,6 +931,35 @@ export default function AdminFinancePage() {
               : `${summary.entry_count} payment${summary.entry_count === 1 ? "" : "s"} logged this month`
           }
         />
+        <AdminMetricCard
+          label="Net take-home"
+          value={
+            loading || !summary
+              ? "..."
+              : formatMoney(summary.month_total, summary.approx_primary.currency)
+          }
+          detail={
+            loading || !summary
+              ? ""
+              : `${formatMonthLabel(month)} in ${summary.approx_primary.currency}`
+          }
+        />
+        <AdminMetricCard
+          label={`Approx ${summary?.approx_secondary.currency ?? "EUR"}`}
+          value={
+            loading || !summary
+              ? "..."
+              : formatMoney(
+                  summary.approx_secondary.amount,
+                  summary.approx_secondary.currency
+                )
+          }
+          detail={
+            loading || !summary
+              ? ""
+              : `${summary.approx_secondary.source} exchange rates`
+          }
+        />
       </div>
 
       <div className="mb-6">
@@ -972,7 +988,7 @@ export default function AdminFinancePage() {
                 </p>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-3">
+              <div className="grid gap-4 xl:grid-cols-3">
                 {Object.values(keepSummary.scenarios).map((scenario) => (
                   <div
                     key={scenario.key}
@@ -984,6 +1000,7 @@ export default function AdminFinancePage() {
                           {scenario.active ? "Active model" : "Projection"}
                         </p>
                         <p className="mt-2 font-medium text-foreground">{scenario.label}</p>
+                        <p className="mt-1 text-xs text-foreground-muted">Shown in {scenario.currency}</p>
                       </div>
                       <span className="rounded-full bg-white px-2.5 py-1 text-[11px] text-foreground-muted shadow-sm">
                         {FINANCE_TAX_FRAMEWORK_LABELS[scenario.framework]}
@@ -1046,7 +1063,7 @@ export default function AdminFinancePage() {
             <p className="text-sm text-foreground-muted">Loading fixed cost reserve...</p>
           ) : (
             <div className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 xl:grid-cols-3">
                 <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
                     Configured annual reserve
@@ -1131,7 +1148,7 @@ export default function AdminFinancePage() {
 
           {showExpenseForm ? (
             <form className="grid gap-4" onSubmit={handleCreateExpense}>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
                 <label className="text-sm text-foreground-muted">
                   Expense date
                   <input
@@ -1343,7 +1360,7 @@ export default function AdminFinancePage() {
           />
 
           <form className="grid gap-5" onSubmit={handleCreateEntry}>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
               <label className="text-sm text-foreground-muted">
                 Existing booking (optional)
                 <select
@@ -1434,7 +1451,7 @@ export default function AdminFinancePage() {
               </label>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {selectedBookingDeposit > 0 ? (
                 <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4 md:col-span-2 xl:col-span-4">
                   <p className="text-sm font-medium text-foreground">Booking deposit helper</p>
@@ -1495,7 +1512,7 @@ export default function AdminFinancePage() {
                     Keep tax and SumUp tied to the actual charged amount. If Lia later uses a different local base to calculate the studio share, set that separately here.
                   </p>
 
-                  <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                     <label className="text-sm text-foreground-muted">
                       Charged card amount
                       <input
@@ -1615,7 +1632,7 @@ export default function AdminFinancePage() {
               </label>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               <label className="text-sm text-foreground-muted">
                 Client name (optional)
                 <input
@@ -1768,7 +1785,7 @@ export default function AdminFinancePage() {
             <p className="text-sm text-foreground-muted">Loading reporting buckets...</p>
           ) : summary ? (
             <div className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 xl:grid-cols-3">
                 {(reportingBucketCurrencies.length > 0
                   ? reportingBucketCurrencies
                   : REPORTING_CURRENCIES

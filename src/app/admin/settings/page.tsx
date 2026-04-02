@@ -581,7 +581,7 @@ export default function AdminSettingsPage() {
                   </p>
                 </div>
 
-                <div className="grid gap-6 xl:grid-cols-2">
+                <div className="grid gap-6 2xl:grid-cols-2">
                   <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
                       Italy model
@@ -734,7 +734,7 @@ export default function AdminSettingsPage() {
                         </label>
                       </div>
 
-                      <label className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-foreground">
+                      <label className="flex items-start gap-2 rounded-xl bg-white px-4 py-3 text-foreground">
                         <input
                           type="checkbox"
                           checked={settings.italy_is_startup_eligible}
@@ -748,7 +748,7 @@ export default function AdminSettingsPage() {
                         Apply startup substitute tax
                       </label>
 
-                      <label className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-foreground">
+                      <label className="flex items-start gap-2 rounded-xl bg-white px-4 py-3 text-foreground">
                         <input
                           type="checkbox"
                           checked={settings.italy_apply_forfettario_inps_reduction}
@@ -875,7 +875,7 @@ export default function AdminSettingsPage() {
                     key={cost.id}
                     className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4"
                   >
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
                       <label className="text-sm text-foreground-muted">
                         Label
                         <input
@@ -936,7 +936,7 @@ export default function AdminSettingsPage() {
                       </label>
                     </div>
 
-                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
                       <label className="text-sm text-foreground-muted">
                         Notes
                         <input
@@ -951,7 +951,7 @@ export default function AdminSettingsPage() {
 
                       <div className="text-sm text-foreground-muted">
                         Due months
-                        <div className="mt-1 grid grid-cols-4 gap-2 rounded-xl border border-[var(--sabbia-200)] bg-white p-3 text-xs text-foreground-muted sm:grid-cols-6">
+                        <div className="mt-1 grid grid-cols-3 gap-2 rounded-xl border border-[var(--sabbia-200)] bg-white p-3 text-xs text-foreground-muted sm:grid-cols-4 xl:grid-cols-6">
                           {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
                             <label key={month} className="flex items-center gap-2">
                               <input
@@ -967,8 +967,8 @@ export default function AdminSettingsPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-end gap-3">
-                        <label className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-foreground">
+                      <div className="flex flex-wrap items-end gap-3">
+                        <label className="flex items-start gap-2 rounded-xl bg-white px-4 py-3 text-foreground">
                           <input
                             type="checkbox"
                             checked={cost.already_counted_in_tax_model}
@@ -982,7 +982,7 @@ export default function AdminSettingsPage() {
                           />
                           Already counted in tax model
                         </label>
-                        <label className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-foreground">
+                        <label className="flex items-start gap-2 rounded-xl bg-white px-4 py-3 text-foreground">
                           <input
                             type="checkbox"
                             checked={cost.is_active}

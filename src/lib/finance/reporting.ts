@@ -455,6 +455,8 @@ export function buildKeepSummary(
   const monthlyVariableExpenses = getMonthlyVariableExpenses(variableExpenses, monthKey);
   const taxSummary = buildTaxSummary(projects, settings, rates, monthKey);
   const primaryCurrency = settings.reporting_currency_primary;
+  const italyScenarioCurrency: FinanceCurrency = "EUR";
+  const swedenScenarioCurrency: FinanceCurrency = "SEK";
   const currentItalySimulation = taxSummary.simulations.italy;
   const italyStandardSimulation = buildItalyTaxSimulation(
     getInvoicedPayments(projects, taxSummary.tax_year),
@@ -493,7 +495,7 @@ export function buildKeepSummary(
         fixedCosts,
         monthlyVariableExpenses,
         monthKey,
-        primaryCurrency,
+        italyScenarioCurrency,
         rates,
         [
           `Reserve rate derived from yearly ${currentItalySimulation.label} simulation`,
@@ -510,7 +512,7 @@ export function buildKeepSummary(
         fixedCosts,
         monthlyVariableExpenses,
         monthKey,
-        primaryCurrency,
+        italyScenarioCurrency,
         rates,
         [
           "Same invoiced work, but with the standard Italy substitute-tax rate instead of the startup rate",
@@ -526,7 +528,7 @@ export function buildKeepSummary(
         fixedCosts,
         monthlyVariableExpenses,
         monthKey,
-        primaryCurrency,
+        swedenScenarioCurrency,
         rates,
         [
           "First Sweden comparison based on a sole-trader style setup",
