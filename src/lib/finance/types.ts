@@ -78,7 +78,17 @@ export type FinanceMonthlyTrendPoint = {
   net_total: number;
   studio_fee_total: number;
   processor_fee_total: number;
-  invoice_count: number;
+  open_invoice_count: number;
+};
+
+export type FinanceMonthlyContextPayout = {
+  month: string;
+  label: string;
+  work_context: FinanceWorkContext;
+  reporting_currency: FinanceCurrency;
+  fee_total: number;
+  processor_fee_total: number;
+  entry_count: number;
 };
 
 export type FinanceDashboardSummary = {
@@ -97,6 +107,7 @@ export type FinanceDashboardSummary = {
   comparison: FinanceComparison;
   weekly: FinanceWeeklySummary[];
   monthly_trend: FinanceMonthlyTrendPoint[];
+  monthly_context_payouts: FinanceMonthlyContextPayout[];
 };
 
 export type FinanceDashboardResponse = {

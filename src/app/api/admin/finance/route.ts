@@ -5,6 +5,7 @@ import {
   filterProjectsForMonth,
   buildProjectsWithPayments,
   buildInvoiceReminders,
+  buildMonthlyContextPayouts,
   buildMonthlyTrend,
   buildWeeklySummary,
   getNetTotalsByCurrency,
@@ -162,6 +163,7 @@ async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboar
     rates,
     settings.reporting_currency_primary
   );
+  const monthlyContextPayouts = buildMonthlyContextPayouts(projectsWithPayments);
   const approxPrimaryAmount = getApproxTotal(
     monthlyPayments,
     settings.reporting_currency_primary,
@@ -214,6 +216,7 @@ async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboar
       ),
       weekly,
       monthly_trend: monthlyTrend,
+      monthly_context_payouts: monthlyContextPayouts,
     },
     context_settings: contextSettings,
     settings,

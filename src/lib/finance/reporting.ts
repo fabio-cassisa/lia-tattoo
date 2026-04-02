@@ -12,6 +12,7 @@ import type {
   FinanceComparison,
   FinanceContextFeeSummary,
   FinanceInvoiceReminder,
+  FinanceMonthlyContextPayout,
   FinanceMonthlyTrendPoint,
   FinancePaymentDerived,
   FinanceProjectWithPayments,
@@ -391,7 +392,7 @@ export function buildMonthlyTrend(
         net_total: 0,
         studio_fee_total: 0,
         processor_fee_total: 0,
-        invoice_count: 0,
+        open_invoice_count: 0,
       };
 
       current.net_total = roundMoney(
@@ -409,7 +410,7 @@ export function buildMonthlyTrend(
             rates
           )
       );
-      if (payment.invoice_needed) current.invoice_count += 1;
+      if (payment.invoice_needed && !payment.invoice_done) current.open_invoice_count += 1;
 
       monthMap.set(month, current);
     }
@@ -418,6 +419,47 @@ export function buildMonthlyTrend(
   return [...monthMap.values()]
     .sort((a, b) => a.month.localeCompare(b.month))
     .slice(-monthsToInclude);
+}
+
+export function buildMonthlyContextPayouts(
+  projects: FinanceProjectWithPayments[],
+  monthsToInclude = 6
+): FinanceMonthlyContextPayout[] {
+  const payoutMap = new Map<string, FinanceMonthlyContextPayout>();
+
+  for (const project of projects) {
+    for (const payment of project.payments) {
+      const month = getPaymentMonthKey(payment.payment_date);
+      const key = `${month}:${project.work_context}:${payment.reporting_currency}`;
+      const current = payoutMap.get(key) ?? {
+        month,
+        label: formatTrendMonth(month),
+        work_context: project.work_context,
+        reporting_currency: payment.reporting_currency,
+        fee_total: 0,
+        processor_fee_total: 0,
+        entry_count: 0,
+      };
+
+      current.fee_total = roundMoney(current.fee_total + payment.fee_amount);
+      current.processor_fee_total = roundMoney(
+        current.processor_fee_total + payment.processor_fee_amount_reporting
+      );
+      current.entry_count += 1;
+
+      payoutMap.set(key, current);
+    }
+  }
+
+  return [...payoutMap.values()]
+    .sort((a, b) => {
+      if (a.month !== b.month) return a.month.localeCompare(b.month);
+      if (a.work_context !== b.work_context) {
+        return a.work_context.localeCompare(b.work_context);
+      }
+      return a.reporting_currency.localeCompare(b.reporting_currency);
+    })
+    .slice(-monthsToInclude * 4);
 }
 
 function formatTrendMonth(monthKey: string): string {

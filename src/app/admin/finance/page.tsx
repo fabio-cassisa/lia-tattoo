@@ -326,6 +326,27 @@ export default function AdminFinancePage() {
     [invoiceReminders]
   );
 
+  const monthlyPayoutHistory = useMemo(() => {
+    if (!summary || !dashboard) return [];
+
+    return summary.monthly_context_payouts.map((row) => ({
+      ...row,
+      payoutLabel: getOwnerPayoutLabel(row.work_context),
+      contextLabel: getContextLabel(row.work_context, dashboard.context_settings),
+    }));
+  }, [dashboard, summary]);
+
+  const latestTrendPoint = summary?.monthly_trend.at(-1) ?? null;
+  const previousTrendPoint =
+    summary && summary.monthly_trend.length > 1
+      ? summary.monthly_trend[summary.monthly_trend.length - 2]
+      : null;
+
+  const invoiceBacklogDelta = useMemo(() => {
+    if (!latestTrendPoint || !previousTrendPoint) return null;
+    return latestTrendPoint.open_invoice_count - previousTrendPoint.open_invoice_count;
+  }, [latestTrendPoint, previousTrendPoint]);
+
   function resetForm(nextMonth = month, nextDashboard = dashboard) {
     setForm(buildDefaultFormState(nextDashboard, nextMonth));
   }
@@ -1283,6 +1304,157 @@ export default function AdminFinancePage() {
                 </div>
               </div>
             </div>
+          )}
+        </AdminSurface>
+      </div>
+
+      <div className="mb-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <AdminSurface>
+          <AdminSectionHeading
+            title="Monthly finance pulse"
+            description="Seasonality in one place: take-home, studio drag, SumUp drag, and open invoice backlog across the last six months."
+          />
+
+          {loading || !summary ? (
+            <p className="text-sm text-foreground-muted">Loading monthly pulse...</p>
+          ) : summary.monthly_trend.length > 0 ? (
+            <div className="space-y-3">
+              {summary.monthly_trend.map((point) => (
+                <div
+                  key={`${point.month}:seasonality`}
+                  className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-foreground">{point.label}</p>
+                      <p className="mt-1 text-xs text-foreground-muted">
+                        {point.open_invoice_count} open invoice{point.open_invoice_count === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <p className="text-sm font-medium text-foreground">
+                      {formatMoney(point.net_total, summary.approx_primary.currency)}
+                    </p>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs text-foreground-muted sm:grid-cols-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Studio fees</span>
+                      <span>
+                        {formatMoney(point.studio_fee_total, summary.approx_primary.currency)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>SumUp drag</span>
+                      <span>
+                        {formatMoney(point.processor_fee_total, summary.approx_primary.currency)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Invoice backlog</span>
+                      <span>{point.open_invoice_count}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-foreground-muted">
+              Seasonality will show up after a few months of finance entries.
+            </p>
+          )}
+        </AdminSurface>
+
+        <AdminSurface>
+          <AdminSectionHeading
+            title="Backlog trend"
+            description="Simple period-over-period read on invoice backlog so Lia can see if admin debt is shrinking or breeding."
+          />
+
+          {loading || !summary || !latestTrendPoint ? (
+            <p className="text-sm text-foreground-muted">Loading backlog trend...</p>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                  Current month backlog
+                </p>
+                <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
+                  {latestTrendPoint.open_invoice_count}
+                </div>
+                <p className="mt-2 text-xs text-foreground-muted">
+                  {previousTrendPoint
+                    ? invoiceBacklogDelta === 0
+                      ? "Flat vs previous month"
+                      : `${invoiceBacklogDelta && invoiceBacklogDelta > 0 ? "+" : ""}${invoiceBacklogDelta} vs ${previousTrendPoint.label}`
+                    : "No previous month yet"}
+                </p>
+              </div>
+              <div className="space-y-2">
+                {summary.monthly_trend.map((point) => (
+                  <div
+                    key={`${point.month}:backlog`}
+                    className="flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 shadow-sm"
+                  >
+                    <span className="text-sm text-foreground">{point.label}</span>
+                    <span className="text-sm text-foreground-muted">
+                      {point.open_invoice_count} open invoice{point.open_invoice_count === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </AdminSurface>
+      </div>
+
+      <div className="mb-6">
+        <AdminSurface>
+          <AdminSectionHeading
+            title="Owner payout history"
+            description="A six-month view of what each studio owner or context reserve needed per month, with approximate SumUp drag attached to that month’s bucket."
+          />
+
+          {loading ? (
+            <p className="text-sm text-foreground-muted">Loading payout history...</p>
+          ) : monthlyPayoutHistory.length > 0 ? (
+            <div className="overflow-hidden rounded-2xl border border-[var(--sabbia-200)]">
+              <table className="w-full border-collapse text-left text-sm">
+                <thead className="bg-[var(--sabbia-50)] text-foreground-muted">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Month</th>
+                    <th className="px-4 py-3 font-medium">Payout</th>
+                    <th className="px-4 py-3 font-medium">Context</th>
+                    <th className="px-4 py-3 font-medium">Fee total</th>
+                    <th className="px-4 py-3 font-medium">Approx SumUp drag</th>
+                    <th className="px-4 py-3 font-medium">Entries</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyPayoutHistory.map((row) => (
+                    <tr
+                      key={`${row.month}:${row.work_context}:${row.reporting_currency}:history`}
+                      className="border-t border-[var(--sabbia-200)] bg-white"
+                    >
+                      <td className="px-4 py-3 text-foreground">{row.label}</td>
+                      <td className="px-4 py-3 font-medium text-foreground">{row.payoutLabel}</td>
+                      <td className="px-4 py-3 text-foreground-muted">
+                        {row.contextLabel} · {row.reporting_currency}
+                      </td>
+                      <td className="px-4 py-3 text-foreground">
+                        {formatMoney(row.fee_total, row.reporting_currency)}
+                      </td>
+                      <td className="px-4 py-3 text-foreground-muted">
+                        {formatMoney(row.processor_fee_total, row.reporting_currency)}
+                      </td>
+                      <td className="px-4 py-3 text-foreground-muted">{row.entry_count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-foreground-muted">
+              Owner payout history will start filling out after more months of data.
+            </p>
           )}
         </AdminSurface>
       </div>
