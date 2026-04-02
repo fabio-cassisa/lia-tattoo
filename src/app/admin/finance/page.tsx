@@ -131,6 +131,35 @@ function formatTimestamp(timestamp: string | null): string {
   }).format(new Date(timestamp));
 }
 
+function escapeCsvCell(value: string | number | null | undefined): string {
+  const text = value == null ? "" : String(value);
+  if (/[",\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function downloadCsv(
+  fileName: string,
+  rows: Array<Record<string, string | number | null | undefined>>
+) {
+  if (rows.length === 0) return;
+
+  const headers = Object.keys(rows[0]);
+  const csv = [
+    headers.join(","),
+    ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header])).join(",")),
+  ].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function buildDefaultFormState(
   dashboard: FinanceDashboardResponse | null,
   monthKey: string
@@ -346,6 +375,57 @@ export default function AdminFinancePage() {
     if (!latestTrendPoint || !previousTrendPoint) return null;
     return latestTrendPoint.open_invoice_count - previousTrendPoint.open_invoice_count;
   }, [latestTrendPoint, previousTrendPoint]);
+
+  const monthlyPulseExportRows = useMemo(() => {
+    if (!summary) return [];
+
+    return summary.monthly_trend.map((point) => ({
+      month: point.month,
+      label: point.label,
+      primary_currency: summary.approx_primary.currency,
+      net_total: point.net_total,
+      studio_fee_total: point.studio_fee_total,
+      processor_fee_total: point.processor_fee_total,
+      open_invoice_count: point.open_invoice_count,
+    }));
+  }, [summary]);
+
+  const payoutHistoryExportRows = useMemo(
+    () =>
+      monthlyPayoutHistory.map((row) => ({
+        month: row.month,
+        label: row.label,
+        payout_label: row.payoutLabel,
+        context: row.contextLabel,
+        reporting_currency: row.reporting_currency,
+        fee_total: row.fee_total,
+        processor_fee_total: row.processor_fee_total,
+        entry_count: row.entry_count,
+      })),
+    [monthlyPayoutHistory]
+  );
+
+  const reminderExportRows = useMemo(
+    () =>
+      invoiceReminderGroups.map((payment) => ({
+        client_name: payment.client_name,
+        project_label: payment.project_label,
+        payment_date: payment.payment_date,
+        age_days: payment.ageDays,
+        age_label: payment.ageLabel,
+        payment_method: FINANCE_PAYMENT_METHOD_LABELS[payment.payment_method],
+        reporting_currency: payment.reporting_currency,
+        gross_reporting: payment.gross_amount_reporting,
+        studio_fee_reporting: payment.fee_amount,
+        processor_fee_currency: payment.processor_fee_currency,
+        processor_fee_amount: payment.processor_fee_amount,
+        take_home_reporting: payment.net_amount,
+        invoice_reference: payment.invoice_reference,
+        last_nudged: payment.invoice_last_nudged_at,
+        reminder_note: payment.invoice_reminder_note,
+      })),
+    [invoiceReminderGroups]
+  );
 
   function resetForm(nextMonth = month, nextDashboard = dashboard) {
     setForm(buildDefaultFormState(nextDashboard, nextMonth));
@@ -1313,6 +1393,17 @@ export default function AdminFinancePage() {
           <AdminSectionHeading
             title="Monthly finance pulse"
             description="Seasonality in one place: take-home, studio drag, SumUp drag, and open invoice backlog across the last six months."
+            action={
+              <AdminButton
+                variant="secondary"
+                onClick={() =>
+                  downloadCsv(`finance-monthly-pulse-${month}.csv`, monthlyPulseExportRows)
+                }
+                disabled={monthlyPulseExportRows.length === 0}
+              >
+                Export CSV
+              </AdminButton>
+            }
           />
 
           {loading || !summary ? (
@@ -1411,6 +1502,17 @@ export default function AdminFinancePage() {
           <AdminSectionHeading
             title="Owner payout history"
             description="A six-month view of what each studio owner or context reserve needed per month, with approximate SumUp drag attached to that month’s bucket."
+            action={
+              <AdminButton
+                variant="secondary"
+                onClick={() =>
+                  downloadCsv(`finance-owner-payout-history-${month}.csv`, payoutHistoryExportRows)
+                }
+                disabled={payoutHistoryExportRows.length === 0}
+              >
+                Export CSV
+              </AdminButton>
+            }
           />
 
           {loading ? (
@@ -1672,6 +1774,17 @@ export default function AdminFinancePage() {
             <AdminSectionHeading
               title="Invoice reminders"
               description="Card payments should still nudge Lia to invoice, now with simple age-based urgency instead of a polite little graveyard."
+              action={
+                <AdminButton
+                  variant="secondary"
+                  onClick={() =>
+                    downloadCsv(`finance-invoice-reminders-${month}.csv`, reminderExportRows)
+                  }
+                  disabled={reminderExportRows.length === 0}
+                >
+                  Export CSV
+                </AdminButton>
+              }
             />
 
             {loading ? (
