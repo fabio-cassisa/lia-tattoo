@@ -44,6 +44,10 @@ export type FinanceWorkContext =
   | "guest_spot"
   | "private_home";
 
+export type FinanceTaxFramework = "italy" | "sweden";
+
+export type FinanceItalyInpsRegime = "artigiani" | "commercianti";
+
 export type BookingRow = {
   id: string;
   created_at: string;
@@ -191,6 +195,22 @@ export type FinanceSettingsRow = {
   fallback_eur_to_sek: number | null;
   card_invoice_default: boolean;
   card_processor_fee_percentage: number;
+  active_tax_framework: FinanceTaxFramework;
+  italy_tax_label: string;
+  italy_is_startup_eligible: boolean;
+  italy_startup_tax_rate: number;
+  italy_standard_tax_rate: number;
+  italy_profitability_coefficient: number;
+  italy_inps_regime: FinanceItalyInpsRegime;
+  italy_inps_min_taxable_income: number;
+  italy_inps_fixed_annual_contribution: number;
+  italy_inps_variable_rate: number;
+  italy_apply_forfettario_inps_reduction: boolean;
+  sweden_tax_label: string;
+  sweden_self_employment_contribution_rate: number;
+  sweden_municipal_tax_rate: number;
+  sweden_state_tax_threshold: number;
+  sweden_state_tax_rate: number;
   sweden_preview_label: string;
   sweden_preview_rate: number;
   sweden_preview_fixed_monthly_cost: number;
@@ -206,6 +226,22 @@ export type FinanceSettingsInsert = {
   fallback_eur_to_sek?: number | null;
   card_invoice_default?: boolean;
   card_processor_fee_percentage?: number;
+  active_tax_framework?: FinanceTaxFramework;
+  italy_tax_label?: string;
+  italy_is_startup_eligible?: boolean;
+  italy_startup_tax_rate?: number;
+  italy_standard_tax_rate?: number;
+  italy_profitability_coefficient?: number;
+  italy_inps_regime?: FinanceItalyInpsRegime;
+  italy_inps_min_taxable_income?: number;
+  italy_inps_fixed_annual_contribution?: number;
+  italy_inps_variable_rate?: number;
+  italy_apply_forfettario_inps_reduction?: boolean;
+  sweden_tax_label?: string;
+  sweden_self_employment_contribution_rate?: number;
+  sweden_municipal_tax_rate?: number;
+  sweden_state_tax_threshold?: number;
+  sweden_state_tax_rate?: number;
   sweden_preview_label?: string;
   sweden_preview_rate?: number;
   sweden_preview_fixed_monthly_cost?: number;

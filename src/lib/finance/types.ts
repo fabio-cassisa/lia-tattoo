@@ -4,9 +4,11 @@ import type {
   BookingType,
   FinanceContextSettingsRow,
   FinanceCurrency,
+  FinanceItalyInpsRegime,
   FinancePaymentRow,
   FinanceSettingsRow,
   FinanceProjectRow,
+  FinanceTaxFramework,
   FinanceWorkContext,
 } from "@/lib/supabase/database.types";
 
@@ -16,6 +18,7 @@ export type FinanceBookingOption = {
   location: BookingLocation;
   type: BookingType;
   status: BookingStatus;
+  deposit_amount: number | null;
   appointment_date: string | null;
   preferred_dates: string | null;
   is_linked: boolean;
@@ -91,6 +94,59 @@ export type FinanceMonthlyContextPayout = {
   entry_count: number;
 };
 
+export type FinanceTaxSimulationInput = {
+  framework: FinanceTaxFramework;
+  label: string;
+  active: boolean;
+  currency: FinanceCurrency;
+  invoiced_payment_count: number;
+  invoiced_revenue: number;
+  taxable_profit: number;
+  social_contributions: number;
+  income_tax: number;
+  net_income: number;
+  effective_tax_rate: number;
+  notes: string[];
+};
+
+export type FinanceItalyTaxSettings = {
+  label: string;
+  is_startup_eligible: boolean;
+  startup_tax_rate: number;
+  standard_tax_rate: number;
+  profitability_coefficient: number;
+  inps_regime: FinanceItalyInpsRegime;
+  inps_min_taxable_income: number;
+  inps_fixed_annual_contribution: number;
+  inps_variable_rate: number;
+  apply_forfettario_inps_reduction: boolean;
+};
+
+export type FinanceSwedenTaxSettings = {
+  label: string;
+  self_employment_contribution_rate: number;
+  municipal_tax_rate: number;
+  state_tax_threshold: number;
+  state_tax_rate: number;
+};
+
+export type FinanceTaxSummary = {
+  tax_year: number;
+  tax_base_months: string[];
+  actual_framework: FinanceTaxFramework;
+  invoiced_revenue_primary: number;
+  invoiced_revenue_secondary: number;
+  invoiced_revenue_eur: number;
+  invoiced_revenue_sek: number;
+  invoiced_payment_count: number;
+  simulations: {
+    italy: FinanceTaxSimulationInput;
+    sweden: FinanceTaxSimulationInput;
+  };
+  italy_settings: FinanceItalyTaxSettings;
+  sweden_settings: FinanceSwedenTaxSettings;
+};
+
 export type FinanceDashboardSummary = {
   month: string;
   entry_count: number;
@@ -108,6 +164,7 @@ export type FinanceDashboardSummary = {
   weekly: FinanceWeeklySummary[];
   monthly_trend: FinanceMonthlyTrendPoint[];
   monthly_context_payouts: FinanceMonthlyContextPayout[];
+  tax_summary: FinanceTaxSummary;
 };
 
 export type FinanceDashboardResponse = {

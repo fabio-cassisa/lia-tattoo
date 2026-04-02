@@ -8,6 +8,7 @@ import {
   buildMonthlyContextPayouts,
   buildMonthlyTrend,
   buildWeeklySummary,
+  buildTaxSummary,
   getNetTotalsByCurrency,
   getFeeTotalsByCurrency,
   getFeeTotalsByContext,
@@ -73,7 +74,7 @@ async function loadFinanceBase(admin = createAdminClient()) {
     admin
       .from("bookings")
       .select(
-        "id, client_name, location, type, status, appointment_date, preferred_dates"
+        "id, client_name, deposit_amount, location, type, status, appointment_date, preferred_dates"
       )
       .order("created_at", { ascending: false }),
   ]);
@@ -93,6 +94,7 @@ async function loadFinanceBase(admin = createAdminClient()) {
       BookingRow,
       | "id"
       | "client_name"
+      | "deposit_amount"
       | "location"
       | "type"
       | "status"
@@ -107,6 +109,7 @@ function buildBookingOptions(
     BookingRow,
     | "id"
     | "client_name"
+    | "deposit_amount"
     | "location"
     | "type"
     | "status"
@@ -174,6 +177,7 @@ async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboar
     settings.reporting_currency_secondary,
     rates
   );
+  const taxSummary = buildTaxSummary(projectsWithPayments, settings, rates, monthKey);
 
   const previousMonth = getPreviousMonthKey(monthKey);
   const previousProjects = filterProjectsForMonth(projectsWithPayments, previousMonth);
@@ -217,6 +221,7 @@ async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboar
       weekly,
       monthly_trend: monthlyTrend,
       monthly_context_payouts: monthlyContextPayouts,
+      tax_summary: taxSummary,
     },
     context_settings: contextSettings,
     settings,

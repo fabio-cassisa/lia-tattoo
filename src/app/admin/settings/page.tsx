@@ -13,13 +13,33 @@ import {
   AdminSectionHeading,
 } from "@/components/admin/AdminPrimitives";
 import {
+  DEFAULT_ACTIVE_TAX_FRAMEWORK,
+  DEFAULT_ITALY_INPS_FIXED_ANNUAL_CONTRIBUTION,
+  DEFAULT_ITALY_INPS_MIN_TAXABLE_INCOME,
+  DEFAULT_ITALY_INPS_REGIME,
+  DEFAULT_ITALY_INPS_VARIABLE_RATE,
+  DEFAULT_ITALY_PROFITABILITY_COEFFICIENT,
+  DEFAULT_ITALY_STANDARD_TAX_RATE,
+  DEFAULT_ITALY_STARTUP_TAX_RATE,
+  DEFAULT_ITALY_TAX_LABEL,
+  DEFAULT_SWEDEN_MUNICIPAL_TAX_RATE,
+  DEFAULT_SWEDEN_SELF_EMPLOYMENT_CONTRIBUTION_RATE,
+  DEFAULT_SWEDEN_STATE_TAX_RATE,
+  DEFAULT_SWEDEN_STATE_TAX_THRESHOLD,
+  DEFAULT_SWEDEN_TAX_LABEL,
+  FINANCE_ITALY_INPS_REGIME_LABELS,
+  FINANCE_ITALY_INPS_REGIME_OPTIONS,
+  FINANCE_TAX_FRAMEWORK_LABELS,
+  FINANCE_TAX_FRAMEWORK_OPTIONS,
   FINANCE_CURRENCY_OPTIONS,
   getContextLabel,
 } from "@/lib/finance/config";
 import type {
   FinanceContextSettingsRow,
   FinanceCurrency,
+  FinanceItalyInpsRegime,
   FinanceSettingsRow,
+  FinanceTaxFramework,
   FinanceWorkContext,
 } from "@/lib/supabase/database.types";
 import type { FinanceSettingsResponse } from "@/lib/finance/types";
@@ -36,9 +56,22 @@ type SettingsDraft = Pick<
   | "fallback_eur_to_sek"
   | "card_invoice_default"
   | "card_processor_fee_percentage"
-  | "sweden_preview_label"
-  | "sweden_preview_rate"
-  | "sweden_preview_fixed_monthly_cost"
+  | "active_tax_framework"
+  | "italy_tax_label"
+  | "italy_is_startup_eligible"
+  | "italy_startup_tax_rate"
+  | "italy_standard_tax_rate"
+  | "italy_profitability_coefficient"
+  | "italy_inps_regime"
+  | "italy_inps_min_taxable_income"
+  | "italy_inps_fixed_annual_contribution"
+  | "italy_inps_variable_rate"
+  | "italy_apply_forfettario_inps_reduction"
+  | "sweden_tax_label"
+  | "sweden_self_employment_contribution_rate"
+  | "sweden_municipal_tax_rate"
+  | "sweden_state_tax_threshold"
+  | "sweden_state_tax_rate"
 >;
 
 export default function AdminSettingsPage() {
@@ -76,9 +109,38 @@ export default function AdminSettingsPage() {
         fallback_eur_to_sek: data.settings.fallback_eur_to_sek,
         card_invoice_default: data.settings.card_invoice_default,
         card_processor_fee_percentage: data.settings.card_processor_fee_percentage,
-        sweden_preview_label: data.settings.sweden_preview_label,
-        sweden_preview_rate: data.settings.sweden_preview_rate,
-        sweden_preview_fixed_monthly_cost: data.settings.sweden_preview_fixed_monthly_cost,
+        active_tax_framework:
+          data.settings.active_tax_framework ?? DEFAULT_ACTIVE_TAX_FRAMEWORK,
+        italy_tax_label: data.settings.italy_tax_label ?? DEFAULT_ITALY_TAX_LABEL,
+        italy_is_startup_eligible: data.settings.italy_is_startup_eligible ?? true,
+        italy_startup_tax_rate:
+          data.settings.italy_startup_tax_rate ?? DEFAULT_ITALY_STARTUP_TAX_RATE,
+        italy_standard_tax_rate:
+          data.settings.italy_standard_tax_rate ?? DEFAULT_ITALY_STANDARD_TAX_RATE,
+        italy_profitability_coefficient:
+          data.settings.italy_profitability_coefficient ??
+          DEFAULT_ITALY_PROFITABILITY_COEFFICIENT,
+        italy_inps_regime: data.settings.italy_inps_regime ?? DEFAULT_ITALY_INPS_REGIME,
+        italy_inps_min_taxable_income:
+          data.settings.italy_inps_min_taxable_income ??
+          DEFAULT_ITALY_INPS_MIN_TAXABLE_INCOME,
+        italy_inps_fixed_annual_contribution:
+          data.settings.italy_inps_fixed_annual_contribution ??
+          DEFAULT_ITALY_INPS_FIXED_ANNUAL_CONTRIBUTION,
+        italy_inps_variable_rate:
+          data.settings.italy_inps_variable_rate ?? DEFAULT_ITALY_INPS_VARIABLE_RATE,
+        italy_apply_forfettario_inps_reduction:
+          data.settings.italy_apply_forfettario_inps_reduction ?? true,
+        sweden_tax_label: data.settings.sweden_tax_label ?? DEFAULT_SWEDEN_TAX_LABEL,
+        sweden_self_employment_contribution_rate:
+          data.settings.sweden_self_employment_contribution_rate ??
+          DEFAULT_SWEDEN_SELF_EMPLOYMENT_CONTRIBUTION_RATE,
+        sweden_municipal_tax_rate:
+          data.settings.sweden_municipal_tax_rate ?? DEFAULT_SWEDEN_MUNICIPAL_TAX_RATE,
+        sweden_state_tax_threshold:
+          data.settings.sweden_state_tax_threshold ?? DEFAULT_SWEDEN_STATE_TAX_THRESHOLD,
+        sweden_state_tax_rate:
+          data.settings.sweden_state_tax_rate ?? DEFAULT_SWEDEN_STATE_TAX_RATE,
       });
       setError("");
     } catch (err) {
@@ -459,67 +521,317 @@ export default function AdminSettingsPage() {
 
             <AdminSurface>
               <AdminSectionHeading
-                title="Sweden Preview"
-                description="Keep the Sweden comparison configurable and clearly hypothetical, so it helps decisions without pretending to be legal truth."
+                title="Tax frameworks"
+                description="Configure the actual Italy model and the Sweden comparison model. Both only use payments marked as invoiced, which keeps deposits and non-invoiced cash out of the tax theater."
               />
 
               <div className="space-y-4 text-sm text-foreground-muted">
                 <label className="text-sm text-foreground-muted">
-                  Preview label
-                  <input
-                    value={settings.sweden_preview_label}
+                  Active real-world framework
+                  <select
+                    value={settings.active_tax_framework}
                     onChange={(event) =>
-                      updateSettings("sweden_preview_label", event.target.value)
+                      updateSettings(
+                        "active_tax_framework",
+                        event.target.value as FinanceTaxFramework
+                      )
                     }
                     className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
                     style={{ fontSize: "16px" }}
-                  />
+                  >
+                    {FINANCE_TAX_FRAMEWORK_OPTIONS.map((framework) => (
+                      <option key={framework} value={framework}>
+                        {FINANCE_TAX_FRAMEWORK_LABELS[framework]}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="text-sm text-foreground-muted">
-                    Approx rate %
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      value={settings.sweden_preview_rate}
-                      onChange={(event) =>
-                        updateSettings(
-                          "sweden_preview_rate",
-                          Number(event.target.value)
-                        )
-                      }
-                      className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                      style={{ fontSize: "16px" }}
-                    />
-                  </label>
-
-                  <label className="text-sm text-foreground-muted">
-                    Fixed monthly cost
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={settings.sweden_preview_fixed_monthly_cost}
-                      onChange={(event) =>
-                        updateSettings(
-                          "sweden_preview_fixed_monthly_cost",
-                          Number(event.target.value)
-                        )
-                      }
-                      className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                      style={{ fontSize: "16px" }}
-                    />
-                  </label>
+                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4">
+                  <p className="font-medium text-foreground">Booking deposit rule</p>
+                  <p className="mt-2">
+                    If a booking starts with a non-invoiced PayPal deposit, that deposit can be logged for cashflow but should stay outside the tax simulation. The final session payment should be entered as the remainder and only counted for tax when it is actually invoiced.
+                  </p>
                 </div>
 
-                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4">
-                  <p className="font-medium text-foreground">How to use this</p>
-                  <p className="mt-2">
-                    Treat this as a rough decision-support layer. Use the percentage for broad tax/fee drag and the fixed monthly cost for bookkeeping, insurance, software, or setup overhead you want to pressure-test.
-                  </p>
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                      Italy model
+                    </p>
+                    <div className="mt-4 space-y-4">
+                      <label className="text-sm text-foreground-muted">
+                        Label
+                        <input
+                          value={settings.italy_tax_label}
+                          onChange={(event) =>
+                            updateSettings("italy_tax_label", event.target.value)
+                          }
+                          className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                          style={{ fontSize: "16px" }}
+                        />
+                      </label>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <label className="text-sm text-foreground-muted">
+                          Startup tax rate %
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={settings.italy_startup_tax_rate}
+                            onChange={(event) =>
+                              updateSettings(
+                                "italy_startup_tax_rate",
+                                Number(event.target.value)
+                              )
+                            }
+                            className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                            style={{ fontSize: "16px" }}
+                          />
+                        </label>
+
+                        <label className="text-sm text-foreground-muted">
+                          Standard tax rate %
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={settings.italy_standard_tax_rate}
+                            onChange={(event) =>
+                              updateSettings(
+                                "italy_standard_tax_rate",
+                                Number(event.target.value)
+                              )
+                            }
+                            className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                            style={{ fontSize: "16px" }}
+                          />
+                        </label>
+
+                        <label className="text-sm text-foreground-muted">
+                          Profitability coefficient %
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={settings.italy_profitability_coefficient}
+                            onChange={(event) =>
+                              updateSettings(
+                                "italy_profitability_coefficient",
+                                Number(event.target.value)
+                              )
+                            }
+                            className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                            style={{ fontSize: "16px" }}
+                          />
+                        </label>
+
+                        <label className="text-sm text-foreground-muted">
+                          INPS regime
+                          <select
+                            value={settings.italy_inps_regime}
+                            onChange={(event) =>
+                              updateSettings(
+                                "italy_inps_regime",
+                                event.target.value as FinanceItalyInpsRegime
+                              )
+                            }
+                            className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                            style={{ fontSize: "16px" }}
+                          >
+                            {FINANCE_ITALY_INPS_REGIME_OPTIONS.map((regime) => (
+                              <option key={regime} value={regime}>
+                                {FINANCE_ITALY_INPS_REGIME_LABELS[regime]}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="text-sm text-foreground-muted">
+                          INPS minimale reddito
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={settings.italy_inps_min_taxable_income}
+                            onChange={(event) =>
+                              updateSettings(
+                                "italy_inps_min_taxable_income",
+                                Number(event.target.value)
+                              )
+                            }
+                            className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                            style={{ fontSize: "16px" }}
+                          />
+                        </label>
+
+                        <label className="text-sm text-foreground-muted">
+                          Fixed annual INPS contribution
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={settings.italy_inps_fixed_annual_contribution}
+                            onChange={(event) =>
+                              updateSettings(
+                                "italy_inps_fixed_annual_contribution",
+                                Number(event.target.value)
+                              )
+                            }
+                            className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                            style={{ fontSize: "16px" }}
+                          />
+                        </label>
+
+                        <label className="text-sm text-foreground-muted">
+                          Variable INPS rate %
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={settings.italy_inps_variable_rate}
+                            onChange={(event) =>
+                              updateSettings(
+                                "italy_inps_variable_rate",
+                                Number(event.target.value)
+                              )
+                            }
+                            className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                            style={{ fontSize: "16px" }}
+                          />
+                        </label>
+                      </div>
+
+                      <label className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-foreground">
+                        <input
+                          type="checkbox"
+                          checked={settings.italy_is_startup_eligible}
+                          onChange={(event) =>
+                            updateSettings(
+                              "italy_is_startup_eligible",
+                              event.target.checked
+                            )
+                          }
+                        />
+                        Apply startup substitute tax
+                      </label>
+
+                      <label className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-foreground">
+                        <input
+                          type="checkbox"
+                          checked={settings.italy_apply_forfettario_inps_reduction}
+                          onChange={(event) =>
+                            updateSettings(
+                              "italy_apply_forfettario_inps_reduction",
+                              event.target.checked
+                            )
+                          }
+                        />
+                        Apply 35% INPS reduction
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                      Sweden model
+                    </p>
+                    <div className="mt-4 space-y-4">
+                      <label className="text-sm text-foreground-muted">
+                        Label
+                        <input
+                          value={settings.sweden_tax_label}
+                          onChange={(event) =>
+                            updateSettings("sweden_tax_label", event.target.value)
+                          }
+                          className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                          style={{ fontSize: "16px" }}
+                        />
+                      </label>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <label className="text-sm text-foreground-muted">
+                          Egenavgifter %
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={settings.sweden_self_employment_contribution_rate}
+                            onChange={(event) =>
+                              updateSettings(
+                                "sweden_self_employment_contribution_rate",
+                                Number(event.target.value)
+                              )
+                            }
+                            className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                            style={{ fontSize: "16px" }}
+                          />
+                        </label>
+
+                        <label className="text-sm text-foreground-muted">
+                          Municipal tax %
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={settings.sweden_municipal_tax_rate}
+                            onChange={(event) =>
+                              updateSettings(
+                                "sweden_municipal_tax_rate",
+                                Number(event.target.value)
+                              )
+                            }
+                            className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                            style={{ fontSize: "16px" }}
+                          />
+                        </label>
+
+                        <label className="text-sm text-foreground-muted">
+                          State tax threshold (SEK)
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={settings.sweden_state_tax_threshold}
+                            onChange={(event) =>
+                              updateSettings(
+                                "sweden_state_tax_threshold",
+                                Number(event.target.value)
+                              )
+                            }
+                            className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                            style={{ fontSize: "16px" }}
+                          />
+                        </label>
+
+                        <label className="text-sm text-foreground-muted">
+                          State tax rate %
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={settings.sweden_state_tax_rate}
+                            onChange={(event) =>
+                              updateSettings(
+                                "sweden_state_tax_rate",
+                                Number(event.target.value)
+                              )
+                            }
+                            className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                            style={{ fontSize: "16px" }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </AdminSurface>

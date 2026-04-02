@@ -1,21 +1,39 @@
 import {
   calculateFeeAmount,
   calculateProcessorFeeAmount,
+  DEFAULT_ITALY_INPS_FIXED_ANNUAL_CONTRIBUTION,
+  DEFAULT_ITALY_INPS_MIN_TAXABLE_INCOME,
+  DEFAULT_ITALY_INPS_REGIME,
+  DEFAULT_ITALY_INPS_VARIABLE_RATE,
+  DEFAULT_ITALY_PROFITABILITY_COEFFICIENT,
+  DEFAULT_ITALY_STANDARD_TAX_RATE,
+  DEFAULT_ITALY_STARTUP_TAX_RATE,
+  DEFAULT_ITALY_TAX_LABEL,
+  DEFAULT_ACTIVE_TAX_FRAMEWORK,
+  DEFAULT_SWEDEN_MUNICIPAL_TAX_RATE,
+  DEFAULT_SWEDEN_SELF_EMPLOYMENT_CONTRIBUTION_RATE,
+  DEFAULT_SWEDEN_STATE_TAX_RATE,
+  DEFAULT_SWEDEN_STATE_TAX_THRESHOLD,
+  DEFAULT_SWEDEN_TAX_LABEL,
 } from "@/lib/finance/config";
 import type {
   FinanceCurrency,
   FinancePaymentRow,
   FinanceProjectRow,
   FinanceSettingsRow,
+  FinanceTaxFramework,
 } from "@/lib/supabase/database.types";
 import type {
   FinanceComparison,
   FinanceContextFeeSummary,
   FinanceInvoiceReminder,
+  FinanceItalyTaxSettings,
   FinanceMonthlyContextPayout,
   FinanceMonthlyTrendPoint,
   FinancePaymentDerived,
   FinanceProjectWithPayments,
+  FinanceSwedenTaxSettings,
+  FinanceTaxSummary,
   FinanceWeeklySummary,
 } from "@/lib/finance/types";
 
@@ -31,6 +49,215 @@ const CARD_PROCESSOR_CURRENCY: FinanceCurrency = "EUR";
 
 const DEFAULT_EUR_TO_SEK = 11.6;
 const DEFAULT_EUR_TO_DKK = 7.46;
+
+function clampPercentage(value: number): number {
+  return Math.min(100, Math.max(0, value));
+}
+
+function getTaxYearMonths(year: number): string[] {
+  return Array.from({ length: 12 }, (_, index) =>
+    `${year}-${String(index + 1).padStart(2, "0")}`
+  );
+}
+
+function sumGrossPaymentsByCurrency(
+  payments: FinancePaymentDerived[],
+  currency: FinanceCurrency,
+  rates: ResolvedExchangeRates
+): number {
+  return roundMoney(
+    payments.reduce(
+      (total, payment) => total + convertAmount(payment.gross_amount, payment.currency, currency, rates),
+      0
+    )
+  );
+}
+
+function getInvoicedPayments(projects: FinanceProjectWithPayments[], taxYear: number) {
+  return projects
+    .flatMap((project) => project.payments)
+    .filter(
+      (payment) => payment.invoice_done && getPaymentMonthKey(payment.payment_date).startsWith(String(taxYear))
+    );
+}
+
+export function getItalyTaxSettings(settings: FinanceSettingsRow): FinanceItalyTaxSettings {
+  return {
+    label: settings.italy_tax_label || DEFAULT_ITALY_TAX_LABEL,
+    is_startup_eligible: settings.italy_is_startup_eligible ?? true,
+    startup_tax_rate: clampPercentage(settings.italy_startup_tax_rate ?? DEFAULT_ITALY_STARTUP_TAX_RATE),
+    standard_tax_rate: clampPercentage(settings.italy_standard_tax_rate ?? DEFAULT_ITALY_STANDARD_TAX_RATE),
+    profitability_coefficient: clampPercentage(
+      settings.italy_profitability_coefficient ?? DEFAULT_ITALY_PROFITABILITY_COEFFICIENT
+    ),
+    inps_regime:
+      settings.italy_inps_regime === "commercianti" ? "commercianti" : DEFAULT_ITALY_INPS_REGIME,
+    inps_min_taxable_income:
+      settings.italy_inps_min_taxable_income ?? DEFAULT_ITALY_INPS_MIN_TAXABLE_INCOME,
+    inps_fixed_annual_contribution:
+      settings.italy_inps_fixed_annual_contribution ??
+      DEFAULT_ITALY_INPS_FIXED_ANNUAL_CONTRIBUTION,
+    inps_variable_rate: clampPercentage(
+      settings.italy_inps_variable_rate ?? DEFAULT_ITALY_INPS_VARIABLE_RATE
+    ),
+    apply_forfettario_inps_reduction:
+      settings.italy_apply_forfettario_inps_reduction ?? true,
+  };
+}
+
+export function getSwedenTaxSettings(settings: FinanceSettingsRow): FinanceSwedenTaxSettings {
+  return {
+    label: settings.sweden_tax_label || DEFAULT_SWEDEN_TAX_LABEL,
+    self_employment_contribution_rate: clampPercentage(
+      settings.sweden_self_employment_contribution_rate ??
+        DEFAULT_SWEDEN_SELF_EMPLOYMENT_CONTRIBUTION_RATE
+    ),
+    municipal_tax_rate: clampPercentage(
+      settings.sweden_municipal_tax_rate ?? DEFAULT_SWEDEN_MUNICIPAL_TAX_RATE
+    ),
+    state_tax_threshold:
+      settings.sweden_state_tax_threshold ?? DEFAULT_SWEDEN_STATE_TAX_THRESHOLD,
+    state_tax_rate: clampPercentage(
+      settings.sweden_state_tax_rate ?? DEFAULT_SWEDEN_STATE_TAX_RATE
+    ),
+  };
+}
+
+function calculateItalyInpsContribution(
+  taxableProfit: number,
+  settings: FinanceItalyTaxSettings
+): number {
+  const baseContribution = settings.inps_fixed_annual_contribution;
+  const excessTaxableIncome = Math.max(0, taxableProfit - settings.inps_min_taxable_income);
+  const variableContribution = excessTaxableIncome * (settings.inps_variable_rate / 100);
+  const totalContribution = baseContribution + variableContribution;
+
+  return roundMoney(
+    settings.apply_forfettario_inps_reduction ? totalContribution * 0.65 : totalContribution
+  );
+}
+
+function buildItalyTaxSimulation(
+  invoicedPayments: FinancePaymentDerived[],
+  settings: FinanceItalyTaxSettings,
+  actualFramework: FinanceTaxFramework,
+  rates: ResolvedExchangeRates
+) {
+  const invoicedRevenue = sumGrossPaymentsByCurrency(invoicedPayments, "EUR", rates);
+  const taxableProfit = roundMoney(invoicedRevenue * (settings.profitability_coefficient / 100));
+  const socialContributions = calculateItalyInpsContribution(taxableProfit, settings);
+  const substituteTaxRate = settings.is_startup_eligible
+    ? settings.startup_tax_rate
+    : settings.standard_tax_rate;
+  const incomeTax = roundMoney(
+    Math.max(0, taxableProfit - socialContributions) * (substituteTaxRate / 100)
+  );
+  const netIncome = roundMoney(invoicedRevenue - socialContributions - incomeTax);
+
+  return {
+    framework: "italy" as const,
+    label: settings.label,
+    active: actualFramework === "italy",
+    currency: "EUR" as const,
+    invoiced_payment_count: invoicedPayments.length,
+    invoiced_revenue: invoicedRevenue,
+    taxable_profit: taxableProfit,
+    social_contributions: socialContributions,
+    income_tax: incomeTax,
+    net_income: netIncome,
+    effective_tax_rate:
+      invoicedRevenue > 0
+        ? roundMoney(((socialContributions + incomeTax) / invoicedRevenue) * 100)
+        : 0,
+    notes: [
+      `${settings.inps_regime === "commercianti" ? "Commercianti" : "Artigiani"} INPS base`,
+      `Forfettario coefficient ${roundMoney(settings.profitability_coefficient)}%`,
+      `${settings.is_startup_eligible ? "Startup" : "Standard"} substitute tax ${roundMoney(substituteTaxRate)}%`,
+      settings.apply_forfettario_inps_reduction
+        ? "Includes 35% INPS reduction on the full contribution due"
+        : "No 35% INPS reduction applied",
+    ],
+  };
+}
+
+function buildSwedenTaxSimulation(
+  invoicedPayments: FinancePaymentDerived[],
+  settings: FinanceSwedenTaxSettings,
+  actualFramework: FinanceTaxFramework,
+  rates: ResolvedExchangeRates
+) {
+  const invoicedRevenue = sumGrossPaymentsByCurrency(invoicedPayments, "SEK", rates);
+  const socialContributions = roundMoney(
+    invoicedRevenue * (settings.self_employment_contribution_rate / 100)
+  );
+  const taxableProfit = roundMoney(Math.max(0, invoicedRevenue - socialContributions));
+  const municipalTax = roundMoney(taxableProfit * (settings.municipal_tax_rate / 100));
+  const stateTax = roundMoney(
+    Math.max(0, taxableProfit - settings.state_tax_threshold) * (settings.state_tax_rate / 100)
+  );
+  const incomeTax = roundMoney(municipalTax + stateTax);
+  const netIncome = roundMoney(invoicedRevenue - socialContributions - incomeTax);
+
+  return {
+    framework: "sweden" as const,
+    label: settings.label,
+    active: actualFramework === "sweden",
+    currency: "SEK" as const,
+    invoiced_payment_count: invoicedPayments.length,
+    invoiced_revenue: invoicedRevenue,
+    taxable_profit: taxableProfit,
+    social_contributions: socialContributions,
+    income_tax: incomeTax,
+    net_income: netIncome,
+    effective_tax_rate:
+      invoicedRevenue > 0
+        ? roundMoney(((socialContributions + incomeTax) / invoicedRevenue) * 100)
+        : 0,
+    notes: [
+      `Egenavgifter ${roundMoney(settings.self_employment_contribution_rate)}%`,
+      `Municipal tax ${roundMoney(settings.municipal_tax_rate)}%`,
+      `State tax ${roundMoney(settings.state_tax_rate)}% above ${roundMoney(settings.state_tax_threshold)} SEK`,
+    ],
+  };
+}
+
+export function buildTaxSummary(
+  projects: FinanceProjectWithPayments[],
+  settings: FinanceSettingsRow,
+  rates: ResolvedExchangeRates,
+  monthKey: string
+): FinanceTaxSummary {
+  const taxYear = Number(monthKey.slice(0, 4));
+  const actualFramework = settings.active_tax_framework ?? DEFAULT_ACTIVE_TAX_FRAMEWORK;
+  const italySettings = getItalyTaxSettings(settings);
+  const swedenSettings = getSwedenTaxSettings(settings);
+  const invoicedPayments = getInvoicedPayments(projects, taxYear);
+
+  return {
+    tax_year: taxYear,
+    tax_base_months: getTaxYearMonths(taxYear),
+    actual_framework: actualFramework,
+    invoiced_revenue_primary: sumGrossPaymentsByCurrency(
+      invoicedPayments,
+      settings.reporting_currency_primary,
+      rates
+    ),
+    invoiced_revenue_secondary: sumGrossPaymentsByCurrency(
+      invoicedPayments,
+      settings.reporting_currency_secondary,
+      rates
+    ),
+    invoiced_revenue_eur: sumGrossPaymentsByCurrency(invoicedPayments, "EUR", rates),
+    invoiced_revenue_sek: sumGrossPaymentsByCurrency(invoicedPayments, "SEK", rates),
+    invoiced_payment_count: invoicedPayments.length,
+    simulations: {
+      italy: buildItalyTaxSimulation(invoicedPayments, italySettings, actualFramework, rates),
+      sweden: buildSwedenTaxSimulation(invoicedPayments, swedenSettings, actualFramework, rates),
+    },
+    italy_settings: italySettings,
+    sweden_settings: swedenSettings,
+  };
+}
 
 export function getCurrentMonthKey(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;

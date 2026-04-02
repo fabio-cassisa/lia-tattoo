@@ -30,6 +30,14 @@ function isCurrency(value: unknown): value is FinanceCurrency {
   return ["SEK", "DKK", "EUR"].includes(String(value));
 }
 
+function isTaxFramework(value: unknown): value is FinanceSettingsRow["active_tax_framework"] {
+  return ["italy", "sweden"].includes(String(value));
+}
+
+function isItalyInpsRegime(value: unknown): value is FinanceSettingsRow["italy_inps_regime"] {
+  return ["artigiani", "commercianti"].includes(String(value));
+}
+
 function getString(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -119,6 +127,78 @@ export async function PATCH(request: Request) {
       if (getNumber(body.settings.card_processor_fee_percentage) !== null) {
         settingsUpdates.card_processor_fee_percentage = getNumber(
           body.settings.card_processor_fee_percentage
+        );
+      }
+      if (isTaxFramework(body.settings.active_tax_framework)) {
+        settingsUpdates.active_tax_framework = body.settings.active_tax_framework;
+      }
+      if (getString(body.settings.italy_tax_label) !== null) {
+        settingsUpdates.italy_tax_label = getString(body.settings.italy_tax_label);
+      }
+      if (getBoolean(body.settings.italy_is_startup_eligible) !== null) {
+        settingsUpdates.italy_is_startup_eligible = getBoolean(
+          body.settings.italy_is_startup_eligible
+        );
+      }
+      if (getNumber(body.settings.italy_startup_tax_rate) !== null) {
+        settingsUpdates.italy_startup_tax_rate = getNumber(
+          body.settings.italy_startup_tax_rate
+        );
+      }
+      if (getNumber(body.settings.italy_standard_tax_rate) !== null) {
+        settingsUpdates.italy_standard_tax_rate = getNumber(
+          body.settings.italy_standard_tax_rate
+        );
+      }
+      if (getNumber(body.settings.italy_profitability_coefficient) !== null) {
+        settingsUpdates.italy_profitability_coefficient = getNumber(
+          body.settings.italy_profitability_coefficient
+        );
+      }
+      if (isItalyInpsRegime(body.settings.italy_inps_regime)) {
+        settingsUpdates.italy_inps_regime = body.settings.italy_inps_regime;
+      }
+      if (getNumber(body.settings.italy_inps_min_taxable_income) !== null) {
+        settingsUpdates.italy_inps_min_taxable_income = getNumber(
+          body.settings.italy_inps_min_taxable_income
+        );
+      }
+      if (getNumber(body.settings.italy_inps_fixed_annual_contribution) !== null) {
+        settingsUpdates.italy_inps_fixed_annual_contribution = getNumber(
+          body.settings.italy_inps_fixed_annual_contribution
+        );
+      }
+      if (getNumber(body.settings.italy_inps_variable_rate) !== null) {
+        settingsUpdates.italy_inps_variable_rate = getNumber(
+          body.settings.italy_inps_variable_rate
+        );
+      }
+      if (getBoolean(body.settings.italy_apply_forfettario_inps_reduction) !== null) {
+        settingsUpdates.italy_apply_forfettario_inps_reduction = getBoolean(
+          body.settings.italy_apply_forfettario_inps_reduction
+        );
+      }
+      if (getString(body.settings.sweden_tax_label) !== null) {
+        settingsUpdates.sweden_tax_label = getString(body.settings.sweden_tax_label);
+      }
+      if (getNumber(body.settings.sweden_self_employment_contribution_rate) !== null) {
+        settingsUpdates.sweden_self_employment_contribution_rate = getNumber(
+          body.settings.sweden_self_employment_contribution_rate
+        );
+      }
+      if (getNumber(body.settings.sweden_municipal_tax_rate) !== null) {
+        settingsUpdates.sweden_municipal_tax_rate = getNumber(
+          body.settings.sweden_municipal_tax_rate
+        );
+      }
+      if (getNumber(body.settings.sweden_state_tax_threshold) !== null) {
+        settingsUpdates.sweden_state_tax_threshold = getNumber(
+          body.settings.sweden_state_tax_threshold
+        );
+      }
+      if (getNumber(body.settings.sweden_state_tax_rate) !== null) {
+        settingsUpdates.sweden_state_tax_rate = getNumber(
+          body.settings.sweden_state_tax_rate
         );
       }
       if (getString(body.settings.sweden_preview_label) !== null) {

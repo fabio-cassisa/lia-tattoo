@@ -16,6 +16,7 @@ import {
 import {
   DEFAULT_CARD_PROCESSOR_FEE_PERCENTAGE,
   FINANCE_CURRENCY_OPTIONS,
+  FINANCE_TAX_FRAMEWORK_LABELS,
   FINANCE_PAYMENT_METHOD_LABELS,
   FINANCE_PAYMENT_METHOD_OPTIONS,
   FINANCE_WORK_CONTEXT_OPTIONS,
@@ -58,7 +59,6 @@ type FinanceFormState = {
 
 const DEFAULT_MONTH = normalizeMonthKey();
 const REPORTING_CURRENCIES: FinanceCurrency[] = ["SEK", "DKK", "EUR"];
-const ITALY_PREVIEW_RATE = 0.05;
 const DAY_IN_MS = 86400000;
 
 function formatMoney(amount: number, currency: FinanceCurrency): string {
@@ -82,8 +82,14 @@ function formatDelta(percentDelta: number | null): string {
   return `${percentDelta > 0 ? "+" : ""}${percentDelta}% vs last month`;
 }
 
-function roundAmount(value: number): number {
-  return Math.round(value * 100) / 100;
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100) / 100}%`;
+}
+
+function parseNumberInput(value: string): number | null {
+  if (!value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function getOwnerPayoutLabel(workContext: FinanceWorkContext): string {
@@ -208,6 +214,7 @@ export default function AdminFinancePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [sessionTotalAmount, setSessionTotalAmount] = useState("");
   const [form, setForm] = useState<FinanceFormState>(
     buildDefaultFormState(null, DEFAULT_MONTH)
   );
@@ -250,7 +257,7 @@ export default function AdminFinancePage() {
   }, [dashboard, month, showForm]);
 
   const summary = dashboard?.summary;
-  const bookings = dashboard?.bookings ?? [];
+  const bookings = useMemo(() => dashboard?.bookings ?? [], [dashboard?.bookings]);
   const invoiceReminders = useMemo(
     () => dashboard?.invoice_reminders ?? [],
     [dashboard?.invoice_reminders]
@@ -265,6 +272,34 @@ export default function AdminFinancePage() {
       })),
     [dashboard?.projects, month]
   );
+
+  const selectedBooking = useMemo(
+    () => bookings.find((booking) => booking.id === form.booking_id) ?? null,
+    [bookings, form.booking_id]
+  );
+  const selectedBookingDeposit = selectedBooking?.deposit_amount ?? 0;
+  const selectedBookingCurrency = selectedBooking
+    ? selectedBooking.location === "copenhagen"
+      ? "DKK"
+      : "SEK"
+    : null;
+  const sessionTotalNumber = parseNumberInput(sessionTotalAmount);
+  const depositRemainder =
+    sessionTotalNumber !== null && selectedBookingDeposit > 0
+      ? Math.max(0, sessionTotalNumber - selectedBookingDeposit)
+      : null;
+  const depositHelperReady =
+    selectedBookingDeposit > 0 &&
+    selectedBookingCurrency !== null &&
+    selectedBookingCurrency === form.currency;
+
+  const taxSummary = summary?.tax_summary ?? null;
+  const italySimulation = taxSummary?.simulations.italy ?? null;
+  const swedenSimulation = taxSummary?.simulations.sweden ?? null;
+
+  useEffect(() => {
+    setSessionTotalAmount("");
+  }, [form.booking_id]);
 
   const reportingBucketCurrencies = useMemo(
     () =>
@@ -294,51 +329,6 @@ export default function AdminFinancePage() {
         label: getOwnerPayoutLabel(row.work_context),
         contextLabel: getContextLabel(row.work_context, dashboard.context_settings),
       }));
-  }, [dashboard, summary]);
-
-  const italyPreview = useMemo(() => {
-    if (!summary) return null;
-
-    const approxTaxPrimary = roundAmount(summary.month_total * ITALY_PREVIEW_RATE);
-    const approxTaxSecondary = roundAmount(
-      summary.approx_secondary.amount * ITALY_PREVIEW_RATE
-    );
-
-    return {
-      rate: ITALY_PREVIEW_RATE,
-      primaryTax: approxTaxPrimary,
-      primaryAfterTax: roundAmount(summary.month_total - approxTaxPrimary),
-      secondaryTax: approxTaxSecondary,
-      secondaryAfterTax: roundAmount(summary.approx_secondary.amount - approxTaxSecondary),
-    };
-  }, [summary]);
-
-  const swedenPreview = useMemo(() => {
-    if (!summary || !dashboard) return null;
-
-    const rate = (dashboard.settings.sweden_preview_rate ?? 0) / 100;
-    const fixedPrimary = dashboard.settings.sweden_preview_fixed_monthly_cost ?? 0;
-    const fixedSecondary =
-      summary.approx_primary.currency === summary.approx_secondary.currency || summary.month_total === 0
-        ? fixedPrimary
-        : roundAmount(
-            (fixedPrimary / Math.max(summary.month_total, 1)) * summary.approx_secondary.amount
-          );
-    const variablePrimary = roundAmount(summary.month_total * rate);
-    const variableSecondary = roundAmount(summary.approx_secondary.amount * rate);
-
-    return {
-      label: dashboard.settings.sweden_preview_label || "Sweden preview",
-      rate,
-      fixedPrimary,
-      fixedSecondary,
-      totalPrimaryReserve: roundAmount(variablePrimary + fixedPrimary),
-      totalSecondaryReserve: roundAmount(variableSecondary + fixedSecondary),
-      primaryAfterReserve: roundAmount(summary.month_total - variablePrimary - fixedPrimary),
-      secondaryAfterReserve: roundAmount(
-        summary.approx_secondary.amount - variableSecondary - fixedSecondary
-      ),
-    };
   }, [dashboard, summary]);
 
   const invoiceReminderGroups = useMemo(
@@ -429,6 +419,7 @@ export default function AdminFinancePage() {
 
   function resetForm(nextMonth = month, nextDashboard = dashboard) {
     setForm(buildDefaultFormState(nextDashboard, nextMonth));
+    setSessionTotalAmount("");
   }
 
   function applyBookingPrefill(bookingId: string) {
@@ -479,6 +470,7 @@ export default function AdminFinancePage() {
         const method = value as FinancePaymentMethod;
         const needsInvoice = method === "card" && dashboard.settings.card_invoice_default;
         next.invoice_needed = needsInvoice;
+        next.invoice_done = needsInvoice ? next.invoice_done : false;
         next.processor_fee_percentage =
           method === "card"
             ? String(
@@ -486,6 +478,10 @@ export default function AdminFinancePage() {
                   DEFAULT_CARD_PROCESSOR_FEE_PERCENTAGE
               )
             : "0";
+      }
+
+      if (key === "invoice_needed" && !value) {
+        next.invoice_done = false;
       }
 
       return next;
@@ -863,7 +859,7 @@ export default function AdminFinancePage() {
               </label>
 
               <label className="text-sm text-foreground-muted">
-                Gross amount
+                Payment amount received
                 <input
                   type="number"
                   min="0"
@@ -874,6 +870,11 @@ export default function AdminFinancePage() {
                   style={{ fontSize: "16px" }}
                   required
                 />
+                {selectedBookingDeposit > 0 ? (
+                  <span className="mt-1 block text-xs text-foreground-muted">
+                    Enter the actual amount paid in this transaction. If the booking had a non-invoiced deposit, this should usually be the remainder, not the full tattoo price.
+                  </span>
+                ) : null}
               </label>
 
               <label className="text-sm text-foreground-muted">
@@ -896,6 +897,59 @@ export default function AdminFinancePage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {selectedBookingDeposit > 0 ? (
+                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4 md:col-span-2 xl:col-span-4">
+                  <p className="text-sm font-medium text-foreground">Booking deposit helper</p>
+                  <p className="mt-1 text-sm text-foreground-muted">
+                    Deposit on this booking: {formatMoney(selectedBookingDeposit, selectedBookingCurrency ?? form.currency)}. If you know the full session total, enter it here and use the helper to fill the payable remainder.
+                  </p>
+
+                  <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
+                    <label className="text-sm text-foreground-muted">
+                      Full session total in {selectedBookingCurrency}
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={sessionTotalAmount}
+                        onChange={(event) => setSessionTotalAmount(event.target.value)}
+                        className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                        style={{ fontSize: "16px" }}
+                        placeholder="Example: 2000"
+                      />
+                    </label>
+
+                    <div className="flex items-end">
+                      <AdminButton
+                        type="button"
+                        variant="secondary"
+                        disabled={!depositHelperReady || depositRemainder === null}
+                        onClick={() => {
+                          if (depositRemainder === null) return;
+                          updateForm("gross_amount", String(depositRemainder));
+                        }}
+                      >
+                        Use remaining payment
+                      </AdminButton>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 space-y-1 text-xs text-foreground-muted">
+                    <p>
+                      Formula: {sessionTotalNumber !== null
+                        ? `${sessionTotalNumber} - ${selectedBookingDeposit} = ${depositRemainder ?? 0}`
+                        : `full total - ${selectedBookingDeposit} = remainder`}{" "}
+                      {selectedBookingCurrency}
+                    </p>
+                    {depositHelperReady ? null : (
+                      <p>
+                        Switch payment currency back to {selectedBookingCurrency} to use this helper safely.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
               <label className="text-sm text-foreground-muted">
                 Payment currency
                 <select
@@ -1030,6 +1084,12 @@ export default function AdminFinancePage() {
                     ? `Card fee currently deducts ${form.processor_fee_percentage}% and invoice reminder is ${form.invoice_needed ? "on" : "off"}.`
                     : "Non-card payments default to 0% processor fee."}
                 </p>
+                {selectedBooking?.deposit_amount ? (
+                  <p className="mt-1">
+                    Linked booking deposit: {selectedBooking.deposit_amount}{" "}
+                    {selectedBooking.location === "copenhagen" ? "DKK" : "SEK"}. Best practice: enter only the remainder here if the PayPal deposit stays non-invoiced.
+                  </p>
+                ) : null}
               </div>
 
               <div className="flex flex-col justify-end gap-2 rounded-2xl bg-[var(--sabbia-50)] px-4 py-3 text-sm text-foreground-muted">
@@ -1045,7 +1105,12 @@ export default function AdminFinancePage() {
                   <input
                     type="checkbox"
                     checked={form.invoice_done}
-                    onChange={(event) => updateForm("invoice_done", event.target.checked)}
+                    disabled={!form.invoice_needed}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      updateForm("invoice_needed", checked ? true : form.invoice_needed);
+                      updateForm("invoice_done", checked);
+                    }}
                   />
                   Invoice done
                 </label>
@@ -1226,66 +1291,51 @@ export default function AdminFinancePage() {
 
         <AdminSurface>
           <AdminSectionHeading
-            title="Italy 5% Preview"
-            description="Planning-only view for Lia’s current Italian setup. This is intentionally a rough comparison layer, not a source of tax truth."
+            title={italySimulation?.label ?? "Italy tax model"}
+            description="Yearly tax simulation for the selected year. Only payments marked `invoice_done = true` are included, so non-invoiced deposits stay out of this on purpose."
           />
 
-          {loading || !summary || !italyPreview ? (
-            <p className="text-sm text-foreground-muted">Loading planning preview...</p>
+          {loading || !summary || !taxSummary || !italySimulation ? (
+            <p className="text-sm text-foreground-muted">Loading tax simulation...</p>
           ) : (
             <div className="space-y-4">
               <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
-                  Approx after Italian 5% preview
+                  Estimated yearly net after Italy model
                 </p>
                 <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
-                  {formatMoney(
-                    italyPreview.primaryAfterTax,
-                    summary.approx_primary.currency
-                  )}
+                  {formatMoney(italySimulation.net_income, italySimulation.currency)}
                 </div>
                 <p className="mt-2 text-xs text-foreground-muted">
-                  Approx tax reserve {formatMoney(
-                    italyPreview.primaryTax,
-                    summary.approx_primary.currency
-                  )}
+                  Revenue {formatMoney(italySimulation.invoiced_revenue, italySimulation.currency)} · social contributions {formatMoney(italySimulation.social_contributions, italySimulation.currency)} · tax {formatMoney(italySimulation.income_tax, italySimulation.currency)}
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl bg-white p-4 shadow-sm">
                   <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
-                    {summary.approx_primary.currency} planning view
+                    Simulation basis
                   </p>
                   <p className="mt-2 font-medium text-foreground">
-                    {formatMoney(summary.month_total, summary.approx_primary.currency)} real net
+                    {italySimulation.invoiced_payment_count} invoiced payment{italySimulation.invoiced_payment_count === 1 ? "" : "s"} in {taxSummary.tax_year}
                   </p>
                   <p className="mt-1 text-sm text-foreground-muted">
-                    {formatMoney(
-                      italyPreview.primaryAfterTax,
-                      summary.approx_primary.currency
-                    )} after preview reserve
+                    Taxable profit {formatMoney(italySimulation.taxable_profit, italySimulation.currency)} · effective rate {formatPercent(italySimulation.effective_tax_rate)}
                   </p>
                 </div>
                 <div className="rounded-2xl bg-white p-4 shadow-sm">
                   <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
-                    {summary.approx_secondary.currency} planning view
+                    Actual framework status
                   </p>
                   <p className="mt-2 font-medium text-foreground">
-                    {formatMoney(
-                      summary.approx_secondary.amount,
-                      summary.approx_secondary.currency
-                    )} real net
+                    {italySimulation.active ? "This is the current active model" : `Current active model: ${FINANCE_TAX_FRAMEWORK_LABELS[taxSummary.actual_framework]}`}
                   </p>
                   <p className="mt-1 text-sm text-foreground-muted">
-                    {formatMoney(
-                      italyPreview.secondaryAfterTax,
-                      summary.approx_secondary.currency
-                    )} after preview reserve
+                    {italySimulation.notes.join(" · ")}
                   </p>
                 </div>
               </div>
               <div className="rounded-2xl bg-[var(--sabbia-50)] px-4 py-3 text-xs text-foreground-muted">
-                Side thought: this is the right place for future Sweden scenarios too. Keep simulations separate from the real ledger or the dashboard becomes an expensive hallucination.
+                Deposit rule: PayPal booking deposits that are never invoiced should stay out of this model. Enter the final card or transfer remainder as its own payment line and mark that one invoiced when done.
               </div>
             </div>
           )}
@@ -1295,34 +1345,24 @@ export default function AdminFinancePage() {
       <div className="mb-6">
         <AdminSurface>
           <AdminSectionHeading
-            title={swedenPreview?.label ?? "Sweden preview"}
-            description="Second planning layer for pressure-testing a Sweden-based setup without contaminating the real monthly ledger."
+            title={swedenSimulation?.label ?? "Sweden tax model"}
+            description="Comparison model for a Sweden setup. It uses the same invoiced-only yearly base, so deposits and non-invoiced cash stay outside the tax math."
           />
 
-          {loading || !summary || !swedenPreview ? (
-            <p className="text-sm text-foreground-muted">Loading Sweden preview...</p>
+          {loading || !summary || !taxSummary || !swedenSimulation || !italySimulation ? (
+            <p className="text-sm text-foreground-muted">Loading Sweden simulation...</p>
           ) : (
             <div className="space-y-4">
               <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
                 <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
-                    Approx after Sweden reserve
+                    Estimated yearly net after Sweden model
                   </p>
                   <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
-                    {formatMoney(
-                      swedenPreview.primaryAfterReserve,
-                      summary.approx_primary.currency
-                    )}
+                    {formatMoney(swedenSimulation.net_income, swedenSimulation.currency)}
                   </div>
                   <p className="mt-2 text-xs text-foreground-muted">
-                    Approx reserve {formatMoney(
-                      swedenPreview.totalPrimaryReserve,
-                      summary.approx_primary.currency
-                    )}
-                    {` · ${roundAmount(swedenPreview.rate * 100)}% variable + ${formatMoney(
-                      swedenPreview.fixedPrimary,
-                      summary.approx_primary.currency
-                    )} fixed`}
+                    Revenue {formatMoney(swedenSimulation.invoiced_revenue, swedenSimulation.currency)} · social contributions {formatMoney(swedenSimulation.social_contributions, swedenSimulation.currency)} · tax {formatMoney(swedenSimulation.income_tax, swedenSimulation.currency)}
                   </p>
                 </div>
 
@@ -1332,27 +1372,21 @@ export default function AdminFinancePage() {
                   </p>
                   <div className="mt-3 grid gap-2 text-sm text-foreground-muted">
                     <div className="flex items-center justify-between gap-3">
-                      <span>Real net</span>
+                      <span>Invoiced base</span>
                       <span className="font-medium text-foreground">
-                        {formatMoney(summary.month_total, summary.approx_primary.currency)}
+                        {formatMoney(taxSummary.invoiced_revenue_primary, summary.approx_primary.currency)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <span>Italy 5% preview</span>
+                      <span>{italySimulation.label}</span>
                       <span className="font-medium text-foreground">
-                        {formatMoney(
-                          italyPreview?.primaryAfterTax ?? summary.month_total,
-                          summary.approx_primary.currency
-                        )}
+                        {formatMoney(italySimulation.net_income, italySimulation.currency)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <span>{swedenPreview.label}</span>
+                      <span>{swedenSimulation.label}</span>
                       <span className="font-medium text-foreground">
-                        {formatMoney(
-                          swedenPreview.primaryAfterReserve,
-                          summary.approx_primary.currency
-                        )}
+                        {formatMoney(swedenSimulation.net_income, swedenSimulation.currency)}
                       </span>
                     </div>
                   </div>
@@ -1362,24 +1396,22 @@ export default function AdminFinancePage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl bg-white p-4 shadow-sm">
                   <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
-                    {summary.approx_primary.currency} planning view
+                    Sweden assumptions
                   </p>
                   <p className="mt-2 font-medium text-foreground">
-                    {formatMoney(
-                      swedenPreview.primaryAfterReserve,
-                      summary.approx_primary.currency
-                    )} after reserve
+                    Effective rate {formatPercent(swedenSimulation.effective_tax_rate)}
                   </p>
+                  <p className="mt-1 text-sm text-foreground-muted">{swedenSimulation.notes.join(" · ")}</p>
                 </div>
                 <div className="rounded-2xl bg-white p-4 shadow-sm">
                   <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
-                    {summary.approx_secondary.currency} planning view
+                    Booking deposit rule
                   </p>
                   <p className="mt-2 font-medium text-foreground">
-                    {formatMoney(
-                      swedenPreview.secondaryAfterReserve,
-                      summary.approx_secondary.currency
-                    )} after reserve
+                    Deposits are cashflow, not automatic tax base
+                  </p>
+                  <p className="mt-1 text-sm text-foreground-muted">
+                    If a booking starts with a non-invoiced PayPal deposit, only the later invoiced remainder belongs in this comparison.
                   </p>
                 </div>
               </div>

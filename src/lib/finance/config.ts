@@ -1,7 +1,9 @@
 import type {
   FinanceContextSettingsRow,
   FinanceCurrency,
+  FinanceItalyInpsRegime,
   FinancePaymentMethod,
+  FinanceTaxFramework,
   FinanceWorkContext,
 } from "@/lib/supabase/database.types";
 
@@ -64,6 +66,36 @@ export const FINANCE_WORK_CONTEXT_OPTIONS: FinanceWorkContext[] = [
 
 export const CARD_INVOICE_PAYMENT_METHODS: FinancePaymentMethod[] = ["card"];
 export const DEFAULT_CARD_PROCESSOR_FEE_PERCENTAGE = 1.95;
+export const FINANCE_TAX_FRAMEWORK_OPTIONS: FinanceTaxFramework[] = ["italy", "sweden"];
+export const FINANCE_ITALY_INPS_REGIME_OPTIONS: FinanceItalyInpsRegime[] = [
+  "artigiani",
+  "commercianti",
+];
+
+export const FINANCE_TAX_FRAMEWORK_LABELS: Record<FinanceTaxFramework, string> = {
+  italy: "Italy",
+  sweden: "Sweden",
+};
+
+export const FINANCE_ITALY_INPS_REGIME_LABELS: Record<FinanceItalyInpsRegime, string> = {
+  artigiani: "Artigiani",
+  commercianti: "Commercianti",
+};
+
+export const DEFAULT_ACTIVE_TAX_FRAMEWORK: FinanceTaxFramework = "italy";
+export const DEFAULT_ITALY_TAX_LABEL = "Italy actual setup";
+export const DEFAULT_ITALY_STARTUP_TAX_RATE = 5;
+export const DEFAULT_ITALY_STANDARD_TAX_RATE = 15;
+export const DEFAULT_ITALY_PROFITABILITY_COEFFICIENT = 67;
+export const DEFAULT_ITALY_INPS_REGIME: FinanceItalyInpsRegime = "artigiani";
+export const DEFAULT_ITALY_INPS_MIN_TAXABLE_INCOME = 18555;
+export const DEFAULT_ITALY_INPS_FIXED_ANNUAL_CONTRIBUTION = 4460.64;
+export const DEFAULT_ITALY_INPS_VARIABLE_RATE = 24;
+export const DEFAULT_SWEDEN_TAX_LABEL = "Sweden comparison setup";
+export const DEFAULT_SWEDEN_SELF_EMPLOYMENT_CONTRIBUTION_RATE = 28.97;
+export const DEFAULT_SWEDEN_MUNICIPAL_TAX_RATE = 32.41;
+export const DEFAULT_SWEDEN_STATE_TAX_THRESHOLD = 625800;
+export const DEFAULT_SWEDEN_STATE_TAX_RATE = 20;
 
 export function paymentMethodNeedsInvoiceByDefault(
   method: FinancePaymentMethod
