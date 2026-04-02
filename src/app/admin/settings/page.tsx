@@ -247,7 +247,7 @@ export default function AdminSettingsPage() {
       title="Settings"
       description="Centralize the defaults that should quietly save Lia time: studio fees, currencies, invoice nudges, and the reporting behavior behind the finance dashboard."
       activeTab="settings"
-      maxWidth="medium"
+      maxWidth="wide"
       actions={
         <AdminButton variant="primary" onClick={handleSave} disabled={saving || loading || !settings}>
           {saving ? "Saving..." : "Save defaults"}
@@ -287,7 +287,7 @@ export default function AdminSettingsPage() {
             <div className="space-y-4">
               {contexts.map((context) => (
                 <div key={context.context} className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
-                  <div className="grid gap-4 md:grid-cols-4">
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <label className="text-sm text-foreground-muted">
                       Label
                       <input
@@ -364,7 +364,7 @@ export default function AdminSettingsPage() {
             </div>
           </AdminSurface>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-6 xl:grid-cols-2">
             <AdminSurface>
               <AdminSectionHeading
                 title="Reporting behavior"
@@ -434,7 +434,7 @@ export default function AdminSettingsPage() {
                   </p>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-3">
                   <label className="text-sm text-foreground-muted">
                     SEK → EUR fallback
                     <input
@@ -581,7 +581,7 @@ export default function AdminSettingsPage() {
                   </p>
                 </div>
 
-                <div className="grid gap-6 2xl:grid-cols-2">
+                <div className="grid gap-6 xl:grid-cols-2">
                   <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
                       Italy model
