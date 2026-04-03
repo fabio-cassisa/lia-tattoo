@@ -27,6 +27,8 @@ type AdminMetricCardProps = {
   value: ReactNode;
   detail?: ReactNode;
   tone?: AdminMetricTone;
+  className?: string;
+  valueClassName?: string;
 };
 
 type AdminEmptyStateProps = {
@@ -155,15 +157,19 @@ export function AdminMetricCard({
   value,
   detail,
   tone = "default",
+  className = "",
+  valueClassName = "",
 }: AdminMetricCardProps) {
   return (
     <div
-      className={`rounded-2xl border p-4 shadow-sm ${METRIC_TONE_CLASSES[tone]}`}
+      className={`rounded-2xl border p-4 shadow-sm ${METRIC_TONE_CLASSES[tone]} ${className}`.trim()}
     >
       <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
         {label}
       </p>
-      <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
+      <div
+        className={`mt-2 text-xl font-medium text-foreground sm:text-2xl ${valueClassName}`.trim()}
+      >
         {value}
       </div>
       {detail ? (

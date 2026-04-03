@@ -242,6 +242,13 @@ export default function AdminSettingsPage() {
     }
   }
 
+  const primaryReportingLabel =
+    settings?.reporting_currency_primary === "SEK"
+      ? "SEK for native Swedish reporting"
+      : settings?.reporting_currency_primary === "DKK"
+        ? "DKK for native Danish reporting"
+        : "EUR for normalized overview";
+
   return (
     <AdminShell
       title="Settings"
@@ -287,7 +294,7 @@ export default function AdminSettingsPage() {
             <div className="space-y-4">
               {contexts.map((context) => (
                 <div key={context.context} className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.85fr)] md:items-end">
                     <label className="text-sm text-foreground-muted">
                       Label
                       <input
@@ -342,16 +349,17 @@ export default function AdminSettingsPage() {
                       />
                     </label>
 
-                    <div className="flex items-end">
-                      <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm text-foreground shadow-sm">
+                    <div>
+                      <span className="block text-sm text-foreground-muted">Status</span>
+                      <label className="mt-1 flex min-h-[42px] items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm text-foreground shadow-sm">
                         <input
                           type="checkbox"
                           checked={context.is_active}
                           onChange={(event) =>
                             updateContext(context.context, "is_active", event.target.checked)
                           }
-                        />
-                        Active context
+                          />
+                          Active context
                       </label>
                     </div>
                   </div>
@@ -414,6 +422,11 @@ export default function AdminSettingsPage() {
                       ))}
                     </select>
                   </label>
+                </div>
+
+                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4 text-sm text-foreground-muted">
+                  <p className="font-medium text-foreground">Current main dashboard currency</p>
+                  <p className="mt-1">{primaryReportingLabel}</p>
                 </div>
 
                 <label className="flex items-center gap-2 rounded-xl bg-[var(--sabbia-50)] px-4 py-3 text-sm text-foreground">
@@ -799,7 +812,7 @@ export default function AdminSettingsPage() {
                       </label>
 
                       <label className="text-sm text-foreground-muted">
-                        Egenavgifter %
+                        Self-employment contributions %
                         <input
                           type="number"
                           min="0"
