@@ -18,6 +18,7 @@ gsap.registerPlugin(ScrollTrigger);
  * for performance — layers stay fixed.
  */
 export default function ParchmentBackground() {
+  const paperRef = useRef<HTMLDivElement>(null);
   const driftRef = useRef<HTMLDivElement>(null);
   const stainRef = useRef<HTMLDivElement>(null);
 
@@ -29,10 +30,23 @@ export default function ParchmentBackground() {
     if (prefersReduced) return;
 
     const ctx = gsap.context(() => {
-      // Drift layer — moves at ~3% of scroll speed (very subtle)
+      if (paperRef.current) {
+        gsap.to(paperRef.current, {
+          yPercent: -10,
+          ease: "none",
+          scrollTrigger: {
+            trigger: document.documentElement,
+            start: "top top",
+            end: "bottom bottom",
+            scrub: 0.4,
+          },
+        });
+      }
+
+      // Drift layer — moves at ~6% of scroll speed (still subtle, but visible)
       if (driftRef.current) {
         gsap.to(driftRef.current, {
-          yPercent: -8,
+          yPercent: -16,
           ease: "none",
           scrollTrigger: {
             trigger: document.documentElement,
@@ -43,10 +57,10 @@ export default function ParchmentBackground() {
         });
       }
 
-      // Stain layer — moves at ~5% of scroll speed (slightly more than drift)
+      // Stain layer — moves at ~8% of scroll speed to give the paper some depth.
       if (stainRef.current) {
         gsap.to(stainRef.current, {
-          yPercent: -12,
+          yPercent: -22,
           ease: "none",
           scrollTrigger: {
             trigger: document.documentElement,
@@ -67,6 +81,25 @@ export default function ParchmentBackground() {
       className="pointer-events-none fixed inset-0 overflow-hidden"
       style={{ zIndex: 0 }}
     >
+      {/* Real paper scan, enlarged and masked so the stitched outer edges stay hidden. */}
+      <div
+        ref={paperRef}
+        className="absolute"
+        style={{
+          inset: "-18%",
+          backgroundImage: 'url("/textures/paper-texture-hr.jpg")',
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "cover",
+          opacity: 0.34,
+          mixBlendMode: "multiply",
+          maskImage:
+            "radial-gradient(circle at center, black 0%, black 42%, rgba(0, 0, 0, 0.82) 58%, transparent 78%)",
+          WebkitMaskImage:
+            "radial-gradient(circle at center, black 0%, black 42%, rgba(0, 0, 0, 0.82) 58%, transparent 78%)",
+        }}
+      />
+
       {/* Drift layer — large-scale paper fiber direction */}
       <div
         ref={driftRef}
@@ -77,7 +110,7 @@ export default function ParchmentBackground() {
           bottom: "-10%",
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 600 600' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='drift'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.15' numOctaves='2' seed='42' stitchTiles='stitch' result='n'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.45 0 0 0 0 0.32 0 0 0 0 0.15 0 0 0 0.6 0' in='n'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23drift)'/%3E%3C/svg%3E")`,
           backgroundSize: "600px 600px",
-          opacity: 0.04,
+          opacity: 0.065,
           mixBlendMode: "multiply",
         }}
       />

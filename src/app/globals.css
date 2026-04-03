@@ -105,7 +105,7 @@ body::before {
     /* Fine grain speckle — grit/tooth of the paper */
     url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='speck'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' seed='7' stitchTiles='stitch' result='n'/%3E%3CfeComponentTransfer in='n'%3E%3CfeFuncR type='linear' slope='1.8' intercept='-0.5'/%3E%3CfeFuncG type='linear' slope='1.4' intercept='-0.4'/%3E%3CfeFuncB type='linear' slope='0.8' intercept='-0.2'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23speck)'/%3E%3C/svg%3E");
   background-size: 400px 400px, 200px 200px;
-  opacity: 0.14;
+  opacity: 0.09;
   mix-blend-mode: multiply;
   pointer-events: none;
   z-index: 1;
@@ -117,20 +117,22 @@ body::after {
   position: fixed;
   inset: 0;
   background:
+    /* Center lift keeps the real paper scan readable before the edge wear kicks in */
+    radial-gradient(circle at center, rgba(250, 246, 239, 0.12) 0%, transparent 52%),
     /* Edge vignette — warm darkening, clearly visible at edges */
-    radial-gradient(ellipse at center, transparent 25%, rgba(100, 65, 15, 0.18) 100%),
+    radial-gradient(ellipse at center, transparent 34%, rgba(100, 65, 15, 0.14) 100%),
     /* Age spot — bottom left (foxing) */
-    radial-gradient(ellipse at 8% 92%, rgba(130, 75, 20, 0.09) 0%, transparent 45%),
+    radial-gradient(ellipse at 8% 92%, rgba(130, 75, 20, 0.07) 0%, transparent 45%),
     /* Rust hint — top right corner */
-    radial-gradient(ellipse at 94% 6%, rgba(145, 65, 30, 0.07) 0%, transparent 35%),
+    radial-gradient(ellipse at 94% 6%, rgba(145, 65, 30, 0.055) 0%, transparent 35%),
     /* Top edge — sun-aged band */
-    linear-gradient(to bottom, rgba(110, 75, 20, 0.08) 0%, transparent 10%),
+    linear-gradient(to bottom, rgba(110, 75, 20, 0.06) 0%, transparent 10%),
     /* Bottom edge — well-handled darkening */
-    linear-gradient(to top, rgba(80, 55, 10, 0.09) 0%, transparent 8%),
+    linear-gradient(to top, rgba(80, 55, 10, 0.07) 0%, transparent 8%),
     /* Left edge crease shadow */
-    linear-gradient(to right, rgba(90, 60, 15, 0.06) 0%, transparent 6%),
+    linear-gradient(to right, rgba(90, 60, 15, 0.05) 0%, transparent 6%),
     /* Right edge crease shadow */
-    linear-gradient(to left, rgba(90, 60, 15, 0.06) 0%, transparent 6%);
+    linear-gradient(to left, rgba(90, 60, 15, 0.05) 0%, transparent 6%);
   pointer-events: none;
   z-index: 1;
 }
