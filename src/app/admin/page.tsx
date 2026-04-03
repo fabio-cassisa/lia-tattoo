@@ -16,6 +16,8 @@ import type {
   BookingStatus,
   BookingLocation,
   BookingSize,
+  BookingType,
+  ColorPreference,
 } from "@/lib/supabase/database.types";
 
 // ── Types ────────────────────────────────────────────────
@@ -25,11 +27,11 @@ type Booking = {
   updated_at: string;
   status: BookingStatus;
   location: BookingLocation;
-  type: string;
+  type: BookingType;
   description: string;
   placement: string;
   size: BookingSize;
-  color: string;
+  color: ColorPreference;
   allergies: string | null;
   client_name: string;
   client_email: string;
@@ -45,6 +47,20 @@ type Booking = {
   utm_medium: string | null;
   utm_campaign: string | null;
   utm_content: string | null;
+};
+
+type BookingFormState = {
+  location: BookingLocation;
+  type: BookingType;
+  size: BookingSize;
+  color: ColorPreference;
+  client_name: string;
+  client_email: string;
+  client_phone: string;
+  placement: string;
+  description: string;
+  allergies: string;
+  preferred_dates: string;
 };
 
 // ── Label maps ───────────────────────────────────────────
@@ -92,15 +108,51 @@ const STATUS_LABELS: Record<BookingStatus, string> = {
   cancelled: "Cancelled",
 };
 
+function buildBookingFormState(booking: Booking): BookingFormState {
+  return {
+    location: booking.location,
+    type: booking.type,
+    size: booking.size,
+    color: booking.color,
+    client_name: booking.client_name,
+    client_email: booking.client_email,
+    client_phone: booking.client_phone ?? "",
+    placement: booking.placement,
+    description: booking.description,
+    allergies: booking.allergies ?? "",
+    preferred_dates: booking.preferred_dates ?? "",
+  };
+}
+
+function getStatusSuccessMessage(status: BookingStatus): string {
+  switch (status) {
+    case "approved":
+      return "Booking approved.";
+    case "declined":
+      return "Booking declined.";
+    case "deposit_paid":
+      return "Deposit marked as paid.";
+    case "completed":
+      return "Booking completed.";
+    case "cancelled":
+      return "Booking cancelled.";
+    case "pending":
+      return "Booking moved back to pending.";
+  }
+}
+
 // ── Admin Dashboard ──────────────────────────────────────
 export default function AdminDashboard() {
   const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [statusFilter, setStatusFilter] = useState<BookingStatus | "all">("all");
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [editingBooking, setEditingBooking] = useState(false);
+  const [bookingForm, setBookingForm] = useState<BookingFormState | null>(null);
   const [adminNote, setAdminNote] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
 
@@ -113,8 +165,39 @@ export default function AdminDashboard() {
 
   function selectBooking(booking: Booking) {
     setSelectedBooking(booking);
+    setEditingBooking(false);
+    setBookingForm(buildBookingFormState(booking));
     setAdminNote(booking.admin_notes || "");
     setDepositAmount(getInitialDepositAmount(booking));
+  }
+
+  function closeBookingPanel() {
+    setSelectedBooking(null);
+    setEditingBooking(false);
+    setBookingForm(null);
+  }
+
+  function updateBookingForm<Key extends keyof BookingFormState>(
+    key: Key,
+    value: BookingFormState[Key]
+  ) {
+    setBookingForm((current) => {
+      if (!current) return current;
+
+      if (key === "location") {
+        const nextLocation = value as BookingLocation;
+        return {
+          ...current,
+          location: nextLocation,
+          preferred_dates: nextLocation === "malmo" ? "" : current.preferred_dates,
+        };
+      }
+
+      return {
+        ...current,
+        [key]: value,
+      };
+    });
   }
 
   const fetchBookings = useCallback(async () => {
@@ -148,6 +231,8 @@ export default function AdminDashboard() {
     newStatus: BookingStatus
   ) {
     setActionLoading(true);
+    setError("");
+    setSuccess("");
     try {
       const body: Record<string, unknown> = {
         id: bookingId,
@@ -162,21 +247,134 @@ export default function AdminDashboard() {
         body: JSON.stringify(body),
       });
 
-      if (res.status === 401) {
+        if (res.status === 401) {
+          router.push("/admin/login");
+          return;
+        }
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Update failed");
+
+        // Update local state
+        setBookings((prev) =>
+          prev.map((b) => (b.id === bookingId ? data.booking : b))
+        );
+        selectBooking(data.booking);
+        setSuccess(
+          data.calendar_error
+            ? `${getStatusSuccessMessage(newStatus)} Calendar sync may need manual attention.`
+            : getStatusSuccessMessage(newStatus)
+        );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update booking");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleSaveBookingEdits() {
+    if (!selectedBooking || !bookingForm) return;
+
+    setActionLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch("/api/admin/bookings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selectedBooking.id,
+          location: bookingForm.location,
+          type: bookingForm.type,
+          size: bookingForm.size,
+          color: bookingForm.color,
+          client_name: bookingForm.client_name,
+          client_email: bookingForm.client_email,
+          client_phone: bookingForm.client_phone.trim() || null,
+          placement: bookingForm.placement,
+          description: bookingForm.description,
+          allergies: bookingForm.allergies.trim() || null,
+          preferred_dates:
+            bookingForm.location === "copenhagen"
+              ? bookingForm.preferred_dates.trim() || null
+              : null,
+          ...(bookingForm.location === "copenhagen"
+            ? {
+                appointment_date: null,
+                appointment_end: null,
+              }
+            : {}),
+        }),
+      });
+
+      if (response.status === 401) {
         router.push("/admin/login");
         return;
       }
 
-      if (!res.ok) throw new Error("Update failed");
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update booking details");
+      }
 
-      const data = await res.json();
-      // Update local state
       setBookings((prev) =>
-        prev.map((b) => (b.id === bookingId ? data.booking : b))
+        prev.map((booking) => (booking.id === selectedBooking.id ? data.booking : booking))
       );
       selectBooking(data.booking);
-    } catch {
-      setError("Failed to update booking");
+      setEditingBooking(false);
+      setSuccess(
+        data.calendar_error
+          ? "Booking details updated, but calendar sync may need manual attention."
+          : "Booking details updated."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update booking details");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleDeleteBooking(booking: Booking) {
+    if (!confirm(`Delete ${booking.client_name}'s booking? This also removes its calendar link and stored reference images when possible.`)) {
+      return;
+    }
+
+    setActionLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch("/api/admin/bookings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: booking.id,
+          action: "delete",
+        }),
+      });
+
+      if (response.status === 401) {
+        router.push("/admin/login");
+        return;
+      }
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete booking");
+      }
+
+      setBookings((prev) => prev.filter((item) => item.id !== booking.id));
+      closeBookingPanel();
+      setAdminNote("");
+      setDepositAmount("");
+      setSuccess(
+        data.storage_warning
+          ? "Booking deleted, but some reference images may still need manual cleanup."
+          : "Booking deleted."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete booking");
     } finally {
       setActionLoading(false);
     }
@@ -224,6 +422,7 @@ export default function AdminDashboard() {
   const sortedSources = Object.entries(sourceCounts).sort(
     ([, a], [, b]) => b - a
   );
+  const statusActionsDisabled = actionLoading || editingBooking;
 
   return (
     <AdminShell
@@ -243,6 +442,12 @@ export default function AdminDashboard() {
               dismiss
             </button>
           </AdminAlert>
+        </div>
+      )}
+
+      {success && (
+        <div className="mb-4">
+          <AdminAlert tone="info">{success}</AdminAlert>
         </div>
       )}
 
@@ -370,18 +575,18 @@ export default function AdminDashboard() {
         {selectedBooking && (
           <>
             {/* Mobile overlay backdrop */}
-            <div
-              className="fixed inset-0 bg-black/30 z-40 lg:hidden"
-              onClick={() => setSelectedBooking(null)}
-            />
-            <div className="fixed inset-x-0 bottom-0 top-12 z-50 overflow-y-auto bg-[var(--sabbia-50)] lg:static lg:inset-auto lg:z-auto lg:w-[400px] shrink-0">
-              <div className="bg-white border border-[var(--sabbia-200)] rounded-t-xl lg:rounded p-5 lg:sticky lg:top-6 min-h-full lg:min-h-0">
-                {/* Close button — mobile only */}
-                <button
-                  onClick={() => setSelectedBooking(null)}
-                  className="lg:hidden absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-foreground-muted hover:text-foreground rounded-full bg-[var(--sabbia-100)]"
-                  aria-label="Close"
-                >
+              <div
+                className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+                onClick={closeBookingPanel}
+              />
+              <div className="fixed inset-x-0 bottom-0 top-12 z-50 overflow-y-auto bg-[var(--sabbia-50)] lg:static lg:inset-auto lg:z-auto lg:w-[400px] shrink-0">
+                <div className="bg-white border border-[var(--sabbia-200)] rounded-t-xl lg:rounded p-5 lg:sticky lg:top-6 min-h-full lg:min-h-0">
+                  {/* Close button — mobile only */}
+                  <button
+                    onClick={closeBookingPanel}
+                    className="lg:hidden absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-foreground-muted hover:text-foreground rounded-full bg-[var(--sabbia-100)]"
+                    aria-label="Close"
+                  >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M1 1l12 12M13 1L1 13" />
                   </svg>
@@ -587,6 +792,215 @@ export default function AdminDashboard() {
               {/* Divider */}
               <hr className="my-4 border-[var(--sabbia-200)]" />
 
+              <div className="mb-4 flex flex-wrap gap-2">
+                {!editingBooking ? (
+                  <AdminButton
+                    variant="secondary"
+                    disabled={actionLoading}
+                    onClick={() => {
+                      setEditingBooking(true);
+                      setBookingForm(buildBookingFormState(selectedBooking));
+                    }}
+                  >
+                    Edit request details
+                  </AdminButton>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => handleDeleteBooking(selectedBooking)}
+                  disabled={actionLoading}
+                  className="inline-flex min-h-[40px] items-center justify-center rounded-xl border border-red-200 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Delete booking
+                </button>
+              </div>
+
+              {editingBooking && bookingForm ? (
+                <div className="mb-4 rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                    Edit request details
+                  </p>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <label className="text-xs text-foreground-muted">
+                      Client name
+                      <input
+                        value={bookingForm.client_name}
+                        onChange={(event) => updateBookingForm("client_name", event.target.value)}
+                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                        style={{ fontSize: "16px" }}
+                      />
+                    </label>
+
+                    <label className="text-xs text-foreground-muted">
+                      Client email
+                      <input
+                        type="email"
+                        value={bookingForm.client_email}
+                        onChange={(event) => updateBookingForm("client_email", event.target.value)}
+                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                        style={{ fontSize: "16px" }}
+                      />
+                    </label>
+
+                    <label className="text-xs text-foreground-muted">
+                      Client phone
+                      <input
+                        value={bookingForm.client_phone}
+                        onChange={(event) => updateBookingForm("client_phone", event.target.value)}
+                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                        style={{ fontSize: "16px" }}
+                      />
+                    </label>
+
+                    <label className="text-xs text-foreground-muted">
+                      Location
+                      <select
+                        value={bookingForm.location}
+                        onChange={(event) =>
+                          updateBookingForm("location", event.target.value as BookingLocation)
+                        }
+                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                        style={{ fontSize: "16px" }}
+                      >
+                        {(["malmo", "copenhagen"] as const).map((location) => (
+                          <option key={location} value={location}>
+                            {LOCATION_LABELS[location]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="text-xs text-foreground-muted">
+                      Type
+                      <select
+                        value={bookingForm.type}
+                        onChange={(event) =>
+                          updateBookingForm("type", event.target.value as BookingType)
+                        }
+                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                        style={{ fontSize: "16px" }}
+                      >
+                        {(["flash", "custom", "consultation", "coverup", "rework"] as const).map((type) => (
+                          <option key={type} value={type}>
+                            {TYPE_LABELS[type]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="text-xs text-foreground-muted">
+                      Size
+                      <select
+                        value={bookingForm.size}
+                        onChange={(event) =>
+                          updateBookingForm("size", event.target.value as BookingSize)
+                        }
+                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                        style={{ fontSize: "16px" }}
+                      >
+                        {(["small", "medium", "large", "xlarge"] as const).map((size) => (
+                          <option key={size} value={size}>
+                            {SIZE_LABELS[size]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="text-xs text-foreground-muted">
+                      Color
+                      <select
+                        value={bookingForm.color}
+                        onChange={(event) =>
+                          updateBookingForm("color", event.target.value as ColorPreference)
+                        }
+                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                        style={{ fontSize: "16px" }}
+                      >
+                        {(["blackgrey", "color", "both"] as const).map((color) => (
+                          <option key={color} value={color}>
+                            {COLOR_LABELS[color]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="mt-3 grid gap-3">
+                    <label className="text-xs text-foreground-muted">
+                      Placement
+                      <input
+                        value={bookingForm.placement}
+                        onChange={(event) => updateBookingForm("placement", event.target.value)}
+                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                        style={{ fontSize: "16px" }}
+                      />
+                    </label>
+
+                    <label className="text-xs text-foreground-muted">
+                      Description
+                      <textarea
+                        value={bookingForm.description}
+                        onChange={(event) => updateBookingForm("description", event.target.value)}
+                        rows={4}
+                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                        style={{ fontSize: "16px" }}
+                      />
+                    </label>
+
+                    <label className="text-xs text-foreground-muted">
+                      Allergies
+                      <input
+                        value={bookingForm.allergies}
+                        onChange={(event) => updateBookingForm("allergies", event.target.value)}
+                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                        style={{ fontSize: "16px" }}
+                      />
+                    </label>
+
+                    {bookingForm.location === "copenhagen" ? (
+                      <label className="text-xs text-foreground-muted">
+                        Preferred dates
+                        <textarea
+                          value={bookingForm.preferred_dates}
+                          onChange={(event) => updateBookingForm("preferred_dates", event.target.value)}
+                          rows={3}
+                          className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                          style={{ fontSize: "16px" }}
+                        />
+                      </label>
+                    ) : null}
+                  </div>
+
+                  {selectedBooking.location !== bookingForm.location && selectedBooking.calendar_event_id ? (
+                    <p className="mt-3 text-[11px] leading-relaxed text-foreground-muted">
+                      Changing this booking away from Malmö will remove its synced Google Calendar event on save.
+                    </p>
+                  ) : null}
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <AdminButton
+                      variant="primary"
+                      disabled={actionLoading}
+                      onClick={handleSaveBookingEdits}
+                    >
+                      {actionLoading ? "Saving..." : "Save request changes"}
+                    </AdminButton>
+                    <AdminButton
+                      variant="ghost"
+                      disabled={actionLoading}
+                      onClick={() => {
+                        setEditingBooking(false);
+                        setBookingForm(buildBookingFormState(selectedBooking));
+                      }}
+                    >
+                      Cancel
+                    </AdminButton>
+                  </div>
+                </div>
+              ) : null}
+
               {/* Approval inputs */}
               {selectedBooking.status === "pending" && (
                 <div className="mb-4 space-y-3">
@@ -605,7 +1019,7 @@ export default function AdminDashboard() {
                   </div>
                   <div>
                     <label className="block text-xs text-foreground-muted mb-1">
-                      Deposit amount ({getDepositCurrency(selectedBooking.location)})
+                      Deposit amount ({getDepositCurrency(bookingForm?.location ?? selectedBooking.location)})
                     </label>
                     <input
                       type="number"
@@ -613,12 +1027,12 @@ export default function AdminDashboard() {
                       onChange={(e) => setDepositAmount(e.target.value)}
                       className="w-full px-3 py-2 border border-[var(--sabbia-200)] rounded text-sm bg-white text-foreground focus:outline-none focus:border-[var(--trad-red-500)]"
                       style={{ fontSize: "16px" }}
-                      placeholder={String(
-                        getDefaultDepositAmount(
-                          selectedBooking.location,
-                          selectedBooking.size
-                        )
-                      )}
+                        placeholder={String(
+                          getDefaultDepositAmount(
+                            bookingForm?.location ?? selectedBooking.location,
+                            bookingForm?.size ?? selectedBooking.size
+                          )
+                        )}
                     />
                     <p className="mt-1 text-[11px] text-foreground-muted">
                       Pre-filled from size and location. Override it if needed
@@ -627,6 +1041,12 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               )}
+
+              {editingBooking ? (
+                <p className="mb-4 text-[11px] leading-relaxed text-foreground-muted">
+                  Save or cancel the request edits before changing the booking status.
+                </p>
+              ) : null}
 
               {/* Action buttons based on status */}
               <div className="space-y-2">
@@ -637,7 +1057,7 @@ export default function AdminDashboard() {
                         onClick={() =>
                           handleStatusUpdate(selectedBooking.id, "approved")
                         }
-                        disabled={actionLoading}
+                        disabled={statusActionsDisabled}
                         className="flex-1 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
                       >
                         {actionLoading ? "..." : "Approve"}
@@ -646,7 +1066,7 @@ export default function AdminDashboard() {
                         onClick={() =>
                           handleStatusUpdate(selectedBooking.id, "declined")
                         }
-                        disabled={actionLoading}
+                        disabled={statusActionsDisabled}
                         className="flex-1 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 transition-colors"
                       >
                         {actionLoading ? "..." : "Decline"}
@@ -660,7 +1080,7 @@ export default function AdminDashboard() {
                     onClick={() =>
                       handleStatusUpdate(selectedBooking.id, "deposit_paid")
                     }
-                    disabled={actionLoading}
+                    disabled={statusActionsDisabled}
                     className="w-full py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
                   >
                     {actionLoading ? "..." : "Mark Deposit Paid"}
@@ -673,7 +1093,7 @@ export default function AdminDashboard() {
                     onClick={() =>
                       handleStatusUpdate(selectedBooking.id, "completed")
                     }
-                    disabled={actionLoading}
+                    disabled={statusActionsDisabled}
                     className="w-full py-2 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 transition-colors"
                   >
                     {actionLoading ? "..." : "Mark Completed (sends aftercare email)"}
@@ -687,7 +1107,7 @@ export default function AdminDashboard() {
                       onClick={() =>
                         handleStatusUpdate(selectedBooking.id, "cancelled")
                       }
-                      disabled={actionLoading}
+                      disabled={statusActionsDisabled}
                       className="w-full py-2 text-sm border border-gray-300 text-gray-500 rounded hover:bg-gray-50 disabled:opacity-50 transition-colors"
                     >
                       Cancel booking

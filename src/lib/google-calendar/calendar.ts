@@ -182,58 +182,13 @@ function isOverlapping(
  * Called when deposit is paid → booking is confirmed.
  * Returns the Google Calendar event ID.
  */
-export async function createBookingEvent(
-  booking: BookingRow
-): Promise<string> {
+export async function createBookingEvent(booking: BookingRow): Promise<string> {
   const calendar = getCalendarClient();
   const calendarId = getCalendarId();
-  const duration = SESSION_DURATIONS[booking.size];
-
-  if (!booking.appointment_date) {
-    throw new Error("Booking has no appointment_date");
-  }
-
-  const startTime = new Date(booking.appointment_date);
-  const endTime = new Date(
-    startTime.getTime() + duration.minutes * 60 * 1000
-  );
 
   const event = await calendar.events.insert({
     calendarId,
-    requestBody: {
-      summary: `${booking.client_name} — ${formatType(booking.type)}`,
-      description: [
-        `Client: ${booking.client_name}`,
-        `Email: ${booking.client_email}`,
-        booking.client_phone ? `Phone: ${booking.client_phone}` : null,
-        `Type: ${formatType(booking.type)}`,
-        `Size: ${booking.size} (${duration.label})`,
-        `Placement: ${booking.placement}`,
-        `Color: ${booking.color === "blackgrey" ? "Black & Grey" : booking.color === "color" ? "Color" : "Both"}`,
-        booking.description ? `\nDescription:\n${booking.description}` : null,
-        booking.allergies ? `\nAllergies: ${booking.allergies}` : null,
-        booking.admin_notes ? `\nNotes: ${booking.admin_notes}` : null,
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      start: {
-        dateTime: startTime.toISOString(),
-        timeZone: TIMEZONE,
-      },
-      end: {
-        dateTime: endTime.toISOString(),
-        timeZone: TIMEZONE,
-      },
-      // Color: banana/yellow (6) to match the calendar color
-      colorId: "5",
-      reminders: {
-        useDefault: false,
-        overrides: [
-          { method: "popup", minutes: 60 }, // 1 hour before
-          { method: "popup", minutes: 1440 }, // 1 day before
-        ],
-      },
-    },
+    requestBody: buildBookingEventRequestBody(booking),
   });
 
   if (!event.data.id) {
@@ -241,6 +196,23 @@ export async function createBookingEvent(
   }
 
   return event.data.id;
+}
+
+/**
+ * Update an existing calendar event after booking details change.
+ */
+export async function updateBookingEvent(
+  eventId: string,
+  booking: BookingRow
+): Promise<void> {
+  const calendar = getCalendarClient();
+  const calendarId = getCalendarId();
+
+  await calendar.events.patch({
+    calendarId,
+    eventId,
+    requestBody: buildBookingEventRequestBody(booking),
+  });
 }
 
 /**
@@ -273,6 +245,79 @@ function formatType(type: string): string {
     rework: "Rework",
   };
   return labels[type] ?? type;
+}
+
+function getBookingEventTimes(booking: BookingRow): {
+  startTime: Date;
+  endTime: Date;
+} {
+  if (!booking.appointment_date) {
+    throw new Error("Booking has no appointment_date");
+  }
+
+  const duration = SESSION_DURATIONS[booking.size];
+  const startTime = new Date(booking.appointment_date);
+
+  if (Number.isNaN(startTime.getTime())) {
+    throw new Error("Booking has an invalid appointment_date");
+  }
+
+  const fallbackEndTime = new Date(
+    startTime.getTime() + duration.minutes * 60 * 1000
+  );
+  const explicitEndTime = booking.appointment_end
+    ? new Date(booking.appointment_end)
+    : null;
+  const endTime =
+    explicitEndTime &&
+    !Number.isNaN(explicitEndTime.getTime()) &&
+    explicitEndTime > startTime
+      ? explicitEndTime
+      : fallbackEndTime;
+
+  return { startTime, endTime };
+}
+
+function buildBookingEventRequestBody(
+  booking: BookingRow
+): calendar_v3.Schema$Event {
+  const duration = SESSION_DURATIONS[booking.size];
+  const { startTime, endTime } = getBookingEventTimes(booking);
+
+  return {
+    summary: `${booking.client_name} — ${formatType(booking.type)}`,
+    description: [
+      `Client: ${booking.client_name}`,
+      `Email: ${booking.client_email}`,
+      booking.client_phone ? `Phone: ${booking.client_phone}` : null,
+      `Type: ${formatType(booking.type)}`,
+      `Size: ${booking.size} (${duration.label})`,
+      `Placement: ${booking.placement}`,
+      `Color: ${booking.color === "blackgrey" ? "Black & Grey" : booking.color === "color" ? "Color" : "Both"}`,
+      booking.description ? `\nDescription:\n${booking.description}` : null,
+      booking.allergies ? `\nAllergies: ${booking.allergies}` : null,
+      booking.admin_notes ? `\nNotes: ${booking.admin_notes}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    start: {
+      dateTime: startTime.toISOString(),
+      timeZone: TIMEZONE,
+    },
+    end: {
+      dateTime: endTime.toISOString(),
+      timeZone: TIMEZONE,
+    },
+    // Color: banana/yellow (6) to match the calendar color
+    colorId: "5",
+    reminders: {
+      useDefault: false,
+      overrides: [
+        { method: "popup", minutes: 60 },
+        { method: "popup", minutes: 1440 },
+      ],
+    },
+  };
 }
 
 /**
