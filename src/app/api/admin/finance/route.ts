@@ -195,12 +195,12 @@ async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboar
     settings.reporting_currency_primary
   );
   const monthlyContextPayouts = buildMonthlyContextPayouts(projectsWithPayments);
-  const approxPrimaryAmount = getApproxTotal(
+  const approxPrimary = getApproxTotal(
     monthlyPayments,
     settings.reporting_currency_primary,
     rates
   );
-  const approxSecondaryAmount = getApproxTotal(
+  const approxSecondary = getApproxTotal(
     monthlyPayments,
     settings.reporting_currency_secondary,
     rates
@@ -232,7 +232,7 @@ async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboar
   const previousPayments = previousProjects.flatMap((project) =>
     project.payments.filter((payment) => payment.payment_date.startsWith(previousMonth))
   );
-  const previousPrimaryAmount = getApproxTotal(
+  const previousPrimary = getApproxTotal(
     previousPayments,
     settings.reporting_currency_primary,
     rates
@@ -243,7 +243,7 @@ async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboar
     summary: {
       month: monthKey,
       entry_count: monthlyPayments.length,
-      month_total: approxPrimaryAmount,
+      month_total: approxPrimary.amount,
       week_total: weekly.at(-1)?.net_total ?? 0,
       open_invoice_count: invoiceReminders.length,
       net_totals_by_reporting_currency: netTotals,
@@ -253,17 +253,17 @@ async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboar
       fee_totals_by_context: feeTotalsByContext,
       approx_primary: {
         currency: settings.reporting_currency_primary,
-        amount: approxPrimaryAmount,
-        source: rates.source,
+        amount: approxPrimary.amount,
+        source: approxPrimary.source,
       },
       approx_secondary: {
         currency: settings.reporting_currency_secondary,
-        amount: approxSecondaryAmount,
-        source: rates.source,
+        amount: approxSecondary.amount,
+        source: approxSecondary.source,
       },
       comparison: buildComparison(
-        approxPrimaryAmount,
-        previousPrimaryAmount,
+        approxPrimary.amount,
+        previousPrimary.amount,
         previousMonth
       ),
       weekly,
@@ -291,6 +291,7 @@ function getString(value: unknown): string | null {
 }
 
 function getNumber(value: unknown): number | null {
+  if (typeof value === "string" && value.trim().length === 0) return null;
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
@@ -316,6 +317,27 @@ function isPaymentMethod(value: unknown): value is FinancePaymentMethod {
 
 function isCurrency(value: unknown): value is FinancePaymentInsert["currency"] {
   return ["SEK", "DKK", "EUR"].includes(String(value));
+}
+
+function buildPaymentFxSnapshot(rates: Awaited<ReturnType<typeof resolveExchangeRates>>) {
+  return {
+    fx_eur_to_sek: rates.eur_to_sek,
+    fx_eur_to_dkk: rates.eur_to_dkk,
+    fx_source: rates.source,
+  } as const;
+}
+
+function shouldRefreshPaymentFxSnapshot(paymentUpdates: Record<string, unknown>): boolean {
+  return [
+    "gross_amount",
+    "currency",
+    "reporting_currency",
+    "payment_method",
+    "fee_percentage",
+    "studio_fee_base_amount",
+    "studio_fee_base_currency",
+    "processor_fee_percentage",
+  ].some((key) => Object.prototype.hasOwnProperty.call(paymentUpdates, key));
 }
 
 export async function GET(request: NextRequest) {
@@ -408,6 +430,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { contextSettings, settings } = await loadFinanceBase(admin);
+    const rates = await resolveExchangeRates(settings);
     const currency = isCurrency(body.currency)
       ? body.currency
       : getContextCurrencyDefault(workContext, contextSettings);
@@ -423,12 +446,18 @@ export async function POST(request: NextRequest) {
         ? settings.card_processor_fee_percentage ??
           DEFAULT_CARD_PROCESSOR_FEE_PERCENTAGE
         : 0);
+    const invoiceDone = getBoolean(body.invoice_done) ?? false;
     const invoiceNeeded =
-      getBoolean(body.invoice_needed) ??
+      invoiceDone ||
+      getBoolean(body.invoice_needed) ||
       (settings.card_invoice_default
         ? paymentMethodNeedsInvoiceByDefault(paymentMethod)
         : false);
-    const invoiceDone = getBoolean(body.invoice_done) ?? false;
+    const studioFeeBaseAmount = getNumber(body.studio_fee_base_amount);
+    const studioFeeBaseCurrency =
+      studioFeeBaseAmount !== null && isCurrency(body.studio_fee_base_currency)
+        ? body.studio_fee_base_currency
+        : null;
 
     const projectInsert: FinanceProjectInsert = {
       booking_id: getString(body.booking_id),
@@ -460,15 +489,14 @@ export async function POST(request: NextRequest) {
       reporting_currency: reportingCurrency,
       payment_method: paymentMethod,
       fee_percentage: feePercentage,
-      studio_fee_base_amount: getNumber(body.studio_fee_base_amount),
-      studio_fee_base_currency: isCurrency(body.studio_fee_base_currency)
-        ? body.studio_fee_base_currency
-        : null,
+      studio_fee_base_amount: studioFeeBaseAmount,
+      studio_fee_base_currency: studioFeeBaseCurrency,
       processor_fee_percentage: processorFeePercentage,
       invoice_needed: invoiceNeeded,
       invoice_done: invoiceDone,
       invoice_reference: getString(body.invoice_reference),
       notes: getString(body.payment_notes),
+      ...buildPaymentFxSnapshot(rates),
     };
 
     const { error: paymentError } = await admin
@@ -534,50 +562,213 @@ export async function PATCH(request: NextRequest) {
         const response = await buildDashboardResponse(monthKey);
         return Response.json({ message: "Expense deleted", ...response });
       }
-    }
 
-    const updates: Record<string, unknown> = {};
-    if (getString(body.payment_label) !== null) updates.payment_label = getString(body.payment_label);
-    if (getString(body.payment_date) !== null) updates.payment_date = getString(body.payment_date);
-    if (getNumber(body.gross_amount) !== null) updates.gross_amount = getNumber(body.gross_amount);
-    if (isCurrency(body.currency)) updates.currency = body.currency;
-    if (isCurrency(body.reporting_currency)) updates.reporting_currency = body.reporting_currency;
-    if (isPaymentMethod(body.payment_method)) updates.payment_method = body.payment_method;
-    if (getNumber(body.fee_percentage) !== null) updates.fee_percentage = getNumber(body.fee_percentage);
-    if (getNumber(body.processor_fee_percentage) !== null) {
-      updates.processor_fee_percentage = getNumber(body.processor_fee_percentage);
-    }
-    if (getBoolean(body.invoice_needed) !== null) updates.invoice_needed = getBoolean(body.invoice_needed);
-    if (getBoolean(body.invoice_done) !== null) updates.invoice_done = getBoolean(body.invoice_done);
-    if (body.invoice_last_nudged_at !== undefined) {
-      updates.invoice_last_nudged_at = getString(body.invoice_last_nudged_at);
-    }
-    if (body.invoice_reminder_note !== undefined) {
-      updates.invoice_reminder_note = getString(body.invoice_reminder_note);
-    }
-    if (body.invoice_reference !== undefined) updates.invoice_reference = getString(body.invoice_reference);
-    if (body.notes !== undefined) updates.notes = getString(body.notes);
+      const expenseDate = getString(body.expense_date);
+      const label = getString(body.label);
+      const category = getString(body.category);
+      const amount = getNumber(body.amount);
 
-    if (Object.keys(updates).length === 0) {
-      return Response.json({ error: "No valid fields to update" }, { status: 400 });
+      if (!expenseDate || !label || !category || amount === null) {
+        return Response.json(
+          { error: "Expense date, label, category, and amount are required" },
+          { status: 400 }
+        );
+      }
+
+      if (![
+        "needles",
+        "ink",
+        "supplies",
+        "equipment",
+        "travel",
+        "other",
+      ].includes(category)) {
+        return Response.json({ error: "Invalid expense category" }, { status: 400 });
+      }
+
+      const { settings } = await loadFinanceBase(admin);
+      const { data: updatedExpense, error: updateError } = await admin
+        .from("finance_variable_expenses")
+        .update({
+          expense_date: expenseDate,
+          label,
+          category: category as FinanceVariableExpenseInsert["category"],
+          amount,
+          currency: isCurrency(body.currency)
+            ? body.currency
+            : settings.reporting_currency_primary,
+          notes: getString(body.notes),
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (updateError || !updatedExpense) {
+        console.error("Finance variable expense update error:", updateError);
+        return Response.json({ error: "Failed to update expense" }, { status: 500 });
+      }
+
+      const monthKey = normalizeMonthKey(updatedExpense.expense_date.slice(0, 7));
+      const response = await buildDashboardResponse(monthKey);
+      return Response.json({ message: "Expense updated", ...response });
     }
 
     const admin = createAdminClient();
-    const { data: updatedPayment, error } = await admin
+    const action = getString(body.action) ?? "update";
+    const { settings } = await loadFinanceBase(admin);
+    const { data: existingPayment, error: existingPaymentError } = await admin
       .from("finance_payments")
-      .update(updates)
+      .select(
+        "id, payment_date, project_id, currency, reporting_currency, payment_method, fee_percentage, studio_fee_base_amount, studio_fee_base_currency, processor_fee_percentage, invoice_needed, invoice_done"
+      )
       .eq("id", id)
-      .select()
       .single();
 
-    if (error || !updatedPayment) {
-      console.error("Finance payment update error:", error);
-      return Response.json({ error: "Failed to update payment" }, { status: 500 });
+    if (existingPaymentError || !existingPayment) {
+      return Response.json({ error: "Payment not found" }, { status: 404 });
     }
 
-    const monthKey = normalizeMonthKey(updatedPayment.payment_date.slice(0, 7));
+    if (action === "delete") {
+      const { error: deletePaymentError } = await admin
+        .from("finance_payments")
+        .delete()
+        .eq("id", id);
+
+      if (deletePaymentError) {
+        console.error("Finance payment delete error:", deletePaymentError);
+        return Response.json({ error: "Failed to delete payment" }, { status: 500 });
+      }
+
+      const { count: remainingPaymentCount, error: remainingPaymentCountError } = await admin
+        .from("finance_payments")
+        .select("id", { count: "exact", head: true })
+        .eq("project_id", existingPayment.project_id);
+
+      if (remainingPaymentCountError) {
+        console.error("Finance remaining payment count error:", remainingPaymentCountError);
+        return Response.json({ error: "Failed to refresh finance entry state" }, { status: 500 });
+      }
+
+      if ((remainingPaymentCount ?? 0) === 0) {
+        const { error: deleteProjectError } = await admin
+          .from("finance_projects")
+          .delete()
+          .eq("id", existingPayment.project_id);
+
+        if (deleteProjectError) {
+          console.error("Finance project delete error:", deleteProjectError);
+          return Response.json({ error: "Failed to delete empty project" }, { status: 500 });
+        }
+      }
+
+      const monthKey = normalizeMonthKey(existingPayment.payment_date.slice(0, 7));
+      const response = await buildDashboardResponse(monthKey);
+      return Response.json({ message: "Finance entry deleted", ...response });
+    }
+
+    const paymentUpdates: Record<string, unknown> = {};
+    const projectUpdates: Record<string, unknown> = {};
+    const projectId = getString(body.project_id) ?? existingPayment.project_id;
+
+    if (body.booking_id !== undefined) projectUpdates.booking_id = getString(body.booking_id);
+    if (body.client_name !== undefined) {
+      projectUpdates.client_name = getString(body.client_name) ?? "Walk-in / direct client";
+    }
+    if (body.project_label !== undefined) {
+      projectUpdates.project_label = getString(body.project_label) ?? "Tattoo session";
+    }
+    if (body.session_date !== undefined) projectUpdates.session_date = getString(body.session_date);
+    if (isFinanceWorkContext(body.work_context)) projectUpdates.work_context = body.work_context;
+    if (body.project_notes !== undefined) projectUpdates.notes = getString(body.project_notes);
+
+    if (getString(body.payment_label) !== null) paymentUpdates.payment_label = getString(body.payment_label);
+    if (getString(body.payment_date) !== null) paymentUpdates.payment_date = getString(body.payment_date);
+    if (getNumber(body.gross_amount) !== null) paymentUpdates.gross_amount = getNumber(body.gross_amount);
+    if (isCurrency(body.currency)) paymentUpdates.currency = body.currency;
+    if (isCurrency(body.reporting_currency)) paymentUpdates.reporting_currency = body.reporting_currency;
+    if (isPaymentMethod(body.payment_method)) paymentUpdates.payment_method = body.payment_method;
+    if (getNumber(body.fee_percentage) !== null) paymentUpdates.fee_percentage = getNumber(body.fee_percentage);
+    if (body.studio_fee_base_amount !== undefined) {
+      paymentUpdates.studio_fee_base_amount = getNumber(body.studio_fee_base_amount);
+    }
+    if (body.studio_fee_base_currency !== undefined) {
+      paymentUpdates.studio_fee_base_currency = isCurrency(body.studio_fee_base_currency)
+        ? body.studio_fee_base_currency
+        : null;
+    }
+    if (getNumber(body.processor_fee_percentage) !== null) {
+      paymentUpdates.processor_fee_percentage = getNumber(body.processor_fee_percentage);
+    }
+    if (getBoolean(body.invoice_needed) !== null) {
+      paymentUpdates.invoice_needed = getBoolean(body.invoice_needed);
+    }
+    if (getBoolean(body.invoice_done) !== null) {
+      paymentUpdates.invoice_done = getBoolean(body.invoice_done);
+    }
+
+    if (paymentUpdates.invoice_done === true) {
+      paymentUpdates.invoice_needed = true;
+    }
+    if (paymentUpdates.invoice_needed === false) {
+      paymentUpdates.invoice_done = false;
+    }
+    if (paymentUpdates.studio_fee_base_amount === null) {
+      paymentUpdates.studio_fee_base_currency = null;
+    }
+    if (body.invoice_last_nudged_at !== undefined) {
+      paymentUpdates.invoice_last_nudged_at = getString(body.invoice_last_nudged_at);
+    }
+    if (body.invoice_reminder_note !== undefined) {
+      paymentUpdates.invoice_reminder_note = getString(body.invoice_reminder_note);
+    }
+    if (body.invoice_reference !== undefined) {
+      paymentUpdates.invoice_reference = getString(body.invoice_reference);
+    }
+    if (body.payment_notes !== undefined || body.notes !== undefined) {
+      paymentUpdates.notes = getString(body.payment_notes ?? body.notes);
+    }
+
+    if (Object.keys(paymentUpdates).length === 0 && Object.keys(projectUpdates).length === 0) {
+      return Response.json({ error: "No valid fields to update" }, { status: 400 });
+    }
+
+    if (shouldRefreshPaymentFxSnapshot(paymentUpdates)) {
+      const rates = await resolveExchangeRates(settings);
+      Object.assign(paymentUpdates, buildPaymentFxSnapshot(rates));
+    }
+
+    if (Object.keys(projectUpdates).length > 0) {
+      const { error: projectUpdateError } = await admin
+        .from("finance_projects")
+        .update(projectUpdates)
+        .eq("id", projectId);
+
+      if (projectUpdateError) {
+        console.error("Finance project update error:", projectUpdateError);
+        return Response.json({ error: "Failed to update project" }, { status: 500 });
+      }
+    }
+
+    let monthKey = normalizeMonthKey(existingPayment.payment_date.slice(0, 7));
+
+    if (Object.keys(paymentUpdates).length > 0) {
+      const { data: updatedPayment, error: paymentUpdateError } = await admin
+        .from("finance_payments")
+        .update(paymentUpdates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (paymentUpdateError || !updatedPayment) {
+        console.error("Finance payment update error:", paymentUpdateError);
+        return Response.json({ error: "Failed to update payment" }, { status: 500 });
+      }
+
+      monthKey = normalizeMonthKey(updatedPayment.payment_date.slice(0, 7));
+    }
+
     const response = await buildDashboardResponse(monthKey);
-    return Response.json({ message: "Payment updated", ...response });
+    return Response.json({ message: "Finance entry updated", ...response });
   } catch (error) {
     console.error("Finance patch error:", error);
     return Response.json({ error: "Internal server error" }, { status: 500 });

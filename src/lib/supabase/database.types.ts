@@ -360,6 +360,9 @@ export type FinancePaymentRow = {
   invoice_reminder_note: string | null;
   invoice_reference: string | null;
   notes: string | null;
+  fx_eur_to_sek: number | null;
+  fx_eur_to_dkk: number | null;
+  fx_source: "live" | "fallback" | null;
 };
 
 export type FinancePaymentInsert = {
@@ -380,6 +383,9 @@ export type FinancePaymentInsert = {
   invoice_reminder_note?: string | null;
   invoice_reference?: string | null;
   notes?: string | null;
+  fx_eur_to_sek?: number | null;
+  fx_eur_to_dkk?: number | null;
+  fx_source?: "live" | "fallback" | null;
 };
 
 export type Database = {

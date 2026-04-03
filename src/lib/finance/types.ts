@@ -30,6 +30,7 @@ export type FinanceBookingOption = {
 };
 
 export type FinancePaymentDerived = FinancePaymentRow & {
+  original_net_amount: number;
   gross_amount_reporting: number;
   fee_amount: number;
   processor_fee_currency: FinanceCurrency;
@@ -52,7 +53,7 @@ export type FinanceInvoiceReminder = FinancePaymentDerived & {
 export type FinanceApproxTotal = {
   currency: FinanceCurrency;
   amount: number;
-  source: "live" | "fallback";
+  source: "live" | "fallback" | "mixed";
 };
 
 export type FinanceComparison = {

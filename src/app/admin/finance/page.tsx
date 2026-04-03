@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AdminEmptyState,
@@ -31,6 +31,7 @@ import { getPreviousMonthKey, normalizeMonthKey } from "@/lib/finance/reporting"
 import type {
   FinanceCurrency,
   FinancePaymentMethod,
+  FinanceTaxFramework,
   FinanceVariableExpenseCategory,
   FinanceWorkContext,
 } from "@/lib/supabase/database.types";
@@ -54,7 +55,7 @@ type FinanceFormState = {
   payment_method: FinancePaymentMethod;
   fee_percentage: string;
   studio_fee_base_amount: string;
-  studio_fee_base_currency: FinanceCurrency;
+  studio_fee_base_currency: FinanceCurrency | "";
   processor_fee_percentage: string;
   invoice_needed: boolean;
   invoice_done: boolean;
@@ -64,6 +65,7 @@ type FinanceFormState = {
 };
 
 type VariableExpenseFormState = {
+  id?: string;
   expense_date: string;
   label: string;
   category: FinanceVariableExpenseCategory;
@@ -71,6 +73,13 @@ type VariableExpenseFormState = {
   currency: FinanceCurrency;
   notes: string;
 };
+
+type EditingFinanceEntry = {
+  projectId: string;
+  paymentId: string;
+};
+
+type FinanceWorkspaceView = "operations" | "insights";
 
 const DEFAULT_MONTH = normalizeMonthKey();
 const REPORTING_CURRENCIES: FinanceCurrency[] = ["SEK", "DKK", "EUR"];
@@ -118,6 +127,18 @@ function getOwnerPayoutLabel(workContext: FinanceWorkContext): string {
     case "private_home":
       return "Private / home fee reserve";
   }
+}
+
+function getSocialReserveLabel(framework: FinanceTaxFramework): string {
+  return framework === "italy" ? "INPS reserve" : "Self-employment reserve";
+}
+
+function getFixedSocialReserveLabel(framework: FinanceTaxFramework): string {
+  return framework === "italy" ? "Fixed INPS" : "Fixed social reserve";
+}
+
+function getVariableSocialReserveLabel(framework: FinanceTaxFramework): string {
+  return framework === "italy" ? "Variable INPS" : "Self-employment contributions";
 }
 
 function getInvoiceAgeDays(paymentDate: string): number {
@@ -207,7 +228,7 @@ function buildDefaultFormState(
     payment_method: "cash",
     fee_percentage: String(feePercentage),
     studio_fee_base_amount: "",
-    studio_fee_base_currency: currency,
+    studio_fee_base_currency: "",
     processor_fee_percentage: "0",
     invoice_needed: false,
     invoice_done: false,
@@ -220,6 +241,22 @@ function buildDefaultFormState(
 function getTrendBarHeight(value: number, maxValue: number): string {
   if (maxValue <= 0) return "10%";
   return `${Math.max(10, (value / maxValue) * 100)}%`;
+}
+
+function getRelativeBarWidth(value: number, maxValue: number, minPercent = 10): string {
+  if (value <= 0 || maxValue <= 0) return "0%";
+  return `${Math.max(minPercent, (value / maxValue) * 100)}%`;
+}
+
+function getApproxRateSourceLabel(source: "live" | "fallback" | "mixed"): string {
+  switch (source) {
+    case "live":
+      return "Frozen payment snapshots from live rates";
+    case "fallback":
+      return "Frozen payment snapshots from fallback rates";
+    case "mixed":
+      return "Mixed historical snapshots and fallback rates";
+  }
 }
 
 function CollapsibleFinanceSection({
@@ -243,6 +280,30 @@ function CollapsibleFinanceSection({
       </summary>
       <div className="mt-4">{children}</div>
     </details>
+  );
+}
+
+function FinanceFormSection({
+  title,
+  description,
+  children,
+  className = "",
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={`rounded-3xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/60 p-4 shadow-sm sm:p-5 ${className}`.trim()}
+    >
+      <div className="mb-4">
+        <h3 className="text-base font-semibold tracking-[-0.01em] text-ink-900">{title}</h3>
+        {description ? <p className="mt-1 text-sm text-foreground-muted">{description}</p> : null}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -325,6 +386,7 @@ function MoneyFlowBar({
 export default function AdminFinancePage() {
   const router = useRouter();
   const [month, setMonth] = useState(DEFAULT_MONTH);
+  const [financeView, setFinanceView] = useState<FinanceWorkspaceView>("operations");
   const [dashboard, setDashboard] = useState<FinanceDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -332,7 +394,10 @@ export default function AdminFinancePage() {
   const [success, setSuccess] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<EditingFinanceEntry | null>(null);
   const [sessionTotalAmount, setSessionTotalAmount] = useState("");
+  const [showStudioSplitOverride, setShowStudioSplitOverride] = useState(false);
+  const financeEntryAnchorRef = useRef<HTMLDivElement | null>(null);
   const [form, setForm] = useState<FinanceFormState>(
     buildDefaultFormState(null, DEFAULT_MONTH)
   );
@@ -382,6 +447,21 @@ export default function AdminFinancePage() {
     setForm(buildDefaultFormState(dashboard, month));
   }, [dashboard, month, showForm]);
 
+  useEffect(() => {
+    if (!showForm) return;
+    setForm((current) => {
+      const nextDate = `${month}-01`;
+      if (current.payment_date.startsWith(month)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        payment_date: nextDate,
+      };
+    });
+  }, [month, showForm]);
+
   const summary = dashboard?.summary;
   const bookings = useMemo(() => dashboard?.bookings ?? [], [dashboard?.bookings]);
   const invoiceReminders = useMemo(
@@ -423,6 +503,7 @@ export default function AdminFinancePage() {
     selectedBookingDeposit > 0 &&
     selectedBookingCurrency !== null &&
     selectedBookingCurrency === form.currency;
+  const hasCustomSplitAmount = form.studio_fee_base_amount.trim().length > 0;
 
   const taxSummary = summary?.tax_summary ?? null;
   const fixedCostSummary = summary?.fixed_costs ?? null;
@@ -434,6 +515,11 @@ export default function AdminFinancePage() {
   useEffect(() => {
     setSessionTotalAmount("");
   }, [form.booking_id]);
+
+  useEffect(() => {
+    if (!showForm || financeView !== "operations") return;
+    financeEntryAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [financeView, showForm]);
 
   const reportingBucketCurrencies = useMemo(
     () =>
@@ -451,6 +537,20 @@ export default function AdminFinancePage() {
   const trendMax = useMemo(() => {
     const points = summary?.monthly_trend ?? [];
     return points.reduce((max, point) => Math.max(max, point.net_total), 0);
+  }, [summary?.monthly_trend]);
+
+  const monthlyPulseMaxTotal = useMemo(() => {
+    const points = summary?.monthly_trend ?? [];
+    return points.reduce(
+      (max, point) =>
+        Math.max(max, point.net_total + point.studio_fee_total + point.processor_fee_total),
+      0
+    );
+  }, [summary?.monthly_trend]);
+
+  const invoiceReminderTrendMax = useMemo(() => {
+    const points = summary?.monthly_trend ?? [];
+    return points.reduce((max, point) => Math.max(max, point.open_invoice_count), 0);
   }, [summary?.monthly_trend]);
 
   const ownerPayoutRows = useMemo(() => {
@@ -553,11 +653,14 @@ export default function AdminFinancePage() {
 
   function resetForm(nextMonth = month, nextDashboard = dashboard) {
     setForm(buildDefaultFormState(nextDashboard, nextMonth));
+    setEditingEntry(null);
     setSessionTotalAmount("");
+    setShowStudioSplitOverride(false);
   }
 
   function resetExpenseForm(nextDashboard = dashboard, nextMonth = month) {
     setExpenseForm({
+      id: undefined,
       expense_date: `${nextMonth}-01`,
       label: "",
       category: "supplies",
@@ -566,6 +669,22 @@ export default function AdminFinancePage() {
       notes: "",
     });
   }
+
+  const financeViewDescription =
+    financeView === "operations"
+      ? "Daily-use workspace for entries, payouts, cashflow, and invoice reminders."
+      : "Trend and planning workspace for charts, tax models, and historical comparisons.";
+  const financeEntryButtonLabel =
+    financeView !== "operations" && showForm
+      ? "Back to form"
+      : showForm
+        ? "Hide form"
+        : "Add finance entry";
+
+  const financeFormHeading = editingEntry ? "Edit finance entry" : "Quick finance entry";
+  const financeFormDescription = editingEntry
+    ? "Adjust the existing project/payment details without re-entering the whole month by hand."
+    : "Keep the required fields brutally short, then let Lia override the defaults only when reality demands it.";
 
   function applyBookingPrefill(bookingId: string) {
     if (!dashboard) return;
@@ -606,7 +725,9 @@ export default function AdminFinancePage() {
         );
         next.currency = defaultCurrency;
         next.reporting_currency = defaultCurrency;
-        next.studio_fee_base_currency = defaultCurrency;
+        if (next.studio_fee_base_amount) {
+          next.studio_fee_base_currency = defaultCurrency;
+        }
         next.fee_percentage = String(
           getContextFeeDefault(workContext, dashboard.context_settings)
         );
@@ -617,7 +738,6 @@ export default function AdminFinancePage() {
         const needsInvoice = method === "card" && dashboard.settings.card_invoice_default;
         const actualFramework = dashboard.settings.active_tax_framework ?? "italy";
         next.invoice_needed = needsInvoice;
-        next.invoice_done = needsInvoice ? next.invoice_done : false;
         next.processor_fee_percentage =
           method === "card"
             ? String(
@@ -628,15 +748,66 @@ export default function AdminFinancePage() {
 
         if (method === "card") {
           next.currency = actualFramework === "italy" ? "EUR" : next.reporting_currency;
+        }
+      }
+
+      if (key === "studio_fee_base_amount") {
+        const hasCustomSplitAmount = typeof value === "string" && value.trim().length > 0;
+        if (!hasCustomSplitAmount) {
+          next.studio_fee_base_currency = "";
+        } else if (!next.studio_fee_base_currency) {
           next.studio_fee_base_currency = next.reporting_currency;
         }
       }
 
-      if (key === "invoice_needed" && !value) {
-        next.invoice_done = false;
-      }
-
       return next;
+    });
+  }
+
+  function startEditingEntry(project: FinanceProjectWithPayments, paymentId: string) {
+    const payment = project.payments.find((item) => item.id === paymentId);
+    if (!payment || !dashboard) return;
+
+    setFinanceView("operations");
+    setShowForm(true);
+    setEditingEntry({ projectId: project.id, paymentId: payment.id });
+    setSessionTotalAmount("");
+    setShowStudioSplitOverride(payment.studio_fee_base_amount !== null);
+    setForm({
+      booking_id: project.booking_id ?? "",
+      client_name: project.client_name,
+      project_label: project.project_label,
+      session_date: project.session_date ?? "",
+      work_context: project.work_context,
+      payment_label: payment.payment_label,
+      payment_date: payment.payment_date,
+      gross_amount: String(payment.gross_amount),
+      currency: payment.currency,
+      reporting_currency: payment.reporting_currency,
+      payment_method: payment.payment_method,
+      fee_percentage: String(payment.fee_percentage),
+      studio_fee_base_amount:
+        payment.studio_fee_base_amount !== null ? String(payment.studio_fee_base_amount) : "",
+      studio_fee_base_currency: payment.studio_fee_base_currency ?? "",
+      processor_fee_percentage: String(payment.processor_fee_percentage),
+      invoice_needed: payment.invoice_needed,
+      invoice_done: payment.invoice_done,
+      invoice_reference: payment.invoice_reference ?? "",
+      project_notes: project.notes ?? "",
+      payment_notes: payment.notes ?? "",
+    });
+  }
+
+  function startEditingExpense(expense: typeof monthlyVariableExpenses[number]) {
+    setShowExpenseForm(true);
+    setExpenseForm({
+      id: expense.id,
+      expense_date: expense.expense_date,
+      label: expense.label,
+      category: expense.category,
+      amount: String(expense.amount),
+      currency: expense.currency,
+      notes: expense.notes ?? "",
     });
   }
 
@@ -647,22 +818,31 @@ export default function AdminFinancePage() {
     setSuccess("");
 
     try {
+      const isEditing = editingEntry !== null;
       const response = await fetch("/api/admin/finance", {
-        method: "POST",
+        method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          ...(isEditing
+            ? {
+                id: editingEntry?.paymentId,
+                project_id: editingEntry?.projectId,
+              }
+            : {}),
           ...form,
           booking_id: form.booking_id || null,
           client_name: form.client_name || null,
           project_label: form.project_label || null,
           gross_amount: Number(form.gross_amount),
           fee_percentage: Number(form.fee_percentage),
-          studio_fee_base_amount: form.studio_fee_base_amount
-            ? Number(form.studio_fee_base_amount)
-            : null,
-          studio_fee_base_currency: form.studio_fee_base_amount
-            ? form.studio_fee_base_currency
-            : null,
+          studio_fee_base_amount:
+            form.studio_fee_base_amount.trim().length > 0
+              ? Number(form.studio_fee_base_amount)
+              : null,
+          studio_fee_base_currency:
+            form.studio_fee_base_amount.trim().length > 0 && form.studio_fee_base_currency
+              ? form.studio_fee_base_currency
+              : null,
           processor_fee_percentage: Number(form.processor_fee_percentage),
           invoice_reference: form.invoice_reference || null,
           project_notes: form.project_notes || null,
@@ -677,7 +857,7 @@ export default function AdminFinancePage() {
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create finance entry");
+        throw new Error(data.error || `Failed to ${isEditing ? "update" : "create"} finance entry`);
       }
 
       const nextDashboard = data as FinanceDashboardResponse;
@@ -685,9 +865,9 @@ export default function AdminFinancePage() {
       setMonth(nextDashboard.month);
       setShowForm(false);
       resetForm(nextDashboard.month, nextDashboard);
-      setSuccess("Finance entry saved.");
+      setSuccess(isEditing ? "Finance entry updated." : "Finance entry saved.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create finance entry");
+      setError(err instanceof Error ? err.message : "Failed to save finance entry");
     } finally {
       setSaving(false);
     }
@@ -700,10 +880,17 @@ export default function AdminFinancePage() {
     setSuccess("");
 
     try {
+      const isEditing = Boolean(expenseForm.id);
       const response = await fetch("/api/admin/finance", {
-        method: "POST",
+        method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          ...(isEditing
+            ? {
+                id: expenseForm.id,
+                action: "update",
+              }
+            : {}),
           entry_type: "variable_expense",
           expense_date: expenseForm.expense_date,
           label: expenseForm.label,
@@ -716,21 +903,63 @@ export default function AdminFinancePage() {
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create expense");
+        throw new Error(data.error || `Failed to ${isEditing ? "update" : "create"} expense`);
       }
 
       setDashboard(data as FinanceDashboardResponse);
       setShowExpenseForm(false);
       resetExpenseForm(data as FinanceDashboardResponse, month);
-      setSuccess("Expense added.");
+      setSuccess(isEditing ? "Expense updated." : "Expense added.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create expense");
+      setError(err instanceof Error ? err.message : "Failed to save expense");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteEntry(projectId: string, paymentId: string) {
+    if (!confirm("Delete this finance entry? This removes the payment and deletes the project too if it has no other payments.")) {
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch("/api/admin/finance", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: paymentId,
+          project_id: projectId,
+          action: "delete",
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete finance entry");
+      }
+
+      setDashboard(data as FinanceDashboardResponse);
+      if (editingEntry?.paymentId === paymentId) {
+        resetForm((data as FinanceDashboardResponse).month, data as FinanceDashboardResponse);
+        setShowForm(false);
+      }
+      setSuccess("Finance entry removed.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete finance entry");
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDeleteExpense(id: string) {
+    if (!confirm("Delete this expense?")) {
+      return;
+    }
+
     setSaving(true);
     setError("");
     setSuccess("");
@@ -752,6 +981,10 @@ export default function AdminFinancePage() {
       }
 
       setDashboard(data as FinanceDashboardResponse);
+      if (expenseForm.id === id) {
+        resetExpenseForm(data as FinanceDashboardResponse, (data as FinanceDashboardResponse).month);
+        setShowExpenseForm(false);
+      }
       setSuccess("Expense removed.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete expense");
@@ -845,6 +1078,28 @@ export default function AdminFinancePage() {
   function renderBucketCard(currency: FinanceCurrency) {
     if (!summary) return null;
 
+    const takeHome = summary.net_totals_by_reporting_currency[currency];
+    const studioFees = summary.studio_fee_totals_by_reporting_currency[currency];
+    const cardFees = summary.processor_fee_approx_totals_by_reporting_currency[currency];
+    const bucketTotal = takeHome + studioFees + cardFees;
+    const bucketSegments = [
+      {
+        label: "Studio fees",
+        value: studioFees,
+        color: "var(--trad-red-500)",
+      },
+      {
+        label: "Card fee drag",
+        value: cardFees,
+        color: "var(--blush-300)",
+      },
+      {
+        label: "Cash kept",
+        value: takeHome,
+        color: "var(--ink-900)",
+      },
+    ].filter((segment) => segment.value > 0);
+
     return (
       <div
         key={currency}
@@ -859,22 +1114,56 @@ export default function AdminFinancePage() {
           </span>
         </div>
         <div className="mt-3 space-y-2 text-sm">
+          {bucketSegments.length > 0 ? (
+            <div className="space-y-3">
+              <div className="flex h-3 overflow-hidden rounded-full bg-white/80">
+                {bucketSegments.map((segment) => (
+                  <div
+                    key={segment.label}
+                    className="h-full"
+                    style={{
+                      backgroundColor: segment.color,
+                      flexGrow: segment.value,
+                      flexBasis: 0,
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="grid gap-2 text-xs text-foreground-muted">
+                {bucketSegments.map((segment) => (
+                  <div key={segment.label} className="flex items-center justify-between gap-3">
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="block h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: segment.color }}
+                      />
+                      {segment.label}
+                    </span>
+                    <span>
+                      {formatMoney(segment.value, currency)}
+                      {bucketTotal > 0 ? ` · ${formatPercent((segment.value / bucketTotal) * 100)}` : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="flex items-center justify-between gap-3">
-            <span className="text-foreground-muted">Take-home</span>
+            <span className="text-foreground-muted">Cash kept</span>
             <span className="font-medium text-foreground">
-              {formatMoney(summary.net_totals_by_reporting_currency[currency], currency)}
+              {formatMoney(takeHome, currency)}
             </span>
           </div>
           <div className="flex items-center justify-between gap-3">
             <span className="text-foreground-muted">Studio fees</span>
             <span className="text-foreground">
-              {formatMoney(summary.studio_fee_totals_by_reporting_currency[currency], currency)}
+              {formatMoney(studioFees, currency)}
             </span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-foreground-muted">Approx card-fee impact</span>
+            <span className="text-foreground-muted">Card fee drag</span>
             <span className="text-foreground">
-              {formatMoney(summary.processor_fee_approx_totals_by_reporting_currency[currency], currency)}
+              {formatMoney(cardFees, currency)}
             </span>
           </div>
         </div>
@@ -904,7 +1193,7 @@ export default function AdminFinancePage() {
   return (
     <AdminShell
       title="Finance"
-      description="Track monthly take-home, studio splits, card fees, and invoice reminders without turning Lia’s admin into fake accounting theater."
+      description="Track monthly cash kept, studio splits, card fees, and invoice reminders without turning Lia’s admin into fake accounting theater."
       activeTab="finance"
       maxWidth="wide"
       actions={
@@ -919,14 +1208,24 @@ export default function AdminFinancePage() {
           <AdminButton
             variant={showForm ? "secondary" : "primary"}
             onClick={() => {
-              setShowForm((current) => !current);
               setSuccess("");
-              if (showForm) {
-                resetForm();
+              if (financeView !== "operations") {
+                setFinanceView("operations");
+                if (!showForm) {
+                  setShowForm(true);
+                }
+                return;
               }
+              setShowForm((current) => {
+                const next = !current;
+                if (!next) {
+                  resetForm();
+                }
+                return next;
+              });
             }}
           >
-            {showForm ? "Hide form" : "Add finance entry"}
+            {financeEntryButtonLabel}
           </AdminButton>
         </div>
       }
@@ -948,112 +1247,158 @@ export default function AdminFinancePage() {
         </div>
       ) : null}
 
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-7">
-        <AdminMetricCard
-          label="This week"
-          value={
-            loading || !summary
-              ? "..."
-              : formatMoney(summary.week_total, summary.approx_primary.currency)
-          }
-          detail={
-            loading || !summary
-              ? ""
-              : `${summary.weekly.at(-1)?.label ?? "No payments this week"}`
-          }
-        />
-        <AdminMetricCard
-          label="Cash received"
-          tone="success"
-          value={
-            loading || !keepSummary
-              ? "..."
-              : formatMoney(keepSummary.active_cashflow.cash_received, keepSummary.currency)
-          }
-          detail={
-            loading || !keepSummary
-              ? ""
-              : `${keepSummary.payment_count} payment${keepSummary.payment_count === 1 ? "" : "s"} this month after studio split and payment fees`
-          }
-        />
-        <AdminMetricCard
-          label="Studio fees"
-          tone="accent"
-          value={
-            loading || !summary
-              ? "..."
-              : `${formatMoney(summary.studio_fee_totals_by_reporting_currency.SEK, "SEK")} · ${formatMoney(summary.studio_fee_totals_by_reporting_currency.DKK, "DKK")} · ${formatMoney(summary.studio_fee_totals_by_reporting_currency.EUR, "EUR")}`
-          }
-          detail="Native fee buckets by studio/context, not by whichever currency the client happened to use."
-        />
-        <AdminMetricCard
-          label="SumUp fees"
-          value={
-            loading || !summary
-              ? "..."
-              : formatMoney(summary.processor_fee_totals_by_processor_currency.EUR, "EUR")
-          }
-          detail="Raw processor fees stay in EUR because Lia's SumUp account settles through Italy."
-        />
-        <AdminMetricCard
-          label="Payment fees"
-          value={
-            loading || !keepSummary
-              ? "..."
-              : formatMoney(keepSummary.active_cashflow.processor_fees, keepSummary.currency)
-          }
-          detail={
-            loading || !keepSummary
-              ? ""
-              : "SumUp/card fees only hit payment methods that actually use them."
-          }
-        />
-        <AdminMetricCard
-          label="Open invoices"
-          value={loading ? "..." : summary?.open_invoice_count ?? 0}
-          tone={(summary?.open_invoice_count ?? 0) > 0 ? "warning" : "success"}
-          detail={
-            loading || !summary
-              ? ""
-              : `${summary.entry_count} payment${summary.entry_count === 1 ? "" : "s"} logged this month`
-          }
-        />
-        <AdminMetricCard
-          label="Disposable estimate"
-          value={
-            loading || !keepSummary
-              ? "..."
-              : formatMoney(keepSummary.active_cashflow.estimated_disposable, keepSummary.currency)
-          }
-          detail={
-            loading || !keepSummary
-              ? ""
-              : `${formatMonthLabel(month)} after reserve + fixed + variable costs`
-          }
-        />
-        <AdminMetricCard
-          label={`Approx ${summary?.approx_secondary.currency ?? "EUR"}`}
-          value={
-            loading || !summary
-              ? "..."
-              : formatMoney(
-                  summary.approx_secondary.amount,
-                  summary.approx_secondary.currency
-                )
-          }
-          detail={
-            loading || !summary
-              ? ""
-              : `${summary.approx_secondary.source} exchange rates`
-          }
-        />
+      <div className="mb-6 rounded-2xl border border-[var(--sabbia-200)] bg-white/90 p-2 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setFinanceView("operations")}
+            className={`inline-flex min-h-[40px] items-center rounded-xl px-4 py-2 text-sm transition-colors ${
+              financeView === "operations"
+                ? "bg-[var(--ink-900)] text-[var(--sabbia-50)]"
+                : "bg-[var(--sabbia-100)] text-foreground hover:bg-[var(--sabbia-200)]"
+            }`}
+          >
+            Operations
+          </button>
+          <button
+            type="button"
+            onClick={() => setFinanceView("insights")}
+            className={`inline-flex min-h-[40px] items-center rounded-xl px-4 py-2 text-sm transition-colors ${
+              financeView === "insights"
+                ? "bg-[var(--ink-900)] text-[var(--sabbia-50)]"
+                : "bg-[var(--sabbia-100)] text-foreground hover:bg-[var(--sabbia-200)]"
+            }`}
+          >
+            Insights
+          </button>
+          <div className="flex min-h-[40px] items-center px-1 text-sm text-foreground-muted">
+            {financeViewDescription}
+          </div>
+        </div>
       </div>
+
+      {financeView === "operations" ? (
+        <div className="mb-6 space-y-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <AdminMetricCard
+              label="This week"
+              value={
+                loading || !summary
+                  ? "..."
+                  : formatMoney(summary.week_total, summary.approx_primary.currency)
+              }
+              detail={
+                loading || !summary
+                  ? ""
+                  : summary.weekly.at(-1)?.label ?? "No payments this week"
+              }
+            />
+            <AdminMetricCard
+              label="Cash received"
+              tone="success"
+              value={
+                loading || !keepSummary
+                  ? "..."
+                  : formatMoney(keepSummary.active_cashflow.cash_received, keepSummary.currency)
+              }
+              detail={
+                loading || !keepSummary
+                  ? ""
+                  : `${keepSummary.payment_count} payment${keepSummary.payment_count === 1 ? "" : "s"} after studio split + card fees`
+              }
+            />
+            <AdminMetricCard
+              label="Payment fees"
+              value={
+                loading || !keepSummary
+                  ? "..."
+                  : formatMoney(keepSummary.active_cashflow.processor_fees, keepSummary.currency)
+              }
+              detail="Only payment methods that actually use a processor."
+            />
+            <AdminMetricCard
+              label="Disposable estimate"
+              value={
+                loading || !keepSummary
+                  ? "..."
+                  : formatMoney(keepSummary.active_cashflow.estimated_disposable, keepSummary.currency)
+              }
+              detail={
+                loading || !keepSummary
+                  ? ""
+                  : `${formatMonthLabel(month)} after reserve + business costs`
+              }
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <AdminMetricCard
+              label="Studio fees"
+              tone="accent"
+              value={
+                loading || !summary
+                  ? "..."
+                  : `${formatMoney(summary.studio_fee_totals_by_reporting_currency.SEK, "SEK")} · ${formatMoney(summary.studio_fee_totals_by_reporting_currency.DKK, "DKK")} · ${formatMoney(summary.studio_fee_totals_by_reporting_currency.EUR, "EUR")}`
+              }
+              valueClassName="text-lg leading-tight sm:text-xl"
+              detail="Local payout buckets by studio/context."
+            />
+            <AdminMetricCard
+              label="SumUp fees"
+              value={
+                loading || !summary
+                  ? "..."
+                  : formatMoney(summary.processor_fee_totals_by_processor_currency.EUR, "EUR")
+              }
+              detail="Raw processor fees stay in EUR."
+            />
+            <AdminMetricCard
+              label="Invoice reminders"
+              value={
+                loading || !summary
+                  ? "..."
+                  : `${summary.open_invoice_count} pending`
+              }
+              tone={(summary?.open_invoice_count ?? 0) > 0 ? "warning" : "success"}
+              detail={
+                loading || !keepSummary || !summary
+                  ? ""
+                  : `${keepSummary.invoiced_payment_count} inside reserve · ${keepSummary.excluded_payment_count} outside invoice-based reserve`
+              }
+            />
+            <AdminMetricCard
+              label={`Approx ${summary?.approx_secondary.currency ?? "EUR"}`}
+              value={
+                loading || !summary
+                  ? "..."
+                  : formatMoney(
+                      summary.approx_secondary.amount,
+                      summary.approx_secondary.currency
+                    )
+              }
+              detail={
+                loading || !summary
+                  ? ""
+                  : `Normalized overview only · ${getApproxRateSourceLabel(summary.approx_secondary.source)}`
+              }
+            />
+          </div>
+        </div>
+      ) : null}
 
       <div className="mb-6">
         <AdminSurface>
           <AdminSectionHeading
-            title="Cashflow and Disposable Money"
-            description="Use all monthly cash received as the real base. Then reserve income tax only on invoiced payments, add mandatory social/fixed obligations, and subtract materials so Lia can see what is truly disposable."
+            title={
+              financeView === "operations"
+                ? "Cashflow and Disposable Money"
+                : "Cashflow Planning Snapshot"
+            }
+            description={
+              financeView === "operations"
+                ? "Use all monthly cash received as the real base. Then reserve income tax only on invoiced payments, add mandatory social/fixed obligations, and subtract materials so Lia can see what is truly disposable."
+                : "Keep the finance logic visible while exploring trends and comparisons, without dragging the whole operational workspace along."
+            }
           />
 
           {loading || !summary || !keepSummary ? (
@@ -1098,7 +1443,7 @@ export default function AdminFinancePage() {
                       <span>{formatMoney(keepSummary.active_cashflow.income_tax_reserve, keepSummary.currency)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <span>INPS / social reserve</span>
+                      <span>{getSocialReserveLabel(keepSummary.active_cashflow.framework)}</span>
                       <span>{formatMoney(keepSummary.active_cashflow.social_reserve, keepSummary.currency)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
@@ -1114,19 +1459,19 @@ export default function AdminFinancePage() {
 
                 <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm">
                   <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
-                    Invoicing impact
+                    Reserve basis
                   </p>
                   <div className="mt-3 grid gap-2 text-xs text-foreground-muted">
                     <div className="flex items-center justify-between gap-3">
-                      <span>Invoiced payments</span>
+                      <span>Payments inside reserve</span>
                       <span>{keepSummary.invoiced_payment_count}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <span>Not invoiced yet</span>
+                      <span>Outside invoice-based reserve</span>
                       <span>{keepSummary.excluded_payment_count}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <span>Gross excluded from % tax</span>
+                      <span>Gross outside reserve</span>
                       <span>{formatMoney(keepSummary.excluded_gross_total, keepSummary.currency)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
@@ -1134,16 +1479,16 @@ export default function AdminFinancePage() {
                       <span>{formatMoney(keepSummary.active_cashflow.invoiced_gross, keepSummary.currency)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <span>Fixed social reserve</span>
+                      <span>{getFixedSocialReserveLabel(keepSummary.active_cashflow.framework)}</span>
                       <span>{formatMoney(keepSummary.active_cashflow.fixed_social_reserve, keepSummary.currency)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <span>Variable social reserve</span>
+                      <span>{getVariableSocialReserveLabel(keepSummary.active_cashflow.framework)}</span>
                       <span>{formatMoney(keepSummary.active_cashflow.variable_social_reserve, keepSummary.currency)}</span>
                     </div>
                   </div>
                   <p className="mt-3 text-xs text-foreground-muted">
-                    Non-invoiced money still counts as cash received, but it stays outside the percentage-based income-tax reserve until invoice is done. Fixed social obligations and other business costs still reduce what is truly disposable.
+                    Cash can already be received even when the reserve basis is not complete yet. Only payments marked as invoice done enter the percentage-based income-tax reserve; fixed social obligations and other business costs still reduce what is truly disposable.
                   </p>
                 </div>
               </div>
@@ -1184,7 +1529,7 @@ export default function AdminFinancePage() {
                       color: "var(--trad-red-500)",
                     },
                     {
-                      label: "INPS / social reserve",
+                      label: getSocialReserveLabel(keepSummary.active_cashflow.framework),
                       value: keepSummary.active_cashflow.social_reserve,
                       color: "var(--ink-700)",
                     },
@@ -1208,70 +1553,89 @@ export default function AdminFinancePage() {
                 />
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-3">
-                {Object.values(keepSummary.scenarios).map((scenario) => (
-                  <div
-                    key={scenario.key}
-                    className={`rounded-2xl border p-4 ${scenario.active ? "border-[var(--ink-900)] bg-white shadow-sm" : "border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80"}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
-                          {scenario.active ? "Active model" : "Projection"}
-                        </p>
-                        <p className="mt-2 font-medium text-foreground">{scenario.label}</p>
-                        <p className="mt-1 text-xs text-foreground-muted">Shown in {scenario.currency}</p>
-                      </div>
-                      <span className="rounded-full bg-white px-2.5 py-1 text-[11px] text-foreground-muted shadow-sm">
-                        {FINANCE_TAX_FRAMEWORK_LABELS[scenario.framework]}
-                      </span>
+              {financeView === "insights" ? (
+                <details className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/60 p-4">
+                <summary className="cursor-pointer list-none">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Model comparison</p>
+                      <p className="mt-1 text-xs text-foreground-muted">
+                        Keep this collapsed unless you actually need to compare Italy startup, Italy standard, and Sweden side by side.
+                      </p>
                     </div>
-
-                    <div className="mt-3 text-xl font-medium text-foreground sm:text-2xl">
-                      {formatMoney(scenario.estimated_disposable, scenario.currency)}
-                    </div>
-
-                    <div className="mt-3 grid gap-x-4 gap-y-2 text-xs text-foreground-muted sm:grid-cols-2">
-                      <div className="flex items-center justify-between gap-3">
-                        <span>Cash received</span>
-                        <span>{formatMoney(scenario.cash_received, scenario.currency)}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span>Income tax reserve</span>
-                        <span>{formatMoney(scenario.income_tax_reserve, scenario.currency)}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span>INPS / social reserve</span>
-                        <span>{formatMoney(scenario.social_reserve, scenario.currency)}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span>Fixed obligations</span>
-                        <span>{formatMoney(scenario.fixed_obligation_reserve, scenario.currency)}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span>Variable costs</span>
-                        <span>{formatMoney(scenario.variable_expense_reserve, scenario.currency)}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span>Invoiced gross</span>
-                        <span>{formatMoney(scenario.invoiced_gross, scenario.currency)}</span>
-                      </div>
-                    </div>
-
-                    <p className="mt-3 text-xs text-foreground-muted">
-                      {scenario.missing_fixed_cost_count > 0
-                        ? `${scenario.missing_fixed_cost_count} fixed cost amount${scenario.missing_fixed_cost_count === 1 ? " is" : "s are"} still missing`
-                        : "All active fixed-cost rows in this model have amounts."}
-                    </p>
+                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] text-foreground-muted shadow-sm">
+                      3 scenarios
+                    </span>
                   </div>
-                ))}
-              </div>
+                </summary>
+
+                <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                  {Object.values(keepSummary.scenarios).map((scenario) => (
+                    <div
+                      key={scenario.key}
+                      className={`rounded-2xl border p-4 ${scenario.active ? "border-[var(--ink-900)] bg-white shadow-sm" : "border-[var(--sabbia-200)] bg-white/80"}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                            {scenario.active ? "Active model" : "Projection"}
+                          </p>
+                          <p className="mt-2 font-medium text-foreground">{scenario.label}</p>
+                          <p className="mt-1 text-xs text-foreground-muted">Shown in {scenario.currency}</p>
+                        </div>
+                        <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-[11px] text-foreground-muted">
+                          {FINANCE_TAX_FRAMEWORK_LABELS[scenario.framework]}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 text-xl font-medium text-foreground sm:text-2xl">
+                        {formatMoney(scenario.estimated_disposable, scenario.currency)}
+                      </div>
+
+                      <div className="mt-3 grid gap-x-4 gap-y-2 text-xs text-foreground-muted sm:grid-cols-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <span>Cash received</span>
+                          <span>{formatMoney(scenario.cash_received, scenario.currency)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span>Income tax reserve</span>
+                          <span>{formatMoney(scenario.income_tax_reserve, scenario.currency)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span>{getSocialReserveLabel(scenario.framework)}</span>
+                          <span>{formatMoney(scenario.social_reserve, scenario.currency)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span>Fixed obligations</span>
+                          <span>{formatMoney(scenario.fixed_obligation_reserve, scenario.currency)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span>Variable costs</span>
+                          <span>{formatMoney(scenario.variable_expense_reserve, scenario.currency)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span>Reserve basis</span>
+                          <span>{formatMoney(scenario.invoiced_gross, scenario.currency)}</span>
+                        </div>
+                      </div>
+
+                      <p className="mt-3 text-xs text-foreground-muted">
+                        {scenario.missing_fixed_cost_count > 0
+                          ? `${scenario.missing_fixed_cost_count} fixed cost amount${scenario.missing_fixed_cost_count === 1 ? " is" : "s are"} still missing`
+                          : "All active fixed-cost rows in this model have amounts."}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </details>
+              ) : null}
 
             </div>
           )}
         </AdminSurface>
       </div>
 
+      {financeView === "operations" ? (
       <div className="mb-6">
         <AdminSurface>
           <AdminSectionHeading
@@ -1283,7 +1647,7 @@ export default function AdminFinancePage() {
             <p className="text-sm text-foreground-muted">Loading fixed cost reserve...</p>
           ) : (
             <div className="space-y-4">
-              <div className="grid gap-4 xl:grid-cols-3">
+              <div className="grid gap-4 xl:grid-cols-2">
                 <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
                     Configured annual reserve
@@ -1293,18 +1657,6 @@ export default function AdminFinancePage() {
                   </div>
                   <p className="mt-2 text-xs text-foreground-muted">
                     {fixedCostSummary.configured_count} cost line{fixedCostSummary.configured_count === 1 ? "" : "s"} with known amounts
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm">
-                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
-                    Missing data
-                  </p>
-                  <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
-                    {fixedCostSummary.missing_amount_count}
-                  </div>
-                  <p className="mt-2 text-xs text-foreground-muted">
-                    Missing fixed-cost amount{fixedCostSummary.missing_amount_count === 1 ? "" : "s"}. They stay excluded from totals until filled in.
                   </p>
                 </div>
 
@@ -1320,6 +1672,12 @@ export default function AdminFinancePage() {
                   </p>
                 </div>
               </div>
+
+              {fixedCostSummary.missing_amount_count > 0 ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  {fixedCostSummary.missing_amount_count} fixed cost amount{fixedCostSummary.missing_amount_count === 1 ? " is" : "s are"} still missing, so they are excluded from totals for now.
+                </div>
+              ) : null}
 
               {fixedCostSummary.due_soon.length > 0 ? (
                 <div className="space-y-3">
@@ -1347,7 +1705,9 @@ export default function AdminFinancePage() {
           )}
         </AdminSurface>
       </div>
+      ) : null}
 
+      {financeView === "operations" ? (
       <div className="mb-6">
         <AdminSurface>
           <AdminSectionHeading
@@ -1357,11 +1717,20 @@ export default function AdminFinancePage() {
               <AdminButton
                 variant={showExpenseForm ? "ghost" : "secondary"}
                 onClick={() => {
-                  setShowExpenseForm((current) => !current);
-                  if (!showExpenseForm) resetExpenseForm();
+                  setShowExpenseForm((current) => {
+                    const next = !current;
+                    if (next) {
+                      resetExpenseForm();
+                    }
+                    return next;
+                  });
                 }}
               >
-                {showExpenseForm ? "Hide expense form" : "Add expense"}
+                {showExpenseForm
+                  ? expenseForm.id
+                    ? "Hide expense editor"
+                    : "Hide expense form"
+                  : "Add expense"}
               </AdminButton>
             }
           />
@@ -1471,7 +1840,11 @@ export default function AdminFinancePage() {
 
               <div className="flex flex-wrap gap-3">
                 <AdminButton type="submit" variant="primary" disabled={saving}>
-                  {saving ? "Saving..." : "Save expense"}
+                  {saving
+                    ? "Saving..."
+                    : expenseForm.id
+                      ? "Save expense changes"
+                      : "Save expense"}
                 </AdminButton>
                 <AdminButton
                   type="button"
@@ -1548,7 +1921,15 @@ export default function AdminFinancePage() {
                         <p className="text-sm font-medium text-foreground">
                           {formatMoney(expense.amount, expense.currency)}
                         </p>
-                        <div className="mt-2">
+                        <div className="mt-2 flex flex-wrap justify-end gap-2">
+                          <AdminButton
+                            variant="secondary"
+                            className="!min-h-[32px] !px-3 !py-1 text-xs"
+                            disabled={saving}
+                            onClick={() => startEditingExpense(expense)}
+                          >
+                            Edit
+                          </AdminButton>
                           <AdminButton
                             variant="ghost"
                             className="!min-h-[32px] !px-3 !py-1 text-xs"
@@ -1571,109 +1952,300 @@ export default function AdminFinancePage() {
           )}
         </AdminSurface>
       </div>
+      ) : null}
 
-      {showForm ? (
+      {financeView === "operations" ? (
+      <div ref={financeEntryAnchorRef} />
+      ) : null}
+
+      {financeView === "operations" && showForm ? (
         <AdminSurface className="mb-6">
           <AdminSectionHeading
-            title="Quick finance entry"
-            description="Keep the required fields brutally short, then let Lia override the defaults only when reality demands it."
+            title={financeFormHeading}
+            description={financeFormDescription}
           />
 
           <form className="grid gap-5" onSubmit={handleCreateEntry}>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
-              <label className="text-sm text-foreground-muted">
-                Existing booking (optional)
-                <select
-                  value={form.booking_id}
-                  onChange={(event) => {
-                    const bookingId = event.target.value;
-                    updateForm("booking_id", bookingId);
-                    if (bookingId) applyBookingPrefill(bookingId);
-                  }}
-                  className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                  style={{ fontSize: "16px" }}
-                >
-                  <option value="">No linked booking</option>
-                  {bookings.map((booking) => (
-                    <option key={booking.id} value={booking.id}>
-                      {booking.client_name} · {booking.type} · {booking.location}
-                      {booking.is_linked ? " · linked" : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <FinanceFormSection
+              title="Session setup"
+              description="Who, where, and when this payment belongs to."
+            >
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+                <label className="text-sm text-foreground-muted">
+                  Existing booking (optional)
+                  <select
+                    value={form.booking_id}
+                    onChange={(event) => {
+                      const bookingId = event.target.value;
+                      updateForm("booking_id", bookingId);
+                      if (bookingId) applyBookingPrefill(bookingId);
+                    }}
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                  >
+                    <option value="">No linked booking</option>
+                    {bookings.map((booking) => (
+                      <option key={booking.id} value={booking.id}>
+                        {booking.client_name} · {booking.type} · {booking.location}
+                        {booking.is_linked ? " · linked" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label className="text-sm text-foreground-muted">
-                Work context
-                <select
-                  value={form.work_context}
-                  onChange={(event) =>
-                    updateForm("work_context", event.target.value as FinanceWorkContext)
-                  }
-                  className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                  style={{ fontSize: "16px" }}
-                >
-                  {FINANCE_WORK_CONTEXT_OPTIONS.map((context) => (
-                    <option key={context} value={context}>
-                      {dashboard ? getContextLabel(context, dashboard.context_settings) : context}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label className="text-sm text-foreground-muted">
+                  Work context
+                  <select
+                    value={form.work_context}
+                    onChange={(event) =>
+                      updateForm("work_context", event.target.value as FinanceWorkContext)
+                    }
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                  >
+                    {FINANCE_WORK_CONTEXT_OPTIONS.map((context) => (
+                      <option key={context} value={context}>
+                        {dashboard ? getContextLabel(context, dashboard.context_settings) : context}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label className="text-sm text-foreground-muted">
-                Payment date
-                <input
-                  type="date"
-                  value={form.payment_date}
-                  onChange={(event) => updateForm("payment_date", event.target.value)}
-                  className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                  style={{ fontSize: "16px" }}
-                  required
-                />
-              </label>
+                <label className="text-sm text-foreground-muted">
+                  Payment date
+                  <input
+                    type="date"
+                    value={form.payment_date}
+                    onChange={(event) => updateForm("payment_date", event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                    required
+                  />
+                </label>
 
-              <label className="text-sm text-foreground-muted">
-                Payment amount received
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.gross_amount}
-                  onChange={(event) => updateForm("gross_amount", event.target.value)}
-                  className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                  style={{ fontSize: "16px" }}
-                  required
-                />
-                {selectedBookingDeposit > 0 ? (
-                  <span className="mt-1 block text-xs text-foreground-muted">
-                    Enter the actual amount paid in this transaction. If the booking had a non-invoiced deposit, this should usually be the remainder, not the full tattoo price.
-                  </span>
-                ) : null}
-              </label>
+                <label className="text-sm text-foreground-muted">
+                  Payment method
+                  <select
+                    value={form.payment_method}
+                    onChange={(event) =>
+                      updateForm("payment_method", event.target.value as FinancePaymentMethod)
+                    }
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                  >
+                    {FINANCE_PAYMENT_METHOD_OPTIONS.map((method) => (
+                      <option key={method} value={method}>
+                        {FINANCE_PAYMENT_METHOD_LABELS[method]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </FinanceFormSection>
 
-              <label className="text-sm text-foreground-muted">
-                Payment method
-                <select
-                  value={form.payment_method}
-                  onChange={(event) =>
-                    updateForm("payment_method", event.target.value as FinancePaymentMethod)
-                  }
-                  className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                  style={{ fontSize: "16px" }}
-                >
-                  {FINANCE_PAYMENT_METHOD_OPTIONS.map((method) => (
-                    <option key={method} value={method}>
-                      {FINANCE_PAYMENT_METHOD_LABELS[method]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+            <FinanceFormSection
+              title="Money flow"
+              description="Start from what the client actually paid, then override the studio split only when reality is weirder than the default."
+            >
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.95fr)]">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="text-sm text-foreground-muted">
+                    {form.payment_method === "card" ? "Client charged amount" : "Payment amount received"}
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.gross_amount}
+                      onChange={(event) => updateForm("gross_amount", event.target.value)}
+                      className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                      style={{ fontSize: "16px" }}
+                      required
+                    />
+                    {form.payment_method === "card" ? (
+                      <span className="mt-1 block text-xs text-foreground-muted">
+                        Enter the real amount charged to the client here. Card fees stay tied to this amount.
+                      </span>
+                    ) : null}
+                    {selectedBookingDeposit > 0 ? (
+                      <span className="mt-1 block text-xs text-foreground-muted">
+                        Enter the actual amount paid in this transaction. If the booking had a non-invoiced deposit, this should usually be the remainder, not the full tattoo price.
+                      </span>
+                    ) : null}
+                  </label>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  <label className="text-sm text-foreground-muted">
+                    Client payment currency
+                    <select
+                      value={form.currency}
+                      onChange={(event) => updateForm("currency", event.target.value as FinanceCurrency)}
+                      className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                      style={{ fontSize: "16px" }}
+                    >
+                      {FINANCE_CURRENCY_OPTIONS.map((currency) => (
+                        <option key={currency} value={currency}>
+                          {currency}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="text-sm text-foreground-muted">
+                    Reporting bucket
+                    <select
+                      value={form.reporting_currency}
+                      onChange={(event) =>
+                        updateForm("reporting_currency", event.target.value as FinanceCurrency)
+                      }
+                      className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                      style={{ fontSize: "16px" }}
+                    >
+                      {FINANCE_CURRENCY_OPTIONS.map((currency) => (
+                        <option key={currency} value={currency}>
+                          {currency}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="text-sm text-foreground-muted">
+                    Studio fee %
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={form.fee_percentage}
+                      onChange={(event) => updateForm("fee_percentage", event.target.value)}
+                      className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                      style={{ fontSize: "16px" }}
+                    />
+                  </label>
+
+                  <label className="text-sm text-foreground-muted md:col-span-2">
+                    Card processor fee %
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={form.processor_fee_percentage}
+                      onChange={(event) =>
+                        updateForm("processor_fee_percentage", event.target.value)
+                      }
+                      className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                      style={{ fontSize: "16px" }}
+                    />
+                  </label>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-3xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Studio split</p>
+                        <p className="mt-1 text-xs text-foreground-muted">
+                          Default: use the same amount as the client payment.
+                          {form.payment_method === "card"
+                            ? " Turn this on only when Lia pays the studio from a different local amount."
+                            : " Turn this on only when the studio percentage should be based on another amount."}
+                        </p>
+                      </div>
+                      <label className="flex items-center gap-2 rounded-full bg-[var(--sabbia-50)] px-3 py-1.5 text-sm text-foreground">
+                        <input
+                          type="checkbox"
+                          checked={showStudioSplitOverride}
+                          onChange={(event) => {
+                            const checked = event.target.checked;
+                            setShowStudioSplitOverride(checked);
+                            if (!checked) {
+                              updateForm("studio_fee_base_amount", "");
+                              return;
+                            }
+
+                            if (!form.studio_fee_base_currency) {
+                              updateForm("studio_fee_base_currency", form.reporting_currency);
+                            }
+                          }}
+                        />
+                        Use custom split amount
+                      </label>
+                    </div>
+
+                    {showStudioSplitOverride ? (
+                      <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <label className="text-sm text-foreground-muted">
+                          Studio split amount
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={form.studio_fee_base_amount}
+                            onChange={(event) =>
+                              updateForm("studio_fee_base_amount", event.target.value)
+                            }
+                            placeholder="Example: 2000"
+                            className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                            style={{ fontSize: "16px" }}
+                          />
+                          <span className="mt-1 block text-xs text-foreground-muted">
+                            This is the amount the studio percentage should use, not the fee itself.
+                          </span>
+                        </label>
+
+                        <label className="text-sm text-foreground-muted">
+                          Studio split currency
+                          <select
+                            value={form.studio_fee_base_currency}
+                            onChange={(event) =>
+                              updateForm("studio_fee_base_currency", event.target.value as FinanceCurrency)
+                            }
+                            className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                            style={{ fontSize: "16px" }}
+                          >
+                            <option value="">Select currency</option>
+                            {FINANCE_CURRENCY_OPTIONS.map((currency) => (
+                              <option key={currency} value={currency}>
+                                {currency}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    ) : (
+                      <div className="mt-4 rounded-2xl bg-[var(--sabbia-50)]/80 px-4 py-3 text-sm text-foreground-muted">
+                        Studio split will follow the same amount and currency as the client payment.
+                      </div>
+                    )}
+
+                    {form.payment_method === "card" ? (
+                      <p className="mt-3 text-xs text-foreground-muted">
+                        Example: client pays `185 EUR` by card, but the Swedish studio split should be calculated from `2000 SEK`.
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-3xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm">
+                    <p className="text-sm font-medium text-foreground">Current defaults</p>
+                    <p className="mt-2 text-sm text-foreground-muted">
+                      {dashboard ? getContextLabel(form.work_context, dashboard.context_settings) : form.work_context}{" "}
+                      reports in {form.reporting_currency} and uses {form.fee_percentage}% studio fee.
+                    </p>
+                    <p className="mt-2 text-sm text-foreground-muted">
+                      {form.payment_method === "card"
+                        ? `Card fee currently deducts ${form.processor_fee_percentage}% and invoice reminder is ${form.invoice_needed ? "on" : "off"}.`
+                        : "Non-card payments default to 0% processor fee."}
+                    </p>
+                    <p className="mt-2 text-sm text-foreground-muted">
+                      {hasCustomSplitAmount
+                        ? `Studio split currently uses ${form.studio_fee_base_amount} ${form.studio_fee_base_currency || form.reporting_currency}.`
+                        : "Studio split currently follows the client payment amount."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {selectedBookingDeposit > 0 ? (
-                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4 md:col-span-2 xl:col-span-4">
+                <div className="mt-4 rounded-2xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm">
                   <p className="text-sm font-medium text-foreground">Booking deposit helper</p>
                   <p className="mt-1 text-sm text-foreground-muted">
                     Deposit on this booking: {formatMoney(selectedBookingDeposit, selectedBookingCurrency ?? form.currency)}. If you know the full session total, enter it here and use the helper to fill the payable remainder.
@@ -1724,261 +2296,140 @@ export default function AdminFinancePage() {
                   </div>
                 </div>
               ) : null}
+            </FinanceFormSection>
 
-              {form.payment_method === "card" ? (
-                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4 md:col-span-2 xl:col-span-4">
-                  <p className="text-sm font-medium text-foreground">Card payment helper</p>
-                  <p className="mt-1 text-sm text-foreground-muted">
-                    Keep tax and SumUp tied to the actual charged amount. If Lia later settles the studio split from a different rounded local amount, set that custom split amount separately here.
-                  </p>
+            <FinanceFormSection
+              title="Project details"
+              description="Optional metadata for finding the payment later without turning the form into a tax return."
+            >
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                <label className="text-sm text-foreground-muted">
+                  Client name (optional)
+                  <input
+                    value={form.client_name}
+                    onChange={(event) => updateForm("client_name", event.target.value)}
+                    placeholder="Walk-in / direct client"
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                  />
+                </label>
 
-                  <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                    <label className="text-sm text-foreground-muted">
-                      Charged card amount
+                <label className="text-sm text-foreground-muted">
+                  Project label (optional)
+                  <input
+                    value={form.project_label}
+                    onChange={(event) => updateForm("project_label", event.target.value)}
+                    placeholder="Tattoo session"
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                  />
+                </label>
+
+                <label className="text-sm text-foreground-muted">
+                  Payment label
+                  <input
+                    value={form.payment_label}
+                    onChange={(event) => updateForm("payment_label", event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                  />
+                </label>
+
+                <label className="text-sm text-foreground-muted">
+                  Session date (optional)
+                  <input
+                    type="date"
+                    value={form.session_date}
+                    onChange={(event) => updateForm("session_date", event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                  />
+                </label>
+              </div>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <label className="text-sm text-foreground-muted">
+                  Project notes
+                  <textarea
+                    value={form.project_notes}
+                    onChange={(event) => updateForm("project_notes", event.target.value)}
+                    className="mt-1 min-h-[112px] w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                  />
+                </label>
+
+                <label className="text-sm text-foreground-muted">
+                  Payment notes
+                  <textarea
+                    value={form.payment_notes}
+                    onChange={(event) => updateForm("payment_notes", event.target.value)}
+                    className="mt-1 min-h-[112px] w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                  />
+                </label>
+              </div>
+            </FinanceFormSection>
+
+            <FinanceFormSection
+              title="Invoice tracking"
+              description="Only the admin bits needed to remember whether this payment still needs invoicing."
+            >
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.95fr)]">
+                <label className="text-sm text-foreground-muted">
+                  Invoice reference
+                  <input
+                    value={form.invoice_reference}
+                    onChange={(event) => updateForm("invoice_reference", event.target.value)}
+                    placeholder="Optional"
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                  />
+                </label>
+
+                <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white px-4 py-4 text-sm text-foreground-muted shadow-sm">
+                  <p className="font-medium text-foreground">Invoice status</p>
+                  <div className="mt-3 flex flex-col gap-3">
+                    <label className="flex items-center gap-2">
                       <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={form.gross_amount}
-                        onChange={(event) => updateForm("gross_amount", event.target.value)}
-                        className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                        style={{ fontSize: "16px" }}
+                        type="checkbox"
+                        checked={form.invoice_needed}
+                        onChange={(event) => updateForm("invoice_needed", event.target.checked)}
                       />
+                      Invoice needed
                     </label>
-
-                    <label className="text-sm text-foreground-muted">
-                      Charge currency
-                      <select
-                        value={form.currency}
-                        onChange={(event) => updateForm("currency", event.target.value as FinanceCurrency)}
-                        className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                        style={{ fontSize: "16px" }}
-                      >
-                        {FINANCE_CURRENCY_OPTIONS.map((currency) => (
-                          <option key={currency} value={currency}>
-                            {currency}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="text-sm text-foreground-muted">
-                      Amount used for studio split
+                    <label className="flex items-center gap-2">
                       <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={form.studio_fee_base_amount}
-                        onChange={(event) =>
-                          updateForm("studio_fee_base_amount", event.target.value)
-                        }
-                        placeholder="Optional custom split amount"
-                        className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                        style={{ fontSize: "16px" }}
+                        type="checkbox"
+                        checked={form.invoice_done}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          if (checked) {
+                            updateForm("invoice_needed", true);
+                          }
+                          updateForm("invoice_done", checked);
+                        }}
                       />
-                    </label>
-
-                    <label className="text-sm text-foreground-muted">
-                      Split amount currency
-                      <select
-                        value={form.studio_fee_base_currency}
-                        onChange={(event) =>
-                          updateForm("studio_fee_base_currency", event.target.value as FinanceCurrency)
-                        }
-                        className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                        style={{ fontSize: "16px" }}
-                      >
-                        {FINANCE_CURRENCY_OPTIONS.map((currency) => (
-                          <option key={currency} value={currency}>
-                            {currency}
-                          </option>
-                        ))}
-                      </select>
+                      Invoice done
                     </label>
                   </div>
 
-                  <p className="mt-3 text-xs text-foreground-muted">
-                    Example: client sticker price is `2000 SEK`, Lia charges `185 EUR`, then later pays the studio using a rounded local base like `2000 SEK`. Tax and SumUp follow `185 EUR`; the studio percentage follows the custom split amount only if you fill it here.
-                  </p>
+                  {selectedBooking?.deposit_amount ? (
+                    <p className="mt-4 text-xs leading-relaxed text-foreground-muted">
+                      Linked booking deposit: {selectedBooking.deposit_amount}{" "}
+                      {selectedBooking.location === "copenhagen" ? "DKK" : "SEK"}. Best practice: enter only the remainder here if the PayPal deposit stays non-invoiced.
+                    </p>
+                  ) : null}
                 </div>
-              ) : null}
-
-              <label className="text-sm text-foreground-muted">
-                Reporting bucket
-                <select
-                  value={form.reporting_currency}
-                  onChange={(event) =>
-                    updateForm("reporting_currency", event.target.value as FinanceCurrency)
-                  }
-                  className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                  style={{ fontSize: "16px" }}
-                >
-                  {FINANCE_CURRENCY_OPTIONS.map((currency) => (
-                    <option key={currency} value={currency}>
-                      {currency}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="text-sm text-foreground-muted">
-                Studio fee %
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={form.fee_percentage}
-                  onChange={(event) => updateForm("fee_percentage", event.target.value)}
-                  className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                  style={{ fontSize: "16px" }}
-                />
-              </label>
-
-              <label className="text-sm text-foreground-muted">
-                Card processor fee %
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={form.processor_fee_percentage}
-                  onChange={(event) =>
-                    updateForm("processor_fee_percentage", event.target.value)
-                  }
-                  className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                  style={{ fontSize: "16px" }}
-                />
-              </label>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              <label className="text-sm text-foreground-muted">
-                Client name (optional)
-                <input
-                  value={form.client_name}
-                  onChange={(event) => updateForm("client_name", event.target.value)}
-                  placeholder="Walk-in / direct client"
-                  className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                  style={{ fontSize: "16px" }}
-                />
-              </label>
-
-              <label className="text-sm text-foreground-muted">
-                Project label (optional)
-                <input
-                  value={form.project_label}
-                  onChange={(event) => updateForm("project_label", event.target.value)}
-                  placeholder="Tattoo session"
-                  className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                  style={{ fontSize: "16px" }}
-                />
-              </label>
-
-              <label className="text-sm text-foreground-muted">
-                Payment label
-                <input
-                  value={form.payment_label}
-                  onChange={(event) => updateForm("payment_label", event.target.value)}
-                  className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                  style={{ fontSize: "16px" }}
-                />
-              </label>
-
-              <label className="text-sm text-foreground-muted">
-                Session date (optional)
-                <input
-                  type="date"
-                  value={form.session_date}
-                  onChange={(event) => updateForm("session_date", event.target.value)}
-                  className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                  style={{ fontSize: "16px" }}
-                />
-              </label>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">
-              <label className="text-sm text-foreground-muted">
-                Invoice reference
-                <input
-                  value={form.invoice_reference}
-                  onChange={(event) => updateForm("invoice_reference", event.target.value)}
-                  placeholder="Optional"
-                  className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                  style={{ fontSize: "16px" }}
-                />
-              </label>
-
-              <div className="rounded-2xl bg-[var(--sabbia-50)] px-4 py-3 text-sm text-foreground-muted">
-                <p className="font-medium text-foreground">Selected defaults</p>
-                <p className="mt-1">
-                  {dashboard ? getContextLabel(form.work_context, dashboard.context_settings) : form.work_context}
-                  {" "}
-                  reports in {form.reporting_currency} and uses {form.fee_percentage}% studio fee.
-                </p>
-                <p className="mt-1">
-                  {form.payment_method === "card"
-                    ? `Card fee currently deducts ${form.processor_fee_percentage}% and invoice reminder is ${form.invoice_needed ? "on" : "off"}.`
-                    : "Non-card payments default to 0% processor fee."}
-                </p>
-                {selectedBooking?.deposit_amount ? (
-                  <p className="mt-1">
-                    Linked booking deposit: {selectedBooking.deposit_amount}{" "}
-                    {selectedBooking.location === "copenhagen" ? "DKK" : "SEK"}. Best practice: enter only the remainder here if the PayPal deposit stays non-invoiced.
-                  </p>
-                ) : null}
               </div>
-
-              <div className="flex flex-col justify-end gap-2 rounded-2xl bg-[var(--sabbia-50)] px-4 py-3 text-sm text-foreground-muted">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={form.invoice_needed}
-                    onChange={(event) => updateForm("invoice_needed", event.target.checked)}
-                  />
-                  Invoice needed
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={form.invoice_done}
-                    disabled={!form.invoice_needed}
-                    onChange={(event) => {
-                      const checked = event.target.checked;
-                      updateForm("invoice_needed", checked ? true : form.invoice_needed);
-                      updateForm("invoice_done", checked);
-                    }}
-                  />
-                  Invoice done
-                </label>
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="text-sm text-foreground-muted">
-                Project notes
-                <textarea
-                  value={form.project_notes}
-                  onChange={(event) => updateForm("project_notes", event.target.value)}
-                  className="mt-1 min-h-[112px] w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                  style={{ fontSize: "16px" }}
-                />
-              </label>
-
-              <label className="text-sm text-foreground-muted">
-                Payment notes
-                <textarea
-                  value={form.payment_notes}
-                  onChange={(event) => updateForm("payment_notes", event.target.value)}
-                  className="mt-1 min-h-[112px] w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                  style={{ fontSize: "16px" }}
-                />
-              </label>
-            </div>
+            </FinanceFormSection>
 
             <div className="flex flex-wrap gap-2">
               <AdminButton variant="primary" type="submit" disabled={saving}>
-                {saving ? "Saving..." : "Save finance entry"}
+                {saving
+                  ? "Saving..."
+                  : editingEntry
+                    ? "Save finance changes"
+                    : "Save finance entry"}
               </AdminButton>
               <AdminButton
                 variant="secondary"
@@ -1995,10 +2446,12 @@ export default function AdminFinancePage() {
         </AdminSurface>
       ) : null}
 
+      {financeView === "operations" ? (
       <div className="mb-6 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <CollapsibleFinanceSection
           title="Reporting buckets"
-          description="Top cards show the overview. These buckets show the honest monthly breakdown by studio/context currency."
+          description="Top cards show the overview. These buckets keep Malmö in SEK, Copenhagen in DKK, and only use conversion when you explicitly ask for an approximate overview."
+          defaultOpen
         >
 
           {loading ? (
@@ -2076,53 +2529,60 @@ export default function AdminFinancePage() {
           )}
         </CollapsibleFinanceSection>
       </div>
+      ) : null}
 
-      <div className="mb-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <CollapsibleFinanceSection
-          title="Owner payouts"
-          description="This is the operational bit Lia actually needs at month end: who gets paid, in which local currency, and roughly how much processor drag hit that bucket."
-        >
+      {financeView === "operations" ? (
+        <div className="mb-6">
+          <CollapsibleFinanceSection
+            title="Payouts to studios"
+            description="This is the operational bit Lia actually needs at month end: who gets paid, in which local currency, and the fee reserve attached to that bucket."
+            defaultOpen
+          >
 
-          {loading ? (
-            <p className="text-sm text-foreground-muted">Loading payout summary...</p>
-          ) : ownerPayoutRows.length > 0 ? (
-            <div className="space-y-3">
-              {ownerPayoutRows.map((row) => (
-                <div
-                  key={`${row.work_context}:${row.reporting_currency}:owner-payout`}
-                  className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-foreground">{row.label}</p>
-                      <p className="mt-1 text-xs text-foreground-muted">
-                        {row.contextLabel} · {row.entry_count} payment{row.entry_count === 1 ? "" : "s"}
+            {loading ? (
+              <p className="text-sm text-foreground-muted">Loading payout summary...</p>
+            ) : ownerPayoutRows.length > 0 ? (
+              <div className="space-y-3">
+                {ownerPayoutRows.map((row) => (
+                  <div
+                    key={`${row.work_context}:${row.reporting_currency}:owner-payout`}
+                    className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-foreground">{row.label}</p>
+                        <p className="mt-1 text-xs text-foreground-muted">
+                          {row.contextLabel} · {row.entry_count} payment{row.entry_count === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                      <p className="text-sm font-medium text-foreground">
+                        {formatMoney(row.fee_total, row.reporting_currency)}
                       </p>
                     </div>
-                    <p className="text-sm font-medium text-foreground">
-                      {formatMoney(row.fee_total, row.reporting_currency)}
-                    </p>
-                  </div>
-                  <div className="mt-3 grid gap-2 text-xs text-foreground-muted sm:grid-cols-2">
-                    <div className="flex items-center justify-between gap-3">
-                      <span>Gross handled</span>
-                      <span>{formatMoney(row.gross_total, row.reporting_currency)}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span>Approx SumUp drag</span>
-                      <span>{formatMoney(row.processor_fee_total, row.reporting_currency)}</span>
+                    <div className="mt-3 grid gap-2 text-xs text-foreground-muted sm:grid-cols-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Gross handled</span>
+                        <span>{formatMoney(row.gross_total, row.reporting_currency)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Card fee drag</span>
+                        <span>{formatMoney(row.processor_fee_total, row.reporting_currency)}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-foreground-muted">
-              No owner payouts accumulated for {formatMonthLabel(month)} yet.
-            </p>
-          )}
-        </CollapsibleFinanceSection>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-foreground-muted">
+                No studio payouts accumulated for {formatMonthLabel(month)} yet.
+              </p>
+            )}
+          </CollapsibleFinanceSection>
+        </div>
+      ) : null}
 
+      {financeView === "insights" ? (
+      <div className="mb-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
         <CollapsibleFinanceSection
           title={italySimulation?.label ?? "Italy tax model"}
           description="Yearly tax simulation for the selected year. Only payments marked `invoice_done = true` are included, so non-invoiced deposits stay out of this on purpose."
@@ -2147,27 +2607,27 @@ export default function AdminFinancePage() {
                   </span>
                 </div>
 
-                  <div className="mt-3 grid gap-x-4 gap-y-2 text-xs text-foreground-muted sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="flex items-center justify-between gap-3 sm:block xl:flex">
-                      <span>Revenue</span>
-                      <span>{formatMoney(italySimulation.invoiced_revenue, italySimulation.currency)}</span>
-                    </div>
-                  <div className="flex items-center justify-between gap-3 sm:block xl:flex">
+                <div className="mt-3 grid gap-x-4 gap-y-2 text-xs text-foreground-muted sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Revenue</span>
+                    <span>{formatMoney(italySimulation.invoiced_revenue, italySimulation.currency)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
                     <span>Taxable profit</span>
                     <span>{formatMoney(italySimulation.taxable_profit, italySimulation.currency)}</span>
                   </div>
-                    <div className="flex items-center justify-between gap-3 sm:block xl:flex">
-                      <span>Fixed INPS</span>
-                      <span>{formatMoney(italySimulation.fixed_social_contributions, italySimulation.currency)}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3 sm:block xl:flex">
-                      <span>Variable INPS</span>
-                      <span>{formatMoney(italySimulation.variable_social_contributions, italySimulation.currency)}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3 sm:block xl:flex">
-                      <span>Income tax</span>
-                      <span>{formatMoney(italySimulation.income_tax, italySimulation.currency)}</span>
-                    </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Fixed INPS</span>
+                    <span>{formatMoney(italySimulation.fixed_social_contributions, italySimulation.currency)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Variable INPS</span>
+                    <span>{formatMoney(italySimulation.variable_social_contributions, italySimulation.currency)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Income tax</span>
+                    <span>{formatMoney(italySimulation.income_tax, italySimulation.currency)}</span>
+                  </div>
                 </div>
               </div>
 
@@ -2201,8 +2661,35 @@ export default function AdminFinancePage() {
             </div>
           )}
         </CollapsibleFinanceSection>
-      </div>
 
+        <CollapsibleFinanceSection
+          title="Last 6 months"
+          description="Cash-kept trend in the primary reporting currency, so the direction of travel is obvious at a glance."
+        >
+
+          {loading ? (
+            <p className="text-sm text-foreground-muted">Loading trend...</p>
+          ) : summary && summary.monthly_trend.length > 0 ? (
+            <div>
+              <div className="flex items-end gap-3 overflow-x-auto pb-2">
+                {summary.monthly_trend.map((point) =>
+                  renderTrendBar(point, summary.approx_primary.currency)
+                )}
+              </div>
+              <div className="mt-4 rounded-2xl bg-[var(--sabbia-50)] px-4 py-3 text-xs text-foreground-muted">
+                Dark bars show cash kept. Week and card-fee details stay separate below so the chart doesn’t turn into a spaghetti monster.
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-foreground-muted">
+              Trend data will appear once there are payments across multiple months.
+            </p>
+          )}
+        </CollapsibleFinanceSection>
+      </div>
+      ) : null}
+
+      {financeView === "insights" ? (
       <div className="mb-6">
         <CollapsibleFinanceSection
           title={swedenSimulation?.label ?? "Sweden tax model"}
@@ -2235,7 +2722,7 @@ export default function AdminFinancePage() {
                       <span>{formatMoney(swedenSimulation.invoiced_revenue, swedenSimulation.currency)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <span>Social reserve</span>
+                      <span>Self-employment contributions</span>
                       <span>{formatMoney(swedenSimulation.variable_social_contributions, swedenSimulation.currency)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3 sm:col-span-2">
@@ -2298,11 +2785,13 @@ export default function AdminFinancePage() {
           )}
         </CollapsibleFinanceSection>
       </div>
+      ) : null}
 
+      {financeView === "insights" ? (
       <div className="mb-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
         <CollapsibleFinanceSection
           title="Monthly finance pulse"
-          description="Seasonality in one place: take-home, studio drag, SumUp drag, and open invoice backlog across the last six months."
+          description="Seasonality in one place: cash kept, studio drag, card fee drag, and pending invoice reminders across the last six months."
         >
           <div className="mb-4 flex justify-end">
             <AdminButton
@@ -2329,29 +2818,87 @@ export default function AdminFinancePage() {
                     <div>
                       <p className="font-medium text-foreground">{point.label}</p>
                       <p className="mt-1 text-xs text-foreground-muted">
-                        {point.open_invoice_count} open invoice{point.open_invoice_count === 1 ? "" : "s"}
+                        {point.open_invoice_count} pending reminder{point.open_invoice_count === 1 ? "" : "s"}
                       </p>
                     </div>
                     <p className="text-sm font-medium text-foreground">
                       {formatMoney(point.net_total, summary.approx_primary.currency)}
                     </p>
                   </div>
-                  <div className="mt-3 grid gap-2 text-xs text-foreground-muted sm:grid-cols-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <span>Studio fees</span>
-                      <span>
+                  <div className="mt-3 rounded-full bg-white/80 p-1">
+                    <div
+                      className="flex h-4 overflow-hidden rounded-full"
+                      style={{
+                        width: getRelativeBarWidth(
+                          point.net_total + point.studio_fee_total + point.processor_fee_total,
+                          monthlyPulseMaxTotal,
+                          12
+                        ),
+                      }}
+                    >
+                      {point.net_total > 0 ? (
+                        <div
+                          className="h-full"
+                          style={{
+                            width: `${((point.net_total / (point.net_total + point.studio_fee_total + point.processor_fee_total)) * 100).toFixed(2)}%`,
+                            backgroundColor: "var(--ink-900)",
+                          }}
+                        />
+                      ) : null}
+                      {point.studio_fee_total > 0 ? (
+                        <div
+                          className="h-full"
+                          style={{
+                            width: `${((point.studio_fee_total / (point.net_total + point.studio_fee_total + point.processor_fee_total)) * 100).toFixed(2)}%`,
+                            backgroundColor: "var(--trad-red-500)",
+                          }}
+                        />
+                      ) : null}
+                      {point.processor_fee_total > 0 ? (
+                        <div
+                          className="h-full"
+                          style={{
+                            width: `${((point.processor_fee_total / (point.net_total + point.studio_fee_total + point.processor_fee_total)) * 100).toFixed(2)}%`,
+                            backgroundColor: "var(--blush-300)",
+                          }}
+                        />
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs text-foreground-muted sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-xl bg-white px-3 py-2">
+                      <span className="flex items-center gap-2">
+                        <span className="block h-2.5 w-2.5 rounded-full bg-[var(--ink-900)]" />
+                        Cash kept
+                      </span>
+                      <p className="mt-1 font-medium text-foreground">
+                        {formatMoney(point.net_total, summary.approx_primary.currency)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-white px-3 py-2">
+                      <span className="flex items-center gap-2">
+                        <span className="block h-2.5 w-2.5 rounded-full bg-[var(--trad-red-500)]" />
+                        Studio fees
+                      </span>
+                      <p className="mt-1 font-medium text-foreground">
                         {formatMoney(point.studio_fee_total, summary.approx_primary.currency)}
-                      </span>
+                      </p>
                     </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span>SumUp drag</span>
-                      <span>
+                    <div className="rounded-xl bg-white px-3 py-2">
+                      <span className="flex items-center gap-2">
+                        <span className="block h-2.5 w-2.5 rounded-full bg-[var(--blush-300)]" />
+                        SumUp drag
+                      </span>
+                      <p className="mt-1 font-medium text-foreground">
                         {formatMoney(point.processor_fee_total, summary.approx_primary.currency)}
-                      </span>
+                      </p>
                     </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span>Invoice backlog</span>
-                      <span>{point.open_invoice_count}</span>
+                    <div className="rounded-xl bg-white px-3 py-2">
+                      <span className="flex items-center gap-2">
+                        <span className="block h-2.5 w-2.5 rounded-full bg-amber-400" />
+                        Pending reminders
+                      </span>
+                      <p className="mt-1 font-medium text-foreground">{point.open_invoice_count}</p>
                     </div>
                   </div>
                 </div>
@@ -2365,25 +2912,25 @@ export default function AdminFinancePage() {
         </CollapsibleFinanceSection>
 
         <CollapsibleFinanceSection
-          title="Backlog trend"
-          description="Simple period-over-period read on invoice backlog so Lia can see if admin debt is shrinking or breeding."
+          title="Invoice reminder trend"
+          description="Simple period-over-period read on pending invoice reminders so Lia can see if admin debt is shrinking or breeding."
         >
 
           {loading || !summary || !latestTrendPoint ? (
-            <p className="text-sm text-foreground-muted">Loading backlog trend...</p>
+            <p className="text-sm text-foreground-muted">Loading reminder trend...</p>
           ) : (
             <div className="space-y-4">
               <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
-                  Current month backlog
+                  Current month reminders
                 </p>
                 <div className="mt-2 text-xl font-medium text-foreground sm:text-2xl">
                   {latestTrendPoint.open_invoice_count}
                 </div>
-                <p className="mt-2 text-xs text-foreground-muted">
-                  {previousTrendPoint
-                    ? invoiceBacklogDelta === 0
-                      ? "Flat vs previous month"
+                  <p className="mt-2 text-xs text-foreground-muted">
+                    {previousTrendPoint
+                      ? invoiceBacklogDelta === 0
+                        ? "Flat vs previous month"
                       : `${invoiceBacklogDelta && invoiceBacklogDelta > 0 ? "+" : ""}${invoiceBacklogDelta} vs ${previousTrendPoint.label}`
                     : "No previous month yet"}
                 </p>
@@ -2392,12 +2939,26 @@ export default function AdminFinancePage() {
                 {summary.monthly_trend.map((point) => (
                   <div
                     key={`${point.month}:backlog`}
-                    className="flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 shadow-sm"
+                    className="rounded-xl bg-white px-4 py-3 shadow-sm"
                   >
-                    <span className="text-sm text-foreground">{point.label}</span>
-                    <span className="text-sm text-foreground-muted">
-                      {point.open_invoice_count} open invoice{point.open_invoice_count === 1 ? "" : "s"}
-                    </span>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-foreground">{point.label}</span>
+                      <span className="text-sm text-foreground-muted">
+                        {point.open_invoice_count} pending reminder{point.open_invoice_count === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <div className="mt-2 h-3 rounded-full bg-[var(--sabbia-100)]">
+                      <div
+                        className="h-full rounded-full bg-amber-400"
+                        style={{
+                          width: getRelativeBarWidth(
+                            point.open_invoice_count,
+                            invoiceReminderTrendMax,
+                            14
+                          ),
+                        }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2405,11 +2966,13 @@ export default function AdminFinancePage() {
           )}
         </CollapsibleFinanceSection>
       </div>
+      ) : null}
 
+      {financeView === "insights" ? (
       <div className="mb-6">
         <CollapsibleFinanceSection
-          title="Owner payout history"
-          description="A six-month view of what each studio owner or context reserve needed per month, with approximate SumUp drag attached to that month’s bucket."
+          title="Payout history"
+          description="A six-month view of what each studio or context reserve needed per month, with card fee drag attached to that bucket."
         >
           <div className="mb-4 flex justify-end">
             <AdminButton
@@ -2434,7 +2997,7 @@ export default function AdminFinancePage() {
                     <th className="px-4 py-3 font-medium">Payout</th>
                     <th className="px-4 py-3 font-medium">Context</th>
                     <th className="px-4 py-3 font-medium">Fee total</th>
-                    <th className="px-4 py-3 font-medium">Approx SumUp drag</th>
+                    <th className="px-4 py-3 font-medium">Card fee drag</th>
                     <th className="px-4 py-3 font-medium">Entries</th>
                   </tr>
                 </thead>
@@ -2462,18 +3025,21 @@ export default function AdminFinancePage() {
               </table>
             </div>
           ) : (
-            <p className="text-sm text-foreground-muted">
-              Owner payout history will start filling out after more months of data.
-            </p>
+              <p className="text-sm text-foreground-muted">
+                Payout history will start filling out after more months of data.
+              </p>
           )}
         </CollapsibleFinanceSection>
       </div>
+      ) : null}
 
+      {financeView === "operations" ? (
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
           <CollapsibleFinanceSection
             title="Studio / context totals"
             description="Grouped by actual working context and native reporting bucket, so Malmö and Copenhagen stop bleeding into a fake currency view."
+            defaultOpen
           >
 
             {loading ? (
@@ -2487,7 +3053,7 @@ export default function AdminFinancePage() {
                       <th className="px-4 py-3 font-medium">Gross</th>
                       <th className="px-4 py-3 font-medium">Studio fee</th>
                       <th className="px-4 py-3 font-medium">Card fee impact</th>
-                      <th className="px-4 py-3 font-medium">Take-home</th>
+                    <th className="px-4 py-3 font-medium">Cash kept</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2578,23 +3144,44 @@ export default function AdminFinancePage() {
                                   {` · paid in ${payment.currency} · reports in ${payment.reporting_currency}`}
                                 </p>
                               </div>
-                              <div className="grid gap-1 text-right text-xs sm:min-w-48">
+                              <div className="grid gap-1 text-right text-xs sm:min-w-56">
                                 <p className="text-foreground-muted">
-                                  Gross {formatMoney(payment.gross_amount_reporting, payment.reporting_currency)}
+                                  Charged {formatMoney(payment.gross_amount, payment.currency)}
                                 </p>
                                 <p className="text-foreground-muted">
-                                  Studio fee {formatMoney(payment.fee_amount, payment.reporting_currency)}
+                                  Studio fee {formatMoney(payment.fee_amount, payment.reporting_currency)} in {payment.reporting_currency}
                                 </p>
                                 <p className="text-foreground-muted">
                                   Card fee {formatMoney(payment.processor_fee_amount, payment.processor_fee_currency)}
                                 </p>
                                 <p className="font-medium text-foreground">
-                                  Take-home {formatMoney(payment.net_amount, payment.reporting_currency)}
+                                  Cash kept {formatMoney(payment.original_net_amount, payment.currency)}
                                 </p>
+                                {payment.currency !== payment.reporting_currency ? (
+                                  <p className="text-foreground-muted">
+                                    Reporting view {formatMoney(payment.net_amount, payment.reporting_currency)}
+                                  </p>
+                                ) : null}
                               </div>
                             </div>
 
                             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                              <AdminButton
+                                variant="secondary"
+                                className="!min-h-[32px] !px-3 !py-1 text-xs"
+                                disabled={saving}
+                                onClick={() => startEditingEntry(project, payment.id)}
+                              >
+                                Edit
+                              </AdminButton>
+                              <AdminButton
+                                variant="ghost"
+                                className="!min-h-[32px] !px-3 !py-1 text-xs"
+                                disabled={saving}
+                                onClick={() => handleDeleteEntry(project.id, payment.id)}
+                              >
+                                Delete
+                              </AdminButton>
                               <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-foreground-muted">
                                 {payment.fee_percentage}% studio fee
                               </span>
@@ -2651,31 +3238,6 @@ export default function AdminFinancePage() {
         </div>
 
         <div className="space-y-6">
-          <CollapsibleFinanceSection
-            title="Last 6 months"
-            description="Take-home trend in the primary reporting currency, so the direction of travel is obvious at a glance."
-          >
-
-            {loading ? (
-              <p className="text-sm text-foreground-muted">Loading trend...</p>
-            ) : summary && summary.monthly_trend.length > 0 ? (
-              <div>
-                <div className="flex items-end gap-3 overflow-x-auto pb-2">
-                  {summary.monthly_trend.map((point) =>
-                    renderTrendBar(point, summary.approx_primary.currency)
-                  )}
-                </div>
-                <div className="mt-4 rounded-2xl bg-[var(--sabbia-50)] px-4 py-3 text-xs text-foreground-muted">
-                  Dark bars show take-home. Week and card-fee details stay separate below so the chart doesn’t turn into a spaghetti monster.
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-foreground-muted">
-                Trend data will appear once there are payments across multiple months.
-              </p>
-            )}
-          </CollapsibleFinanceSection>
-
           <AdminSurface>
             <AdminSectionHeading
               title="Invoice reminders"
@@ -2712,9 +3274,12 @@ export default function AdminFinancePage() {
                       {payment.project_label} · {payment.payment_date} · {FINANCE_PAYMENT_METHOD_LABELS[payment.payment_method]}
                     </p>
                     <div className="mt-2 grid gap-1 text-xs text-foreground-muted">
-                      <p>Gross {formatMoney(payment.gross_amount_reporting, payment.reporting_currency)}</p>
-                      <p>Studio fee {formatMoney(payment.fee_amount, payment.reporting_currency)}</p>
+                      <p>Charged {formatMoney(payment.gross_amount, payment.currency)}</p>
+                      <p>Studio fee {formatMoney(payment.fee_amount, payment.reporting_currency)} in {payment.reporting_currency}</p>
                       <p>Card fee {formatMoney(payment.processor_fee_amount, payment.processor_fee_currency)}</p>
+                      {payment.currency !== payment.reporting_currency ? (
+                        <p>Reporting view {formatMoney(payment.net_amount, payment.reporting_currency)}</p>
+                      ) : null}
                       <p>Last nudged {formatTimestamp(payment.invoice_last_nudged_at)}</p>
                     </div>
                     <label className="mt-3 block text-xs text-foreground-muted">
@@ -2737,7 +3302,7 @@ export default function AdminFinancePage() {
                     </label>
                     <div className="mt-3 flex items-center justify-between gap-3">
                       <span className="text-xs text-foreground-muted">
-                        Take-home {formatMoney(payment.net_amount, payment.reporting_currency)}
+                        Cash kept {formatMoney(payment.original_net_amount, payment.currency)}
                       </span>
                       <div className="flex flex-wrap gap-2">
                         <AdminButton
@@ -2773,12 +3338,13 @@ export default function AdminFinancePage() {
               </div>
             ) : (
               <p className="text-sm text-foreground-muted">
-                No open invoice reminders for {formatMonthLabel(month)}.
+                No pending invoice reminders for {formatMonthLabel(month)}.
               </p>
             )}
           </AdminSurface>
         </div>
       </div>
+      ) : null}
     </AdminShell>
   );
 }

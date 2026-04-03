@@ -50,6 +50,8 @@ type ResolvedExchangeRates = {
   dkk_to_eur: number;
 };
 
+type FinanceRateSource = ResolvedExchangeRates["source"] | "mixed";
+
 const CARD_PROCESSOR_CURRENCY: FinanceCurrency = "EUR";
 
 const DEFAULT_EUR_TO_SEK = 11.6;
@@ -71,10 +73,12 @@ function sumGrossPaymentsByCurrency(
   rates: ResolvedExchangeRates
 ): number {
   return roundMoney(
-    payments.reduce(
-      (total, payment) => total + convertAmount(payment.gross_amount, payment.currency, currency, rates),
-      0
-    )
+    payments.reduce((total, payment) => {
+      const paymentRates = getPaymentRates(payment, rates);
+      return total + (paymentRates
+        ? convertAmount(payment.gross_amount, payment.currency, currency, paymentRates)
+        : payment.gross_amount);
+    }, 0)
   );
 }
 
@@ -110,6 +114,59 @@ function getMonthlyVariableExpenseTotal(
       0
     )
   );
+}
+
+function buildPaymentSnapshotRates(payment: Pick<
+  FinancePaymentRow,
+  "fx_eur_to_sek" | "fx_eur_to_dkk"
+>): ResolvedExchangeRates | null {
+  if (!payment.fx_eur_to_sek || !payment.fx_eur_to_dkk) {
+    return null;
+  }
+
+  return {
+    source: "fallback",
+    eur_to_sek: payment.fx_eur_to_sek,
+    eur_to_dkk: payment.fx_eur_to_dkk,
+    sek_to_eur: 1 / payment.fx_eur_to_sek,
+    dkk_to_eur: 1 / payment.fx_eur_to_dkk,
+  };
+}
+
+function getPaymentRates(
+  payment: Pick<FinancePaymentRow, "fx_eur_to_sek" | "fx_eur_to_dkk">,
+  fallbackRates?: ResolvedExchangeRates
+): ResolvedExchangeRates | undefined {
+  return buildPaymentSnapshotRates(payment) ?? fallbackRates;
+}
+
+function getApproxRateSource(payments: FinancePaymentDerived[], fallbackSource: FinanceRateSource): FinanceRateSource {
+  let sawSnapshot = false;
+  let sawFallbackOnly = false;
+
+  for (const payment of payments) {
+    if (payment.fx_source) {
+      sawSnapshot = true;
+    } else {
+      sawFallbackOnly = true;
+    }
+
+    if (sawSnapshot && sawFallbackOnly) {
+      return "mixed";
+    }
+  }
+
+  if (sawSnapshot) {
+    const snapshotSources = new Set(
+      payments.map((payment) => payment.fx_source).filter(Boolean) as Array<ResolvedExchangeRates["source"]>
+    );
+    if (snapshotSources.size === 1) {
+      return [...snapshotSources][0];
+    }
+    return "mixed";
+  }
+
+  return fallbackSource;
 }
 
 function getMonthlyFrameworkFixedReserve(
@@ -177,36 +234,44 @@ function buildKeepScenario(
   notes: string[]
 ) {
   const grossCharged = roundMoney(
-    monthlyPayments.reduce(
-      (total, payment) => total + convertAmount(payment.gross_amount, payment.currency, currency, rates),
-      0
-    )
+    monthlyPayments.reduce((total, payment) => {
+      const paymentRates = getPaymentRates(payment, rates);
+      return total + (paymentRates
+        ? convertAmount(payment.gross_amount, payment.currency, currency, paymentRates)
+        : payment.gross_amount);
+    }, 0)
   );
   const cashReceived = roundMoney(
-    monthlyPayments.reduce(
-      (total, payment) => total + convertAmount(payment.net_amount, payment.reporting_currency, currency, rates),
-      0
-    )
+    monthlyPayments.reduce((total, payment) => {
+      const paymentRates = getPaymentRates(payment, rates);
+      return total + (paymentRates
+        ? convertAmount(payment.net_amount, payment.reporting_currency, currency, paymentRates)
+        : payment.net_amount);
+    }, 0)
   );
   const invoicedGross = roundMoney(
-    monthlyInvoicedPayments.reduce(
-      (total, payment) => total + convertAmount(payment.gross_amount, payment.currency, currency, rates),
-      0
-    )
+    monthlyInvoicedPayments.reduce((total, payment) => {
+      const paymentRates = getPaymentRates(payment, rates);
+      return total + (paymentRates
+        ? convertAmount(payment.gross_amount, payment.currency, currency, paymentRates)
+        : payment.gross_amount);
+    }, 0)
   );
   const studioFees = roundMoney(
-    monthlyPayments.reduce(
-      (total, payment) =>
-        total + convertAmount(payment.fee_amount, payment.reporting_currency, currency, rates),
-      0
-    )
+    monthlyPayments.reduce((total, payment) => {
+      const paymentRates = getPaymentRates(payment, rates);
+      return total + (paymentRates
+        ? convertAmount(payment.fee_amount, payment.reporting_currency, currency, paymentRates)
+        : payment.fee_amount);
+    }, 0)
   );
   const processorFees = roundMoney(
-    monthlyPayments.reduce(
-      (total, payment) =>
-        total + convertAmount(payment.processor_fee_amount, payment.processor_fee_currency, currency, rates),
-      0
-    )
+    monthlyPayments.reduce((total, payment) => {
+      const paymentRates = getPaymentRates(payment, rates);
+      return total + (paymentRates
+        ? convertAmount(payment.processor_fee_amount, payment.processor_fee_currency, currency, paymentRates)
+        : payment.processor_fee_amount);
+    }, 0)
   );
   const incomeTaxReserve = roundMoney(
     invoicedGross *
@@ -406,7 +471,7 @@ function buildSwedenTaxSimulation(
         ? roundMoney(((socialContributions + incomeTax) / invoicedRevenue) * 100)
         : 0,
     notes: [
-      `Egenavgifter ${roundMoney(settings.self_employment_contribution_rate)}%`,
+      `Self-employment contributions ${roundMoney(settings.self_employment_contribution_rate)}%`,
       `Municipal tax ${roundMoney(settings.municipal_tax_rate)}%`,
       `State tax ${roundMoney(settings.state_tax_rate)}% above ${roundMoney(settings.state_tax_threshold)} SEK`,
     ],
@@ -544,7 +609,10 @@ export function buildKeepSummary(
   const excludedGrossTotal = roundMoney(
     monthlyPayments.reduce((total, payment) => {
       if (payment.invoice_done) return total;
-      return total + convertAmount(payment.gross_amount, payment.currency, primaryCurrency, rates);
+      const paymentRates = getPaymentRates(payment, rates);
+      return total + (paymentRates
+        ? convertAmount(payment.gross_amount, payment.currency, primaryCurrency, paymentRates)
+        : payment.gross_amount);
     }, 0)
   );
 
@@ -670,17 +738,59 @@ export function derivePayment(
   payment: FinancePaymentRow,
   rates?: ResolvedExchangeRates
 ): FinancePaymentDerived {
-  const gross_amount_reporting = rates
-    ? convertAmount(payment.gross_amount, payment.currency, payment.reporting_currency, rates)
+  const paymentRates = getPaymentRates(payment, rates);
+  const original_processor_fee_currency: FinanceCurrency =
+    payment.payment_method === "card" ? CARD_PROCESSOR_CURRENCY : payment.currency;
+  const original_gross_amount_processor =
+    original_processor_fee_currency === payment.currency
+      ? payment.gross_amount
+      : paymentRates
+        ? convertAmount(
+            payment.gross_amount,
+            payment.currency,
+            original_processor_fee_currency,
+            paymentRates
+          )
+        : payment.gross_amount;
+  const original_processor_fee_amount = calculateProcessorFeeAmount(
+    original_gross_amount_processor,
+    payment.processor_fee_percentage
+  );
+  const original_net_amount = roundMoney(
+    payment.gross_amount -
+      calculateFeeAmount(
+        payment.studio_fee_base_amount !== null && payment.studio_fee_base_currency !== null && paymentRates
+          ? convertAmount(
+              payment.studio_fee_base_amount,
+              payment.studio_fee_base_currency,
+              payment.currency,
+              paymentRates
+            )
+          : payment.studio_fee_base_amount ?? payment.gross_amount,
+        payment.fee_percentage
+      ) -
+      (original_processor_fee_currency === payment.currency
+        ? original_processor_fee_amount
+        : paymentRates
+          ? convertAmount(
+              original_processor_fee_amount,
+              original_processor_fee_currency,
+              payment.currency,
+              paymentRates
+            )
+          : original_processor_fee_amount)
+  );
+  const gross_amount_reporting = paymentRates
+    ? convertAmount(payment.gross_amount, payment.currency, payment.reporting_currency, paymentRates)
     : payment.gross_amount;
   const studio_fee_base_reporting =
     payment.studio_fee_base_amount !== null && payment.studio_fee_base_currency !== null
-      ? rates
+      ? paymentRates
         ? convertAmount(
             payment.studio_fee_base_amount,
             payment.studio_fee_base_currency,
             payment.reporting_currency,
-            rates
+            paymentRates
           )
         : payment.studio_fee_base_amount
       : gross_amount_reporting;
@@ -690,19 +800,19 @@ export function derivePayment(
   const gross_amount_processor =
     processor_fee_currency === payment.currency
       ? payment.gross_amount
-      : rates
-        ? convertAmount(payment.gross_amount, payment.currency, processor_fee_currency, rates)
+      : paymentRates
+        ? convertAmount(payment.gross_amount, payment.currency, processor_fee_currency, paymentRates)
         : payment.gross_amount;
   const processor_fee_amount = calculateProcessorFeeAmount(
     gross_amount_processor,
     payment.processor_fee_percentage
   );
-  const processor_fee_amount_reporting = rates
+  const processor_fee_amount_reporting = paymentRates
     ? convertAmount(
         processor_fee_amount,
         processor_fee_currency,
         payment.reporting_currency,
-        rates
+        paymentRates
       )
     : processor_fee_amount;
   const net_amount = roundMoney(
@@ -711,6 +821,7 @@ export function derivePayment(
 
   return {
     ...payment,
+    original_net_amount,
     gross_amount_reporting,
     fee_amount,
     processor_fee_currency,
@@ -977,10 +1088,20 @@ export function buildWeeklySummary(
 
     current.month_entry_count += 1;
     current.net_total = roundMoney(
-      current.net_total + convertAmount(payment.net_amount, payment.reporting_currency, primaryCurrency, rates)
+      current.net_total + convertAmount(
+        payment.net_amount,
+        payment.reporting_currency,
+        primaryCurrency,
+        getPaymentRates(payment, rates) ?? rates
+      )
     );
     current.studio_fee_total = roundMoney(
-      current.studio_fee_total + convertAmount(payment.fee_amount, payment.reporting_currency, primaryCurrency, rates)
+      current.studio_fee_total + convertAmount(
+        payment.fee_amount,
+        payment.reporting_currency,
+        primaryCurrency,
+        getPaymentRates(payment, rates) ?? rates
+      )
     );
     current.processor_fee_total = roundMoney(
       current.processor_fee_total +
@@ -988,7 +1109,7 @@ export function buildWeeklySummary(
           payment.processor_fee_amount,
           payment.processor_fee_currency,
           primaryCurrency,
-          rates
+          getPaymentRates(payment, rates) ?? rates
         )
     );
 
@@ -1019,10 +1140,20 @@ export function buildMonthlyTrend(
       };
 
       current.net_total = roundMoney(
-        current.net_total + convertAmount(payment.net_amount, payment.reporting_currency, primaryCurrency, rates)
+        current.net_total + convertAmount(
+          payment.net_amount,
+          payment.reporting_currency,
+          primaryCurrency,
+          getPaymentRates(payment, rates) ?? rates
+        )
       );
       current.studio_fee_total = roundMoney(
-        current.studio_fee_total + convertAmount(payment.fee_amount, payment.reporting_currency, primaryCurrency, rates)
+        current.studio_fee_total + convertAmount(
+          payment.fee_amount,
+          payment.reporting_currency,
+          primaryCurrency,
+          getPaymentRates(payment, rates) ?? rates
+        )
       );
       current.processor_fee_total = roundMoney(
         current.processor_fee_total +
@@ -1030,7 +1161,7 @@ export function buildMonthlyTrend(
             payment.processor_fee_amount,
             payment.processor_fee_currency,
             primaryCurrency,
-            rates
+            getPaymentRates(payment, rates) ?? rates
           )
       );
       if (payment.invoice_needed && !payment.invoice_done) current.open_invoice_count += 1;
@@ -1097,14 +1228,18 @@ export function getApproxTotal(
   currency: FinanceCurrency,
   rates: ResolvedExchangeRates,
   field: "currency" | "reporting_currency" = "reporting_currency"
-): number {
-  return roundMoney(
-    payments.reduce(
-      (sum, payment) =>
-        sum + convertAmount(payment.net_amount, payment[field], currency, rates),
-      0
-    )
-  );
+): { amount: number; source: FinanceRateSource } {
+  return {
+    amount: roundMoney(
+      payments.reduce((sum, payment) => {
+        const paymentRates = getPaymentRates(payment, rates);
+        return sum + (paymentRates
+          ? convertAmount(payment.net_amount, payment[field], currency, paymentRates)
+          : payment.net_amount);
+      }, 0)
+    ),
+    source: getApproxRateSource(payments, rates.source),
+  };
 }
 
 export function buildComparison(
