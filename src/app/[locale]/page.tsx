@@ -95,34 +95,40 @@ function HomeContent({ flashImages }: { flashImages: FlashPreviewImage[] }) {
           HERO SECTION
           ═══════════════════════════════════════ */}
       <section className="relative flex flex-col items-center justify-center min-h-[90vh] px-4 text-center overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 opacity-80" aria-hidden="true">
+        <div className="pointer-events-none absolute inset-0 z-[2]" aria-hidden="true">
           <TattooArtwork
             src="/art/berries/strawberries-together.png"
-            sizes="(max-width: 640px) 44vw, (max-width: 1024px) 28vw, 240px"
+            sizes="(max-width: 640px) 52vw, (max-width: 1024px) 32vw, 280px"
             loading="eager"
-            introDelay={0.08}
-            parallax={8}
-            className="-left-14 top-12 h-56 w-40 rotate-[-10deg] sm:-left-8 sm:top-16 sm:h-72 sm:w-52 lg:left-0 lg:top-20 lg:h-[22rem] lg:w-64"
-            imageClassName="mix-blend-multiply opacity-[0.28]"
+            introDelay={0.02}
+            parallax={6}
+            className="-left-[4.5rem] top-10 h-64 w-44 rotate-[-10deg] sm:-left-12 sm:top-14 sm:h-80 sm:w-56 lg:-left-6 lg:top-[4.5rem] lg:h-[24rem] lg:w-72"
+            imageClassName="mix-blend-normal object-contain opacity-[0.78] drop-shadow-[0_10px_18px_rgba(80,45,20,0.12)]"
           />
-          <div className="absolute -right-14 bottom-20 h-36 w-28 rotate-[10deg] sm:right-1 sm:bottom-24 sm:h-52 sm:w-36 lg:right-8 lg:bottom-20 lg:h-64 lg:w-44">
-            <Image
-              src="/art/berries/raspberry-02.png"
-              alt=""
-              fill
-              sizes="(max-width: 640px) 96px, (max-width: 1024px) 128px, 160px"
-              className="object-contain opacity-[0.14] mix-blend-multiply"
-            />
-          </div>
-          <div className="absolute right-7 top-20 hidden h-28 w-20 rotate-[18deg] sm:block lg:right-20 lg:top-24 lg:h-36 lg:w-24">
-            <Image
-              src="/art/berries/strawberry-02.png"
-              alt=""
-              fill
-              sizes="(max-width: 1024px) 80px, 96px"
-              className="object-contain opacity-[0.12] mix-blend-multiply"
-            />
-          </div>
+          <TattooArtwork
+            src="/art/berries/raspberry-02.png"
+            sizes="(max-width: 640px) 24vw, (max-width: 1024px) 16vw, 144px"
+            introDelay={0.12}
+            parallax={4}
+            className="-right-10 top-16 h-36 w-[6.5rem] rotate-[12deg] sm:right-0 sm:top-[4.5rem] sm:h-48 sm:w-32 lg:right-12 lg:top-[5.5rem] lg:h-56 lg:w-36"
+            imageClassName="mix-blend-normal object-contain opacity-[0.56]"
+          />
+          <TattooArtwork
+            src="/art/berries/strawberry-02.png"
+            sizes="(max-width: 640px) 20vw, (max-width: 1024px) 12vw, 112px"
+            introDelay={0.2}
+            parallax={3}
+            className="right-2 bottom-[7.5rem] h-24 w-[4.5rem] rotate-[10deg] sm:right-4 sm:bottom-28 sm:h-32 sm:w-[5.5rem] lg:right-20 lg:bottom-[6.5rem] lg:h-40 lg:w-28"
+            imageClassName="mix-blend-normal object-contain opacity-[0.5]"
+          />
+          <TattooArtwork
+            src="/art/berries/raspberry-01.png"
+            sizes="(max-width: 640px) 18vw, (max-width: 1024px) 12vw, 104px"
+            introDelay={0.26}
+            parallax={3}
+            className="-left-3 bottom-28 h-[5.5rem] w-16 rotate-[18deg] sm:left-4 sm:bottom-28 sm:h-28 sm:w-20 lg:left-20 lg:bottom-24 lg:h-36 lg:w-24"
+            imageClassName="mix-blend-normal object-contain opacity-[0.46]"
+          />
         </div>
 
         {/* Decorative corner ornaments */}
@@ -306,24 +312,31 @@ function HomeContent({ flashImages }: { flashImages: FlashPreviewImage[] }) {
           ═══════════════════════════════════════ */}
       <section className="relative py-14 sm:py-24 px-4 bg-sabbia-100/40">
         <LineDivider className="absolute top-0 left-0 right-0" />
-        <div className="pointer-events-none absolute inset-0 opacity-80" aria-hidden="true">
+        <div className="pointer-events-none absolute inset-0 z-[2]" aria-hidden="true">
           <TattooArtwork
             src="/art/berries/raspberries-together.png"
-            sizes="(max-width: 640px) 42vw, (max-width: 1024px) 26vw, 224px"
-            introDelay={0.18}
-            parallax={7}
-            className="-left-12 bottom-0 h-52 w-36 rotate-[-8deg] sm:left-0 sm:bottom-2 sm:h-68 sm:w-48 lg:left-10 lg:bottom-0 lg:h-[20rem] lg:w-60"
-            imageClassName="mix-blend-multiply opacity-[0.24]"
+            sizes="(max-width: 640px) 48vw, (max-width: 1024px) 30vw, 260px"
+            introDelay={0.08}
+            parallax={5}
+            className="-left-16 bottom-0 h-60 w-[10.5rem] rotate-[-8deg] sm:-left-6 sm:bottom-0 sm:h-[19rem] sm:w-[13.5rem] lg:left-6 lg:bottom-0 lg:h-[22rem] lg:w-[17rem]"
+            imageClassName="mix-blend-normal object-contain opacity-[0.74] drop-shadow-[0_10px_18px_rgba(80,45,20,0.1)]"
           />
-          <div className="absolute -right-8 top-8 h-32 w-24 rotate-[14deg] sm:right-6 sm:top-10 sm:h-44 sm:w-32 lg:right-16 lg:h-52 lg:w-36">
-            <Image
-              src="/art/berries/strawberry-01.png"
-              alt=""
-              fill
-              sizes="(max-width: 640px) 96px, (max-width: 1024px) 128px, 144px"
-              className="object-contain opacity-[0.13] mix-blend-multiply"
-            />
-          </div>
+          <TattooArtwork
+            src="/art/berries/strawberry-01.png"
+            sizes="(max-width: 640px) 24vw, (max-width: 1024px) 16vw, 148px"
+            introDelay={0.16}
+            parallax={3}
+            className="-right-6 top-8 h-[8.5rem] w-24 rotate-[14deg] sm:right-6 sm:top-10 sm:h-[11.5rem] sm:w-32 lg:right-12 lg:top-12 lg:h-56 lg:w-40"
+            imageClassName="mix-blend-normal object-contain opacity-[0.58]"
+          />
+          <TattooArtwork
+            src="/art/berries/strawberry-02.png"
+            sizes="(max-width: 640px) 18vw, (max-width: 1024px) 12vw, 100px"
+            introDelay={0.24}
+            parallax={2}
+            className="right-10 bottom-10 h-[5.5rem] w-16 rotate-[-12deg] sm:right-12 sm:bottom-12 sm:h-28 sm:w-20 lg:right-28 lg:bottom-14 lg:h-36 lg:w-24"
+            imageClassName="mix-blend-normal object-contain opacity-[0.48]"
+          />
         </div>
 
         <div className="relative z-10 max-w-3xl mx-auto text-center">

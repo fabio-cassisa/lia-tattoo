@@ -48,9 +48,9 @@ export function TattooArtwork({
 
       gsap.set(art, {
         autoAlpha: 0,
-        y: isCompact ? 18 : 26,
-        scale: isCompact ? 0.9 : 0.86,
-        rotation: -4,
+        y: isCompact ? 26 : 34,
+        scale: isCompact ? 0.8 : 0.74,
+        rotation: -7,
         transformOrigin: "50% 70%",
       });
 
@@ -59,9 +59,9 @@ export function TattooArtwork({
         y: 0,
         scale: 1,
         rotation: 0,
-        duration: 1.05,
+        duration: 0.92,
         delay: introDelay,
-        ease: "power3.out",
+        ease: "back.out(1.25)",
         scrollTrigger: {
           trigger: root,
           start: "top 88%",
