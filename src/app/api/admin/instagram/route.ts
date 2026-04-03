@@ -111,7 +111,6 @@ export async function GET(request: NextRequest) {
  * Body:
  *   - action: "setup" — Store initial token
  *   - shortLivedToken: string — The short-lived token from Meta Developer App
- *   - appSecret: string — The app secret from Meta Developer App
  *   - instagramUserId: string — Lia's Instagram user ID
  */
 export async function POST(request: NextRequest) {
@@ -124,17 +123,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     if (body.action === "setup") {
-      const { shortLivedToken, appSecret, instagramUserId } = body;
+      const { shortLivedToken, instagramUserId } = body;
 
-      if (!shortLivedToken || !appSecret || !instagramUserId) {
+      if (!shortLivedToken || !instagramUserId) {
         return Response.json(
-          { error: "Missing required fields: shortLivedToken, appSecret, instagramUserId" },
+          { error: "Missing required fields: shortLivedToken, instagramUserId" },
           { status: 400 },
         );
       }
 
       // Exchange short-lived token for long-lived one
-      const longLived = await exchangeForLongLivedToken(shortLivedToken, appSecret);
+      const longLived = await exchangeForLongLivedToken(shortLivedToken);
 
       const expiresAt = new Date(
         Date.now() + longLived.expires_in * 1000,

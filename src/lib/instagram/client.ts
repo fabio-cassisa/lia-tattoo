@@ -6,12 +6,13 @@
  * - Long-lived token refresh
  * - Error handling with typed responses
  *
- * Setup required (Fabio does this in browser):
+ * Setup required:
  * 1. Create Meta Developer App at https://developers.facebook.com
  * 2. Add Instagram Graph API product
  * 3. Connect Lia's Instagram Business/Creator account
- * 4. Generate long-lived token via token exchange
- * 5. Store token in Supabase via /api/admin/instagram/setup
+ * 4. Store the app secret server-side in `META_APP_SECRET`
+ * 5. Generate a short-lived token and exchange it server-side
+ * 6. Store the long-lived token in Supabase via /api/admin/instagram/setup
  *
  * Docs: https://developers.facebook.com/docs/instagram-platform/instagram-graph-api
  */
@@ -98,12 +99,16 @@ export async function refreshLongLivedToken(currentToken: string): Promise<{
  */
 export async function exchangeForLongLivedToken(
   shortLivedToken: string,
-  appSecret: string,
 ): Promise<{
   access_token: string;
   token_type: string;
   expires_in: number;
 }> {
+  const appSecret = process.env.META_APP_SECRET?.trim();
+  if (!appSecret) {
+    throw new Error("META_APP_SECRET env var is not set");
+  }
+
   const url = `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${appSecret}&access_token=${shortLivedToken}`;
   const res = await fetch(url);
   if (!res.ok) {

@@ -78,6 +78,7 @@ See [`.env.local.example`](.env.local.example) for the full list. Key variables:
 | `LIA_EMAIL` | Booking notification recipient |
 | `GOOGLE_CALENDAR_ID` | Target Google Calendar ID |
 | `GOOGLE_SERVICE_ACCOUNT_KEY` | Base64-encoded service account JSON |
+| `META_APP_SECRET` | Meta app secret for server-side Instagram token exchange |
 | `NEXT_PUBLIC_SITE_URL` | Production URL (used in emails) |
 
 ## Project Structure

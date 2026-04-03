@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
-import { AdminAlert } from "@/components/admin/AdminPrimitives";
+import { AdminAlert, AdminButton } from "@/components/admin/AdminPrimitives";
 
 // ── Types ────────────────────────────────────────────────
 
@@ -444,6 +445,11 @@ export default function AdminInsights() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [setupError, setSetupError] = useState("");
+  const [setupSuccess, setSetupSuccess] = useState("");
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [shortLivedToken, setShortLivedToken] = useState("");
+  const [instagramUserId, setInstagramUserId] = useState("");
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [locale, setLocale] = useState<CoachLocale>("en");
 
@@ -542,6 +548,53 @@ export default function AdminInsights() {
     localStorage.setItem("coach-locale", newLocale);
   };
 
+  const handleSetupSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSetupError("");
+    setSetupSuccess("");
+
+    const trimmedToken = shortLivedToken.trim();
+    const trimmedUserId = instagramUserId.trim();
+
+    if (!trimmedToken || !trimmedUserId) {
+      setSetupError("Short-lived token and Instagram user ID are both required.");
+      return;
+    }
+
+    setSetupLoading(true);
+
+    try {
+      const response = await fetch("/api/admin/instagram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "setup",
+          shortLivedToken: trimmedToken,
+          instagramUserId: trimmedUserId,
+        }),
+      });
+
+      if (response.status === 401) {
+        router.push("/admin/login");
+        return;
+      }
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Instagram setup failed");
+      }
+
+      setSetupSuccess(data.message || "Instagram connected.");
+      setShortLivedToken("");
+      setInstagramUserId("");
+      await Promise.all([fetchStatus(), fetchInsights()]);
+    } catch (err) {
+      setSetupError(err instanceof Error ? err.message : "Instagram setup failed");
+    } finally {
+      setSetupLoading(false);
+    }
+  };
+
   useEffect(() => {
     Promise.all([fetchStatus(), fetchInsights(), fetchFinancePulse()]).finally(() =>
       setLoading(false),
@@ -631,10 +684,80 @@ export default function AdminInsights() {
                 </code>
               </li>
               <li>
-                Use the setup endpoint to exchange it for a long-lived token
-                (auto-refreshes every 60 days)
+                Add the Meta app secret to the server as <code className="bg-[var(--sabbia-100)] px-1.5 py-0.5 rounded text-xs">META_APP_SECRET</code>,
+                then use the setup endpoint to exchange the short-lived token for a long-lived one (auto-refreshes every 60 days)
               </li>
             </ol>
+
+            <div className="mt-6 rounded-2xl border border-[var(--sabbia-200)] bg-white/90 p-4 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                    Final handoff
+                  </p>
+                  <h3 className="mt-1 text-sm font-semibold text-ink-900">
+                    Connect Instagram without touching the browser console
+                  </h3>
+                </div>
+                <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-[11px] text-foreground-muted">
+                  Admin only
+                </span>
+              </div>
+
+              <p className="mt-3 text-sm text-foreground-muted">
+                Once Meta finally gives you the short-lived token from a trusted session, paste it here and the server will exchange and store the long-lived token for you.
+              </p>
+
+              {setupError ? (
+                <div className="mt-4">
+                  <AdminAlert>{setupError}</AdminAlert>
+                </div>
+              ) : null}
+
+              {setupSuccess ? (
+                <div className="mt-4">
+                  <AdminAlert tone="info">{setupSuccess}</AdminAlert>
+                </div>
+              ) : null}
+
+              <form className="mt-4 space-y-4" onSubmit={handleSetupSubmit}>
+                <label className="block text-xs text-foreground-muted">
+                  Short-lived token
+                  <textarea
+                    value={shortLivedToken}
+                    onChange={(event) => setShortLivedToken(event.target.value)}
+                    rows={4}
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)] px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                    placeholder="IGQ..."
+                  />
+                </label>
+
+                <label className="block text-xs text-foreground-muted">
+                  Instagram user ID
+                  <input
+                    value={instagramUserId}
+                    onChange={(event) => setInstagramUserId(event.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)] px-3 py-2 text-sm text-foreground"
+                    style={{ fontSize: "16px" }}
+                    placeholder="17841400..."
+                  />
+                </label>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <AdminButton type="submit" variant="primary" disabled={setupLoading}>
+                    {setupLoading ? "Connecting..." : "Connect Instagram"}
+                  </AdminButton>
+                  <p className="text-xs text-foreground-muted">
+                    The Meta app secret stays on the server via <code className="bg-[var(--sabbia-100)] px-1.5 py-0.5 rounded text-xs">META_APP_SECRET</code>.
+                  </p>
+                </div>
+              </form>
+            </div>
 
             <div className="mt-6 p-4 bg-[var(--sabbia-100)] rounded text-xs font-mono">
               <p className="text-ink-900/60 mb-2">
@@ -647,11 +770,14 @@ export default function AdminInsights() {
 {`{
   "action": "setup",
   "shortLivedToken": "IGQ...",
-  "appSecret": "your-app-secret",
   "instagramUserId": "17841400..."
 }`}
               </pre>
             </div>
+
+            <p className="text-xs text-foreground-muted">
+              The app secret should stay server-side only. Do not paste it into the browser or send it in the request body.
+            </p>
           </div>
 
           {/* Even without IG, show booking-only insights */}
