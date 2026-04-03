@@ -107,27 +107,35 @@ function HomeContent({ flashImages }: { flashImages: FlashPreviewImage[] }) {
           />
           <TattooArtwork
             src="/art/berries/raspberry-02.png"
-            sizes="(max-width: 640px) 24vw, (max-width: 1024px) 16vw, 144px"
+            sizes="(max-width: 640px) 28vw, (max-width: 1024px) 18vw, 168px"
             introDelay={0.12}
             parallax={4}
-            className="-right-10 top-16 h-36 w-[6.5rem] rotate-[12deg] sm:right-0 sm:top-[4.5rem] sm:h-48 sm:w-32 lg:right-12 lg:top-[5.5rem] lg:h-56 lg:w-36"
-            imageClassName="mix-blend-normal object-contain opacity-[0.56]"
+            className="-right-10 top-14 h-44 w-32 rotate-[12deg] sm:right-0 sm:top-[4rem] sm:h-56 sm:w-40 lg:right-10 lg:top-[5rem] lg:h-64 lg:w-44"
+            imageClassName="mix-blend-normal object-contain opacity-[0.62]"
           />
           <TattooArtwork
             src="/art/berries/strawberry-02.png"
-            sizes="(max-width: 640px) 20vw, (max-width: 1024px) 12vw, 112px"
+            sizes="(max-width: 640px) 24vw, (max-width: 1024px) 15vw, 136px"
             introDelay={0.2}
             parallax={3}
-            className="right-2 bottom-[7.5rem] h-24 w-[4.5rem] rotate-[10deg] sm:right-4 sm:bottom-28 sm:h-32 sm:w-[5.5rem] lg:right-20 lg:bottom-[6.5rem] lg:h-40 lg:w-28"
-            imageClassName="mix-blend-normal object-contain opacity-[0.5]"
+            className="right-1 bottom-[7rem] h-32 w-24 rotate-[10deg] sm:right-3 sm:bottom-28 sm:h-40 sm:w-28 lg:right-[4.5rem] lg:bottom-[6rem] lg:h-48 lg:w-32"
+            imageClassName="mix-blend-normal object-contain opacity-[0.56]"
           />
           <TattooArtwork
             src="/art/berries/raspberry-01.png"
-            sizes="(max-width: 640px) 18vw, (max-width: 1024px) 12vw, 104px"
+            sizes="(max-width: 640px) 22vw, (max-width: 1024px) 14vw, 124px"
             introDelay={0.26}
             parallax={3}
-            className="-left-3 bottom-28 h-[5.5rem] w-16 rotate-[18deg] sm:left-4 sm:bottom-28 sm:h-28 sm:w-20 lg:left-20 lg:bottom-24 lg:h-36 lg:w-24"
-            imageClassName="mix-blend-normal object-contain opacity-[0.46]"
+            className="-left-4 bottom-28 h-28 w-20 rotate-[18deg] sm:left-3 sm:bottom-28 sm:h-36 sm:w-24 lg:left-[4.5rem] lg:bottom-24 lg:h-44 lg:w-28"
+            imageClassName="mix-blend-normal object-contain opacity-[0.52]"
+          />
+          <TattooArtwork
+            src="/art/berries/strawberry-01.png"
+            sizes="(max-width: 640px) 20vw, (max-width: 1024px) 14vw, 120px"
+            introDelay={0.34}
+            parallax={2}
+            className="-right-4 bottom-8 h-24 w-[4.5rem] rotate-[-8deg] sm:right-2 sm:bottom-10 sm:h-32 sm:w-24 lg:right-10 lg:bottom-10 lg:h-40 lg:w-28"
+            imageClassName="mix-blend-normal object-contain opacity-[0.42]"
           />
         </div>
 
@@ -323,19 +331,27 @@ function HomeContent({ flashImages }: { flashImages: FlashPreviewImage[] }) {
           />
           <TattooArtwork
             src="/art/berries/strawberry-01.png"
-            sizes="(max-width: 640px) 24vw, (max-width: 1024px) 16vw, 148px"
+            sizes="(max-width: 640px) 28vw, (max-width: 1024px) 18vw, 168px"
             introDelay={0.16}
             parallax={3}
-            className="-right-6 top-8 h-[8.5rem] w-24 rotate-[14deg] sm:right-6 sm:top-10 sm:h-[11.5rem] sm:w-32 lg:right-12 lg:top-12 lg:h-56 lg:w-40"
-            imageClassName="mix-blend-normal object-contain opacity-[0.58]"
+            className="-right-8 top-8 h-40 w-28 rotate-[14deg] sm:right-5 sm:top-10 sm:h-52 sm:w-36 lg:right-10 lg:top-12 lg:h-60 lg:w-44"
+            imageClassName="mix-blend-normal object-contain opacity-[0.64]"
           />
           <TattooArtwork
             src="/art/berries/strawberry-02.png"
-            sizes="(max-width: 640px) 18vw, (max-width: 1024px) 12vw, 100px"
+            sizes="(max-width: 640px) 22vw, (max-width: 1024px) 14vw, 124px"
             introDelay={0.24}
             parallax={2}
-            className="right-10 bottom-10 h-[5.5rem] w-16 rotate-[-12deg] sm:right-12 sm:bottom-12 sm:h-28 sm:w-20 lg:right-28 lg:bottom-14 lg:h-36 lg:w-24"
-            imageClassName="mix-blend-normal object-contain opacity-[0.48]"
+            className="right-8 bottom-10 h-28 w-20 rotate-[-12deg] sm:right-10 sm:bottom-12 sm:h-36 sm:w-24 lg:right-[6.5rem] lg:bottom-14 lg:h-44 lg:w-28"
+            imageClassName="mix-blend-normal object-contain opacity-[0.54]"
+          />
+          <TattooArtwork
+            src="/art/berries/raspberry-02.png"
+            sizes="(max-width: 640px) 20vw, (max-width: 1024px) 14vw, 120px"
+            introDelay={0.3}
+            parallax={2}
+            className="left-2 top-24 h-24 w-[4.5rem] rotate-[-14deg] sm:left-4 sm:top-28 sm:h-32 sm:w-24 lg:left-[4.5rem] lg:top-[7.5rem] lg:h-40 lg:w-28"
+            imageClassName="mix-blend-normal object-contain opacity-[0.44]"
           />
         </div>
 
