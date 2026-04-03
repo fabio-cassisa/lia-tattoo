@@ -7,6 +7,7 @@ import {
   LineDivider,
   CornerOrnament,
 } from "@/components/decorative/TradDivider";
+import { BerrySprig } from "@/components/decorative/BerrySprig";
 import { getAlternates, getWebSiteJsonLd, getLocalBusinessJsonLd } from "@/lib/seo";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -95,22 +96,20 @@ function HomeContent({ flashImages }: { flashImages: FlashPreviewImage[] }) {
           ═══════════════════════════════════════ */}
       <section className="relative flex flex-col items-center justify-center min-h-[90vh] px-4 text-center overflow-hidden">
         <div className="pointer-events-none absolute inset-0 opacity-70" aria-hidden="true">
-          <div className="absolute -left-12 top-16 h-40 w-28 rotate-[-14deg] sm:-left-6 sm:top-20 sm:h-52 sm:w-36 lg:left-6 lg:top-24 lg:h-64 lg:w-44">
-            <Image
-              src="/art/berries/strawberries-together.png"
-              alt=""
-              fill
-              sizes="(max-width: 640px) 112px, (max-width: 1024px) 144px, 176px"
-              className="object-contain opacity-30 mix-blend-multiply"
-            />
-          </div>
+          <BerrySprig
+            variant="strawberry"
+            src="/art/berries/strawberries-together.png"
+            sizes="(max-width: 640px) 112px, (max-width: 1024px) 144px, 176px"
+            loading="eager"
+            className="-left-14 top-12 h-44 w-32 rotate-[-12deg] sm:-left-6 sm:top-[4.5rem] sm:h-[14.5rem] sm:w-40 lg:left-4 lg:top-[5.5rem] lg:h-72 lg:w-48"
+          />
           <div className="absolute -right-12 bottom-24 h-32 w-24 rotate-[10deg] sm:right-2 sm:bottom-28 sm:h-44 sm:w-32 lg:right-10 lg:bottom-24 lg:h-56 lg:w-40">
             <Image
               src="/art/berries/raspberry-02.png"
               alt=""
               fill
               sizes="(max-width: 640px) 96px, (max-width: 1024px) 128px, 160px"
-              className="object-contain opacity-35 mix-blend-multiply"
+              className="object-contain opacity-[0.12] mix-blend-multiply"
             />
           </div>
           <div className="absolute right-8 top-20 hidden h-24 w-16 rotate-[18deg] sm:block lg:right-24 lg:top-24 lg:h-32 lg:w-24">
@@ -119,7 +118,7 @@ function HomeContent({ flashImages }: { flashImages: FlashPreviewImage[] }) {
               alt=""
               fill
               sizes="(max-width: 1024px) 72px, 96px"
-              className="object-contain opacity-25 mix-blend-multiply"
+              className="object-contain opacity-[0.1] mix-blend-multiply"
             />
           </div>
         </div>
@@ -306,22 +305,19 @@ function HomeContent({ flashImages }: { flashImages: FlashPreviewImage[] }) {
       <section className="relative py-14 sm:py-24 px-4 bg-sabbia-100/40">
         <LineDivider className="absolute top-0 left-0 right-0" />
         <div className="pointer-events-none absolute inset-0 opacity-75" aria-hidden="true">
-          <div className="absolute -left-8 bottom-4 h-40 w-28 rotate-[-10deg] sm:left-2 sm:bottom-6 sm:h-52 sm:w-36 lg:left-16 lg:bottom-4 lg:h-64 lg:w-44">
-            <Image
-              src="/art/berries/raspberries-together.png"
-              alt=""
-              fill
-              sizes="(max-width: 640px) 112px, (max-width: 1024px) 144px, 176px"
-              className="object-contain opacity-20 mix-blend-multiply"
-            />
-          </div>
+          <BerrySprig
+            variant="raspberry"
+            src="/art/berries/raspberries-together.png"
+            sizes="(max-width: 640px) 112px, (max-width: 1024px) 144px, 176px"
+            className="-left-10 bottom-1 h-[10.5rem] w-[7.5rem] rotate-[-9deg] sm:left-0 sm:bottom-4 sm:h-56 sm:w-40 lg:left-12 lg:bottom-1 lg:h-[17rem] lg:w-48"
+          />
           <div className="absolute -right-8 top-8 h-28 w-20 rotate-[14deg] sm:right-6 sm:top-10 sm:h-40 sm:w-28 lg:right-20 lg:h-48 lg:w-32">
             <Image
               src="/art/berries/strawberry-01.png"
               alt=""
               fill
               sizes="(max-width: 640px) 80px, (max-width: 1024px) 112px, 128px"
-              className="object-contain opacity-20 mix-blend-multiply"
+              className="object-contain opacity-[0.09] mix-blend-multiply"
             />
           </div>
         </div>
