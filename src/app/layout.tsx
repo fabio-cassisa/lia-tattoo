@@ -6,7 +6,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://lia-tattoo.vercel.
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "liagiorgi.one.ttt — ❋ Traditional Tattoo Artist ❋",
+    default: "liagiorgi.one.ttt — Malmö · Copenhagen based",
     template: "%s | liagiorgi.one.ttt",
   },
   description:
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   authors: [{ name: "liagiorgi.one.ttt" }],
   creator: "liagiorgi.one.ttt",
   openGraph: {
-    title: "liagiorgi.one.ttt — ❋ Traditional Tattoo Artist ❋",
+    title: "liagiorgi.one.ttt — Malmö · Copenhagen based",
     description:
       "Traditional & Old School tattoo art based in Malmö, with selected guest-spot dates in Copenhagen.",
     type: "website",
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "liagiorgi.one.ttt — ❋ Traditional Tattoo Artist ❋",
+    title: "liagiorgi.one.ttt — Malmö · Copenhagen based",
     description:
       "Traditional & Old School tattoo art based in Malmö, with selected guest-spot dates in Copenhagen.",
   },
