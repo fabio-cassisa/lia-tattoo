@@ -27,7 +27,9 @@ export default function ParchmentBackground() {
     const prefersReduced = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches;
-    if (prefersReduced) return;
+    const isCompact = window.matchMedia("(max-width: 767px)").matches;
+    const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
+    if (prefersReduced || isCompact || isCoarsePointer) return;
 
     const ctx = gsap.context(() => {
       if (paperRef.current) {
@@ -92,6 +94,7 @@ export default function ParchmentBackground() {
           backgroundRepeat: "no-repeat",
           backgroundSize: "cover",
           opacity: 0.34,
+          transform: "translateZ(0)",
           mixBlendMode: "multiply",
           maskImage:
             "radial-gradient(circle at center, black 0%, black 42%, rgba(0, 0, 0, 0.82) 58%, transparent 78%)",
@@ -103,7 +106,7 @@ export default function ParchmentBackground() {
       {/* Drift layer — large-scale paper fiber direction */}
       <div
         ref={driftRef}
-        className="absolute inset-0"
+        className="absolute inset-0 hidden md:block"
         style={{
           /* Extend beyond viewport so parallax shift doesn't reveal edges */
           top: "-10%",
@@ -118,7 +121,7 @@ export default function ParchmentBackground() {
       {/* Stain layer — subtle foxing spots / coffee ring marks */}
       <div
         ref={stainRef}
-        className="absolute inset-0"
+        className="absolute inset-0 hidden md:block"
         style={{
           top: "-15%",
           bottom: "-15%",

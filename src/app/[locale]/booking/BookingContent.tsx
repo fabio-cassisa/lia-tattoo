@@ -295,7 +295,7 @@ export default function BookingContent({
                       <span className="w-2 h-2 rounded-full bg-accent" />
                     )}
                   </span>
-                  <span className="text-sm font-medium">
+                  <span className="min-w-0 text-sm font-medium uppercase tracking-[0.08em]">
                     {t(`location.${loc}`)}
                     <span className="mt-1 block text-xs font-normal text-foreground-muted normal-case tracking-normal">
                       {t(`location.${loc}Note`)}

@@ -62,6 +62,8 @@ async function getHomepagePreviewImages(): Promise<FlashPreviewImage[]> {
 }
 
 type HomePageContent = {
+  heroTitle: string;
+  heroSubtitle: string;
   quote: string;
   quoteHighlight: string;
   aboutBio: string;
@@ -70,6 +72,8 @@ type HomePageContent = {
 
 async function getHomepageContent(locale: Locale): Promise<HomePageContent> {
   const content = await getSiteContent([
+    "home_hero_title",
+    "home_hero_subtitle",
     "home_quote",
     "home_quote_highlight",
     "about_bio",
@@ -77,6 +81,8 @@ async function getHomepageContent(locale: Locale): Promise<HomePageContent> {
   ]);
 
   return {
+    heroTitle: resolveSiteContent(content.home_hero_title, locale, ""),
+    heroSubtitle: resolveSiteContent(content.home_hero_subtitle, locale, ""),
     quote: resolveSiteContent(content.home_quote, locale, ""),
     quoteHighlight: resolveSiteContent(content.home_quote_highlight, locale, ""),
     aboutBio: resolveSiteContent(content.about_bio, locale, ""),
@@ -216,12 +222,12 @@ function HomeContent({
 
           {/* Name — Rye is wide, so scale down from Playfair sizes */}
           <h1 className="font-display text-[1.55rem] min-[375px]:text-[2rem] sm:text-5xl lg:text-6xl font-normal text-ink-900 leading-[1]">
-            {t("title")}
+            {content.heroTitle || t("title")}
           </h1>
 
           {/* Subtitle */}
           <p className="text-[0.8rem] sm:text-lg text-foreground-muted uppercase tracking-[0.12em] min-[375px]:tracking-[0.2em] sm:tracking-[0.35em] font-medium">
-            {t("subtitle")}
+            {content.heroSubtitle || t("subtitle")}
           </p>
 
           {/* Decorative star divider */}

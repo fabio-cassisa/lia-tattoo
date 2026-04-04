@@ -39,6 +39,7 @@ export function TattooArtwork({
       "(prefers-reduced-motion: reduce)"
     ).matches;
     const isCompact = window.matchMedia("(max-width: 767px)").matches;
+    const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
 
     const ctx = gsap.context(() => {
       if (prefersReduced) {
@@ -69,7 +70,7 @@ export function TattooArtwork({
         },
       });
 
-      if (parallax > 0) {
+      if (parallax > 0 && !isCompact && !isCoarsePointer) {
         gsap.fromTo(
           art,
           { yPercent: 0 },

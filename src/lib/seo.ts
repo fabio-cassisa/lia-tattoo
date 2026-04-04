@@ -66,7 +66,7 @@ export function getLocalBusinessJsonLd() {
       },
       {
         "@type": "Place",
-        name: "Copenhagen / Good Morning Tattoo studio",
+        name: "Good Morning Tattoo",
         address: {
           "@type": "PostalAddress",
           addressLocality: "Copenhagen",

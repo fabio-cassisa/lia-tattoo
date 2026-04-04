@@ -159,8 +159,11 @@ export type SiteContentKey =
   | "booking_italy_note"
   | "about_italy_note"
   | "about_bio"
+  | "about_profile_image_url"
   | "about_studios_note"
   | "about_travel_note"
+  | "home_hero_title"
+  | "home_hero_subtitle"
   | "home_quote"
   | "home_quote_highlight"
   | "home_booking_cta_subtitle";

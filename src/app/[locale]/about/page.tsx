@@ -30,6 +30,7 @@ export default async function AboutPage({ params }: Props) {
 
   const content = await getSiteContent([
     "about_bio",
+    "about_profile_image_url",
     "about_studios_note",
     "about_travel_note",
     "about_italy_note",
@@ -38,6 +39,7 @@ export default async function AboutPage({ params }: Props) {
   return (
     <AboutContent
       bio={resolveSiteContent(content.about_bio, locale as Locale, "")}
+      profileImageUrl={resolveSiteContent(content.about_profile_image_url, locale as Locale, "")}
       studiosNote={resolveSiteContent(content.about_studios_note, locale as Locale, "")}
       travelNote={resolveSiteContent(content.about_travel_note, locale as Locale, "")}
       italyNote={resolveSiteContent(content.about_italy_note, locale as Locale, "")}
@@ -47,16 +49,19 @@ export default async function AboutPage({ params }: Props) {
 
 function AboutContent({
   bio,
+  profileImageUrl,
   studiosNote,
   travelNote,
   italyNote,
 }: {
   bio: string;
+  profileImageUrl: string;
   studiosNote: string;
   travelNote: string;
   italyNote: string;
 }) {
   const t = useTranslations("about");
+  const tLocations = useTranslations("locations");
 
   return (
     <div className="flex flex-col">
@@ -81,20 +86,18 @@ function AboutContent({
             <CornerOrnament position="bottom-right" />
 
             <div className="relative z-10 flex flex-col gap-6">
-              {/* Photo placeholder */}
-              <div className="w-32 h-32 mx-auto bg-sabbia-100 border border-ink-900/8 flex items-center justify-center">
-                <svg
-                  width="40"
-                  height="40"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  className="text-ink-900/15"
-                >
-                  <path d="M12 2L14.5 8.5L21 12L14.5 15.5L12 22L9.5 15.5L3 12L9.5 8.5L12 2Z" />
-                </svg>
-              </div>
+              {profileImageUrl ? (
+                <div className="mx-auto overflow-hidden rounded-[1.75rem] border border-ink-900/10 bg-sabbia-100 shadow-[0_16px_28px_rgba(26,26,26,0.08)]">
+                  <div className="relative h-44 w-36 sm:h-56 sm:w-44">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={profileImageUrl}
+                      alt="Portrait of Lia Giorgi"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                </div>
+              ) : null}
 
               <p className="text-base text-ink-900 leading-relaxed text-center">
                 {bio || t("bio")}
@@ -139,20 +142,30 @@ function AboutContent({
             {t("findMe")}
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-8">
-            <div className="p-6 border border-ink-900/8 bg-sabbia-50">
-              <h3 className="font-display text-xl font-normal text-ink-900 mb-1">
-                Malmö / Diamant studio
+          <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
+            <div className="rounded-[1.75rem] border border-ink-900/8 bg-sabbia-50 px-6 py-5 text-left shadow-[0_10px_24px_rgba(26,26,26,0.04)]">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="flex h-3 w-3 shrink-0 rounded-full border border-accent/25 bg-accent" />
+                <p className="text-[11px] uppercase tracking-[0.28em] text-foreground-muted">
+                  {tLocations("malmoBadge")}
+                </p>
+              </div>
+              <h3 className="text-lg font-semibold uppercase tracking-[0.08em] text-ink-900">
+                {tLocations("malmo")}
               </h3>
-              <p className="text-sm text-foreground-muted">Malmö, Sweden · resident base</p>
+              <p className="mt-2 text-sm text-foreground-muted">{tLocations("malmoMeta")}</p>
             </div>
-            <div className="p-6 border border-ink-900/8 bg-sabbia-50">
-              <h3 className="font-display text-xl font-normal text-ink-900 mb-1">
-                Copenhagen / Good Morning Tattoo studio
+            <div className="rounded-[1.75rem] border border-ink-900/8 bg-sabbia-50 px-6 py-5 text-left shadow-[0_10px_24px_rgba(26,26,26,0.04)]">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="flex h-3 w-3 shrink-0 rounded-full border border-accent/25 bg-sabbia-50 shadow-[inset_0_0_0_2px_var(--trad-red-500)]" />
+                <p className="text-[11px] uppercase tracking-[0.28em] text-foreground-muted">
+                  {tLocations("copenhagenBadge")}
+                </p>
+              </div>
+              <h3 className="text-lg font-semibold uppercase tracking-[0.08em] text-ink-900">
+                {tLocations("copenhagen")}
               </h3>
-              <p className="text-sm text-foreground-muted">
-                Copenhagen, Denmark · guest spot
-              </p>
+              <p className="mt-2 text-sm text-foreground-muted">{tLocations("copenhagenMeta")}</p>
             </div>
           </div>
 

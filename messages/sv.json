@@ -21,14 +21,18 @@
   },
   "hero": {
     "title": "liagiorgi.one.ttt",
-    "subtitle": "❋ Traditional Tattoo Artist ❋",
+    "subtitle": "Malmö · Copenhagen based",
     "cta": "Boka din tatuering",
     "viewWork": "Se portfolio"
   },
   "locations": {
     "title": "Studior",
-    "malmo": "Malmö / Diamant studio",
-    "copenhagen": "Köpenhamn / Good Morning Tattoo studio"
+    "malmo": "Studio Diamant",
+    "malmoMeta": "Malmö, Sverige",
+    "malmoBadge": "Huvudbas",
+    "copenhagen": "Good Morning Tattoo",
+    "copenhagenMeta": "Köpenhamn, Danmark",
+    "copenhagenBadge": "Guest spot"
   },
   "booking": {
     "title": "Boka tatuering",
@@ -68,10 +72,10 @@
     },
     "location": {
       "label": "Önskad plats",
-      "malmo": "Malmö / Diamant studio",
-      "copenhagen": "Köpenhamn / Good Morning Tattoo studio",
-      "malmoNote": "Huvudbas med regelbunden tillgänglighet och live-val av tider.",
-      "copenhagenNote": "Guest spot-dagar efter överenskommelse för utvalda sessioner i Köpenhamn."
+      "malmo": "Studio Diamant",
+      "copenhagen": "Good Morning Tattoo",
+      "malmoNote": "Malmö, Sverige · huvudbas med regelbunden tillgänglighet och live-val av tider.",
+      "copenhagenNote": "Köpenhamn, Danmark · guest spot-dagar efter överenskommelse för utvalda sessioner."
     },
     "contact": {
       "title": "Kontakt",

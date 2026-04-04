@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
+import { processImageForUpload } from "@/lib/image-processing";
 import { AdminShell, AdminSurface } from "@/components/admin/AdminShell";
 import { AdminAlert, AdminButton, AdminSectionHeading } from "@/components/admin/AdminPrimitives";
 import type { SiteContentKind, SiteContentKey } from "@/lib/supabase/database.types";
@@ -31,14 +32,19 @@ type PortfolioFeatureItem = {
 
 type EditableCopyField = "source_en" | "it_override" | "sv_override" | "da_override";
 
+const CONTENT_FIELD_CLASSNAME =
+  "w-full rounded-2xl border border-[var(--sabbia-200)] bg-white px-4 py-3 text-sm leading-relaxed text-foreground";
+
 export default function AdminContentPage() {
   const router = useRouter();
   const [content, setContent] = useState<SiteContentItem[]>([]);
   const [portfolio, setPortfolio] = useState<PortfolioFeatureItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingAboutImage, setUploadingAboutImage] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const aboutImageInputRef = useRef<HTMLInputElement>(null);
 
   const fetchContent = useCallback(async () => {
     try {
@@ -66,6 +72,10 @@ export default function AdminContentPage() {
   const homepageCandidates = useMemo(
     () => portfolio.filter((item) => item.is_visible).slice(0, 24),
     [portfolio]
+  );
+  const aboutImageItem = useMemo(
+    () => content.find((item) => item.key === "about_profile_image_url"),
+    [content]
   );
 
   function updateContentItem(key: SiteContentKey, field: keyof SiteContentItem, value: string | boolean | null) {
@@ -113,6 +123,46 @@ export default function AdminContentPage() {
         {hint ? <span className="text-xs leading-relaxed text-foreground-muted">{hint}</span> : null}
       </label>
     );
+  }
+
+  async function handleAboutImageUpload(file: File) {
+    setUploadingAboutImage(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const processed = await processImageForUpload(file);
+      const formData = new FormData();
+      formData.append("target", "about_profile_image");
+      formData.append("file", processed.file);
+
+      const response = await fetch("/api/admin/content", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.status === 401) {
+        router.push("/admin/login");
+        return;
+      }
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to upload image");
+
+      if (typeof data.url !== "string") {
+        throw new Error("Upload returned an invalid image URL");
+      }
+
+      updateContentItem("about_profile_image_url", "source_en", data.url);
+      setSuccess("About portrait uploaded. Save changes to publish it.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload image");
+    } finally {
+      setUploadingAboutImage(false);
+      if (aboutImageInputRef.current) {
+        aboutImageInputRef.current.value = "";
+      }
+    }
   }
 
   async function handleSave() {
@@ -188,11 +238,95 @@ export default function AdminContentPage() {
               <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4 text-sm text-foreground-muted">
                 <p className="font-medium text-foreground">Editing scope</p>
                 <p className="mt-1">
-                  Lia manages the English source copy, an optional Italian override, and the homepage feature image picks here.
+                  Lia manages the English source copy, an optional Italian override, the about portrait, and the homepage feature image picks here.
                 </p>
               </div>
 
+              <div className="rounded-2xl border border-[var(--sabbia-200)] p-5">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">About portrait</p>
+                    <p className="mt-1 text-xs text-foreground-muted">
+                      Upload a portrait or paste a direct image URL. This controls the image on the public About page.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      ref={aboutImageInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/heic,.heic"
+                      className="sr-only"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) {
+                          void handleAboutImageUpload(file);
+                        }
+                      }}
+                    />
+                    <AdminButton
+                      type="button"
+                      variant="secondary"
+                      onClick={() => aboutImageInputRef.current?.click()}
+                      disabled={uploadingAboutImage}
+                    >
+                      {uploadingAboutImage ? "Uploading..." : "Upload portrait"}
+                    </AdminButton>
+                    <AdminButton
+                      type="button"
+                      variant="ghost"
+                      onClick={() => updateContentItem("about_profile_image_url", "source_en", "")}
+                      disabled={uploadingAboutImage}
+                    >
+                      Remove image
+                    </AdminButton>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-medium uppercase tracking-[0.15em] text-foreground-muted">
+                      Image URL or uploaded file URL
+                    </span>
+                    <input
+                      value={aboutImageItem?.source_en ?? ""}
+                      onChange={(event) =>
+                        updateContentItem("about_profile_image_url", "source_en", event.target.value)
+                      }
+                      placeholder="https://... or /path/to/image.jpg"
+                      className={CONTENT_FIELD_CLASSNAME}
+                    />
+                    <span className="text-xs leading-relaxed text-foreground-muted">
+                      Uploaded images are stored automatically and pasted here. You can also paste a direct image URL or a relative path.
+                    </span>
+                  </label>
+
+                  <div className="rounded-2xl border border-dashed border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/70 p-4">
+                    {aboutImageItem?.source_en ? (
+                      <div className="space-y-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={aboutImageItem.source_en}
+                          alt="About portrait preview"
+                          className="h-56 w-full rounded-2xl object-cover"
+                        />
+                        <p className="text-xs leading-relaxed text-foreground-muted">
+                          Preview of the public About portrait.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex min-h-[224px] items-center justify-center rounded-2xl border border-dashed border-[var(--sabbia-200)] bg-white text-center text-xs leading-relaxed text-foreground-muted">
+                        No portrait set yet.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {content.map((item) => {
+                if (item.key === "about_profile_image_url") {
+                  return null;
+                }
+
                 const isLongform = item.content_kind === "textarea";
 
                 return (

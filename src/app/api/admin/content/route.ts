@@ -1,6 +1,11 @@
 import { revalidatePath } from "next/cache";
 import { getSupabaseUrl } from "@/lib/supabase/config";
 import { createAdminClient, createServerSupabaseClient } from "@/lib/supabase/server";
+import {
+  buildSiteContentEntry,
+  SITE_CONTENT_DEFINITIONS,
+  SITE_CONTENT_KEYS,
+} from "@/lib/site-content";
 import type {
   SiteContentInsert,
   SiteContentKey,
@@ -38,16 +43,7 @@ function isContentKind(value: unknown): value is SiteContentKind {
 }
 
 function isSiteContentKey(value: unknown): value is SiteContentKey {
-  return [
-    "booking_italy_note",
-    "about_italy_note",
-    "about_bio",
-    "about_studios_note",
-    "about_travel_note",
-    "home_quote",
-    "home_quote_highlight",
-    "home_booking_cta_subtitle",
-  ].includes(String(value));
+  return SITE_CONTENT_KEYS.includes(String(value) as SiteContentKey);
 }
 
 export async function GET() {
@@ -71,8 +67,12 @@ export async function GET() {
     if (contentResult.error) throw contentResult.error;
     if (featuredResult.error) throw featuredResult.error;
 
+    const contentRows = contentResult.data ?? [];
+    const contentMap = new Map(contentRows.map((item) => [item.key as SiteContentKey, item]));
+    const content = SITE_CONTENT_KEYS.map((key) => buildSiteContentEntry(key, contentMap.get(key)));
+
     return Response.json({
-      content: contentResult.data ?? [],
+      content,
       portfolio:
         featuredResult.data?.map((image) => ({
           ...image,
@@ -107,7 +107,7 @@ export async function PATCH(request: Request) {
 
         const payload: SiteContentInsert = {
           key: entry.key,
-          source_en: "",
+          source_en: SITE_CONTENT_DEFINITIONS[entry.key].source_en,
         };
 
         if (getNullableString(entry.title) !== null) payload.title = getNullableString(entry.title);
@@ -175,5 +175,67 @@ export async function PATCH(request: Request) {
   } catch (error) {
     console.error("Site content save error:", error);
     return Response.json({ error: "Failed to save site content" }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  const user = await requireAuth();
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const formData = await request.formData();
+    const file = formData.get("file");
+    const target = formData.get("target");
+
+    if (target !== "about_profile_image") {
+      return Response.json({ error: "Invalid upload target" }, { status: 400 });
+    }
+
+    if (!(file instanceof File)) {
+      return Response.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    const isHeicByExt = ext === "heic" || ext === "heif";
+    if (!allowedTypes.includes(file.type) && !isHeicByExt) {
+      return Response.json(
+        { error: "Invalid file type. Use JPEG, PNG, WebP, or HEIC." },
+        { status: 400 }
+      );
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      return Response.json({ error: "File too large (max 10MB)" }, { status: 400 });
+    }
+
+    const rawExt = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const storageExt = rawExt === "heic" || rawExt === "heif" ? "jpg" : rawExt;
+    const storagePath = `site-content/about/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${storageExt}`;
+
+    const admin = createAdminClient();
+    const arrayBuffer = await file.arrayBuffer();
+    const { error: uploadError } = await admin.storage
+      .from("portfolio")
+      .upload(storagePath, arrayBuffer, {
+        contentType: file.type,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error("Site content upload error:", uploadError);
+      return Response.json({ error: "Upload failed" }, { status: 500 });
+    }
+
+    const supabaseUrl = getSupabaseUrl();
+    return Response.json({
+      url: `${supabaseUrl}/storage/v1/object/public/portfolio/${storagePath}`,
+      storagePath,
+    });
+  } catch (error) {
+    console.error("Site content upload failed:", error);
+    return Response.json({ error: "Failed to upload image" }, { status: 500 });
   }
 }

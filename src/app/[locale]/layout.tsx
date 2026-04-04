@@ -7,7 +7,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import ParchmentBackground from "@/components/ParchmentBackground";
+import ParchmentBackgroundClientOnly from "@/components/ParchmentBackgroundClientOnly";
 
 const rye = Rye({
   variable: "--font-display",
@@ -58,7 +58,7 @@ export default async function LocaleLayout({ children, params }: Props) {
   return (
     <html lang={locale} className={`${rye.variable} ${lora.variable}`}>
       <body className="min-h-screen bg-background text-foreground">
-        <ParchmentBackground />
+        <ParchmentBackgroundClientOnly />
         <NextIntlClientProvider>
           <div className="relative z-10 flex flex-col min-h-screen">
             <Header />
