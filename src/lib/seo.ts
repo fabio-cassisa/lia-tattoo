@@ -34,7 +34,7 @@ export function getWebSiteJsonLd() {
     alternateName: "Lia Giorgi Tattoo",
     url: SITE_URL,
     description:
-      "Traditional & Old School tattoo art. Book your session in Malmö or Copenhagen.",
+      "Traditional & Old School tattoo art based in Malmö, with selected guest-spot dates in Copenhagen.",
     inLanguage: ["en", "sv", "it", "da"],
   };
 }
@@ -66,7 +66,7 @@ export function getLocalBusinessJsonLd() {
       },
       {
         "@type": "Place",
-        name: "Good Morning Tattoo",
+        name: "Copenhagen / Good Morning Tattoo studio",
         address: {
           "@type": "PostalAddress",
           addressLocality: "Copenhagen",

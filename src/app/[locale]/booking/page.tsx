@@ -1,6 +1,8 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import BookingContent from "./BookingContent";
+import type { Locale } from "@/i18n/routing";
 import { getAlternates } from "@/lib/seo";
+import { getSiteContent, resolveSiteContent } from "@/lib/site-content";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -21,5 +23,11 @@ export default async function BookingPage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
 
-  return <BookingContent />;
+  const content = await getSiteContent(["booking_italy_note"]);
+
+  return (
+    <BookingContent
+      italyNote={resolveSiteContent(content.booking_italy_note, locale as Locale, "")}
+    />
+  );
 }

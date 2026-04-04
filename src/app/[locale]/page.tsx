@@ -8,7 +8,10 @@ import {
   CornerOrnament,
 } from "@/components/decorative/TradDivider";
 import { TattooArtwork } from "@/components/decorative/TattooArtwork";
+import type { Locale } from "@/i18n/routing";
 import { getAlternates, getWebSiteJsonLd, getLocalBusinessJsonLd } from "@/lib/seo";
+import { getSiteContent, resolveSiteContent } from "@/lib/site-content";
+import { getSupabaseUrl } from "@/lib/supabase/config";
 import { createAdminClient } from "@/lib/supabase/server";
 
 export const revalidate = 60; // ISR — revalidate every 60 seconds
@@ -22,19 +25,31 @@ type FlashPreviewImage = {
 async function getHomepagePreviewImages(): Promise<FlashPreviewImage[]> {
   try {
     const admin = createAdminClient();
-    const { data, error } = await admin
+    const featuredResult = await admin
+      .from("portfolio_images")
+      .select("id, title, storage_path")
+      .eq("is_visible", true)
+      .eq("featured_on_homepage", true)
+      .order("display_order", { ascending: true })
+      .order("created_at", { ascending: false })
+      .limit(8);
+
+    const fallbackResult = await admin
       .from("portfolio_images")
       .select("id, title, storage_path")
       .eq("is_visible", true)
       .order("created_at", { ascending: false })
       .limit(8);
 
+    const useFallback = Boolean(featuredResult.error) || (featuredResult.data?.length ?? 0) === 0;
+    const { data, error } = useFallback ? fallbackResult : featuredResult;
+
     if (error) {
       console.error("Homepage preview fetch error:", error);
       return [];
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseUrl = getSupabaseUrl();
     return (data ?? []).map((img) => ({
       id: img.id,
       title: img.title,
@@ -44,6 +59,29 @@ async function getHomepagePreviewImages(): Promise<FlashPreviewImage[]> {
     console.error("Homepage preview fetch failed:", err);
     return [];
   }
+}
+
+type HomePageContent = {
+  quote: string;
+  quoteHighlight: string;
+  aboutBio: string;
+  bookingSubtitle: string;
+};
+
+async function getHomepageContent(locale: Locale): Promise<HomePageContent> {
+  const content = await getSiteContent([
+    "home_quote",
+    "home_quote_highlight",
+    "about_bio",
+    "home_booking_cta_subtitle",
+  ]);
+
+  return {
+    quote: resolveSiteContent(content.home_quote, locale, ""),
+    quoteHighlight: resolveSiteContent(content.home_quote_highlight, locale, ""),
+    aboutBio: resolveSiteContent(content.about_bio, locale, ""),
+    bookingSubtitle: resolveSiteContent(content.home_booking_cta_subtitle, locale, ""),
+  };
 }
 
 type Props = {
@@ -65,12 +103,21 @@ export default async function HomePage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const flashImages = await getHomepagePreviewImages();
+  const [flashImages, content] = await Promise.all([
+    getHomepagePreviewImages(),
+    getHomepageContent(locale as Locale),
+  ]);
 
-  return <HomeContent flashImages={flashImages} />;
+  return <HomeContent flashImages={flashImages} content={content} />;
 }
 
-function HomeContent({ flashImages }: { flashImages: FlashPreviewImage[] }) {
+function HomeContent({
+  flashImages,
+  content,
+}: {
+  flashImages: FlashPreviewImage[];
+  content: HomePageContent;
+}) {
   const t = useTranslations("hero");
   const tHome = useTranslations("home");
   const tAbout = useTranslations("about");
@@ -361,13 +408,13 @@ function HomeContent({ flashImages }: { flashImages: FlashPreviewImage[] }) {
           </p>
 
           <blockquote className="font-display text-2xl sm:text-3xl lg:text-4xl font-normal text-ink-900 leading-snug mb-8">
-            &ldquo;{tHome("quote")}
+            &ldquo;{content.quote || tHome("quote")}
             <br />
-            <span className="text-accent">{tHome("quoteHighlight")}</span>&rdquo;
+            <span className="text-accent">{content.quoteHighlight || tHome("quoteHighlight")}</span>&rdquo;
           </blockquote>
 
           <p className="text-base text-foreground-muted max-w-xl mx-auto leading-relaxed mb-8">
-            {tAbout("bio")}
+            {content.aboutBio || tAbout("bio")}
           </p>
 
           <TradDivider className="w-32 mx-auto mb-8" />
@@ -410,7 +457,7 @@ function HomeContent({ flashImages }: { flashImages: FlashPreviewImage[] }) {
           </h2>
 
           <p className="text-sabbia-200 text-base leading-relaxed">
-            {tBooking("subtitle")}
+            {content.bookingSubtitle || tBooking("subtitle")}
           </p>
 
           <Link

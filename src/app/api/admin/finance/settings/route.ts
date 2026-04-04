@@ -1,4 +1,5 @@
 import { createAdminClient, createServerSupabaseClient } from "@/lib/supabase/server";
+import { normalizeContextLabel } from "@/lib/finance/config";
 import type {
   FinanceCurrency,
   FinanceSettingsRow,
@@ -21,8 +22,9 @@ function isFinanceWorkContext(value: unknown): value is FinanceWorkContext {
   return [
     "malmo_studio",
     "copenhagen_studio",
-    "guest_spot",
     "private_home",
+    "torino_studio",
+    "guest_spot",
   ].includes(String(value));
 }
 
@@ -72,7 +74,11 @@ async function buildSettingsResponse(admin = createAdminClient()): Promise<Finan
   if (fixedCostsResult.error) throw fixedCostsResult.error;
 
   return {
-    context_settings: contextResult.data ?? [],
+    context_settings:
+      contextResult.data?.map((context) => ({
+        ...context,
+        label: normalizeContextLabel(context.context, context.label) ?? context.label,
+      })) ?? [],
     settings: settingsResult.data as FinanceSettingsRow,
     fixed_costs: fixedCostsResult.data ?? [],
   };

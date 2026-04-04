@@ -3,8 +3,13 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { processImageForUpload, formatFileSize } from "@/lib/image-processing";
-import { AdminShell, AdminSurface } from "@/components/admin/AdminShell";
-import { AdminAlert } from "@/components/admin/AdminPrimitives";
+import {
+  AdminEmptyState,
+  AdminMetricCard,
+  AdminShell,
+  AdminSurface,
+} from "@/components/admin/AdminShell";
+import { AdminAlert, AdminButton, AdminSectionHeading } from "@/components/admin/AdminPrimitives";
 
 type PortfolioImage = {
   id: string;
@@ -25,6 +30,16 @@ type UploadItem = {
   finalSize?: number;
 };
 
+const PORTFOLIO_FIELD_CLASSNAME =
+  "w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground";
+const PORTFOLIO_CARD_ACTION_CLASSNAME =
+  "inline-flex min-h-[36px] items-center justify-center rounded-full border border-[var(--sabbia-200)] px-3 py-1.5 text-xs text-foreground-muted transition-colors hover:bg-[var(--sabbia-100)] disabled:opacity-30";
+const CATEGORY_LABELS = {
+  all: "All",
+  flash: "Flash",
+  completed: "Completed",
+} as const;
+
 export default function AdminPortfolio() {
   const router = useRouter();
   const [images, setImages] = useState<PortfolioImage[]>([]);
@@ -41,6 +56,7 @@ export default function AdminPortfolio() {
   const [isDragOver, setIsDragOver] = useState(false);
 
   const fetchImages = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await fetch("/api/admin/portfolio");
       if (res.status === 401) { router.push("/admin/login"); return; }
@@ -244,6 +260,9 @@ export default function AdminPortfolio() {
     categoryFilter === "all"
       ? images
       : images.filter((img) => img.category === categoryFilter);
+  const visibleCount = images.filter((img) => img.is_visible).length;
+  const flashCount = images.filter((img) => img.category === "flash").length;
+  const completedCount = images.filter((img) => img.category === "completed").length;
 
   return (
     <AdminShell
@@ -251,271 +270,316 @@ export default function AdminPortfolio() {
       description="Upload, sort, and curate Lia’s work in one place so the public site stays fresh without turning admin into a chore."
       activeTab="portfolio"
       maxWidth="wide"
+      actions={
+        <>
+          <AdminButton type="button" variant="secondary" onClick={fetchImages}>
+            Refresh
+          </AdminButton>
+          <AdminButton
+            type="button"
+            variant="primary"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Choose images
+          </AdminButton>
+        </>
+      }
     >
-
-      {/* Error */}
-      {error && (
-        <div className="mb-4">
+      <div className="space-y-6">
+        {error ? (
           <AdminAlert>
             {error}
             <button onClick={() => setError("")} className="ml-2 underline">dismiss</button>
           </AdminAlert>
-        </div>
-      )}
+        ) : null}
 
-      {/* Upload section */}
-      <AdminSurface className="mb-6">
-        <p className="text-sm font-medium text-foreground mb-3">Upload images</p>
-
-        {/* Category selector */}
-        <div className="mb-3">
-          <label className="block text-xs text-foreground-muted mb-1">Category</label>
-          <select
-            value={uploadCategory}
-            onChange={(e) => setUploadCategory(e.target.value as "flash" | "completed")}
-            className="px-3 py-2 border border-[var(--sabbia-200)] rounded text-sm bg-white text-foreground"
-            style={{ fontSize: "16px" }}
-          >
-            <option value="flash">Flash Designs</option>
-            <option value="completed">Completed Work</option>
-          </select>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <AdminMetricCard label="Total images" value={images.length} detail="Everything in the portfolio library" />
+          <AdminMetricCard label="Visible" value={visibleCount} detail="Shown on the public site" tone={visibleCount > 0 ? "accent" : "default"} />
+          <AdminMetricCard label="Flash" value={flashCount} detail="Bookable flash designs" />
+          <AdminMetricCard label="Completed" value={completedCount} detail="Finished tattoo work" />
         </div>
 
-        {/* Drag & drop zone */}
-        <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => !uploading && fileInputRef.current?.click()}
-          className={`relative border-2 border-dashed rounded-lg p-6 sm:p-8 text-center cursor-pointer transition-colors ${
-            isDragOver
-              ? "border-[var(--trad-red-500)] bg-red-50/30"
-              : "border-[var(--sabbia-300)] hover:border-[var(--ink-900)]/30 hover:bg-[var(--sabbia-50)]"
-          } ${uploading ? "pointer-events-none opacity-60" : ""}`}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
-            multiple
-            onChange={(e) => e.target.files && handleUpload(e.target.files)}
-            className="hidden"
-            id="portfolio-upload"
+        <AdminSurface>
+          <AdminSectionHeading
+            title="Upload images"
+            description="Process, compress, and drop new work into the portfolio without having to think about file prep every single time."
           />
 
-          <div className="flex flex-col items-center gap-2">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-foreground-muted">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
-            </svg>
-            <p className="text-sm text-foreground">
-              {uploading ? "Processing..." : "Drop images here or tap to choose"}
-            </p>
-            <p className="text-xs text-foreground-muted">
-              JPEG, PNG, WebP, or HEIC (iPhone photos) — auto-optimized before upload
-            </p>
-          </div>
-        </div>
-
-        {/* Upload progress queue */}
-        {uploadQueue.length > 0 && (
-          <div className="mt-3 space-y-1.5">
-            {uploadQueue.map((item, idx) => (
-              <div
-                key={idx}
-                className={`flex items-center gap-2 px-3 py-2 rounded text-xs ${
-                  item.status === "done"
-                    ? "bg-green-50 text-green-700"
-                    : item.status === "error"
-                      ? "bg-red-50 text-red-700"
-                      : "bg-[var(--sabbia-50)] text-foreground-muted"
-                }`}
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,220px)_minmax(0,1fr)] lg:items-start">
+            <label className="text-sm text-foreground-muted">
+              Upload category
+              <select
+                value={uploadCategory}
+                onChange={(event) => setUploadCategory(event.target.value as "flash" | "completed")}
+                className={`mt-1 min-h-[44px] ${PORTFOLIO_FIELD_CLASSNAME}`}
+                style={{ fontSize: "16px" }}
               >
-                {/* Status icon */}
-                {item.status === "done" ? (
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M3 8l3.5 3.5L13 5" />
-                  </svg>
-                ) : item.status === "error" ? (
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M4 4l8 8M12 4l-8 8" />
-                  </svg>
-                ) : (
-                  <svg width="14" height="14" viewBox="0 0 16 16" className="animate-spin" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M8 2a6 6 0 015.5 8.5" />
-                  </svg>
-                )}
+                <option value="flash">Flash designs</option>
+                <option value="completed">Completed work</option>
+              </select>
+            </label>
 
-                <span className="truncate flex-1 font-medium">{item.name}</span>
-                <span className="whitespace-nowrap">{item.message}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Upload specs */}
-        <div className="mt-4 p-3 bg-[var(--sabbia-50)] border border-[var(--sabbia-200)] rounded text-xs text-foreground-muted space-y-1">
-          <p className="font-medium text-foreground text-[11px] uppercase tracking-wider mb-1.5">Image specs</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
-            <p><span className="font-medium text-foreground">Formats:</span> JPEG, PNG, WebP, HEIC</p>
-            <p><span className="font-medium text-foreground">Max file size:</span> 10 MB per image</p>
-            <p><span className="font-medium text-foreground">Best size:</span> 1200 x 1200 px (square)</p>
-            <p><span className="font-medium text-foreground">Min recommended:</span> 800 x 800 px</p>
-            <p><span className="font-medium text-foreground">iPhone photos:</span> HEIC auto-converted to JPEG</p>
-            <p><span className="font-medium text-foreground">Auto-optimization:</span> Large images resized & compressed</p>
-          </div>
-        </div>
-      </AdminSurface>
-
-      {/* Filter tabs */}
-      <div className="flex gap-2 mb-4">
-        {(["all", "flash", "completed"] as const).map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setCategoryFilter(cat)}
-            className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
-              categoryFilter === cat
-                ? "bg-[var(--ink-900)] text-[var(--sabbia-50)]"
-                : "bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)]"
-            }`}
-          >
-            {cat === "all" ? `All (${images.length})` : cat === "flash" ? `Flash (${images.filter(i => i.category === "flash").length})` : `Completed (${images.filter(i => i.category === "completed").length})`}
-          </button>
-        ))}
-      </div>
-
-      {/* Image grid */}
-      {loading ? (
-        <p className="text-sm text-foreground-muted py-8 text-center">Loading...</p>
-      ) : filteredImages.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-sm text-foreground-muted">
-            {images.length === 0 ? "No images yet — upload some above!" : "No images in this category."}
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-          {filteredImages.map((img, idx) => (
             <div
-              key={img.id}
-              className={`relative group bg-white border rounded overflow-hidden ${
-                !img.is_visible ? "opacity-50" : ""
-              } ${editingId === img.id ? "border-[var(--trad-red-500)]" : "border-[var(--sabbia-200)]"}`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => !uploading && fileInputRef.current?.click()}
+              className={`relative cursor-pointer rounded-3xl border-2 border-dashed p-6 text-center transition-colors sm:p-8 ${
+                isDragOver
+                  ? "border-[var(--trad-red-500)] bg-red-50/30"
+                  : "border-[var(--sabbia-300)] hover:border-[var(--ink-900)]/30 hover:bg-[var(--sabbia-50)]"
+              } ${uploading ? "pointer-events-none opacity-60" : ""}`}
             >
-              {/* Image */}
-              <div className="aspect-square relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={img.url}
-                  alt={img.title || "Portfolio image"}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-                {/* Hidden badge */}
-                {!img.is_visible && (
-                  <div className="absolute top-2 left-2 px-1.5 py-0.5 text-[10px] bg-gray-800 text-white rounded">
-                    Hidden
-                  </div>
-                )}
-                {/* Category badge */}
-                <div className="absolute top-2 right-2 px-1.5 py-0.5 text-[10px] bg-black/60 text-white rounded">
-                  {img.category === "flash" ? "Flash" : "Done"}
-                </div>
-              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+                multiple
+                onChange={(event) => event.target.files && handleUpload(event.target.files)}
+                className="hidden"
+                id="portfolio-upload"
+              />
 
-              {/* Controls — always visible on mobile, hover on desktop */}
-              <div className="p-2 border-t border-[var(--sabbia-200)]">
-                {editingId === img.id ? (
-                  /* Edit mode */
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      placeholder="Title (optional)"
-                      className="w-full px-2 py-1 border border-[var(--sabbia-200)] rounded text-xs bg-white"
-                      style={{ fontSize: "16px" }}
-                    />
-                    <select
-                      value={editCategory}
-                      onChange={(e) => setEditCategory(e.target.value as "flash" | "completed")}
-                      className="w-full px-2 py-1 border border-[var(--sabbia-200)] rounded text-xs bg-white"
-                      style={{ fontSize: "16px" }}
-                    >
-                      <option value="flash">Flash</option>
-                      <option value="completed">Completed</option>
-                    </select>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handleUpdate(img.id, { title: editTitle || null, category: editCategory })}
-                        className="flex-1 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => setEditingId(null)}
-                        className="flex-1 py-1 text-xs border border-[var(--sabbia-200)] text-foreground-muted rounded hover:bg-[var(--sabbia-100)]"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  /* Display mode */
-                  <div>
-                    {img.title && (
-                      <p className="text-xs text-foreground truncate mb-1">{img.title}</p>
-                    )}
-                    <div className="flex gap-1 flex-wrap">
-                      {/* Move buttons */}
-                      <button
-                        onClick={() => handleMove(img.id, "up")}
-                        disabled={idx === 0}
-                        className="px-1.5 py-0.5 text-[10px] border border-[var(--sabbia-200)] rounded text-foreground-muted hover:bg-[var(--sabbia-100)] disabled:opacity-30"
-                        title="Move left"
-                      >
-                        &larr;
-                      </button>
-                      <button
-                        onClick={() => handleMove(img.id, "down")}
-                        disabled={idx === filteredImages.length - 1}
-                        className="px-1.5 py-0.5 text-[10px] border border-[var(--sabbia-200)] rounded text-foreground-muted hover:bg-[var(--sabbia-100)] disabled:opacity-30"
-                        title="Move right"
-                      >
-                        &rarr;
-                      </button>
-                      {/* Edit */}
-                      <button
-                        onClick={() => {
-                          setEditingId(img.id);
-                          setEditTitle(img.title || "");
-                          setEditCategory(img.category);
-                        }}
-                        className="px-1.5 py-0.5 text-[10px] border border-[var(--sabbia-200)] rounded text-foreground-muted hover:bg-[var(--sabbia-100)]"
-                      >
-                        Edit
-                      </button>
-                      {/* Toggle visibility */}
-                      <button
-                        onClick={() => handleUpdate(img.id, { is_visible: !img.is_visible })}
-                        className="px-1.5 py-0.5 text-[10px] border border-[var(--sabbia-200)] rounded text-foreground-muted hover:bg-[var(--sabbia-100)]"
-                      >
-                        {img.is_visible ? "Hide" : "Show"}
-                      </button>
-                      {/* Delete */}
-                      <button
-                        onClick={() => handleDelete(img.id)}
-                        className="px-1.5 py-0.5 text-[10px] border border-red-300 rounded text-red-600 hover:bg-red-50"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                )}
+              <div className="flex flex-col items-center gap-3">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-foreground-muted">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+                </svg>
+                <p className="text-sm font-medium text-foreground">
+                  {uploading ? "Processing images..." : "Drop images here or tap to choose"}
+                </p>
+                <p className="max-w-md text-xs leading-relaxed text-foreground-muted">
+                  JPEG, PNG, WebP, or HEIC. Large files are auto-optimized before upload so the public site stays fast.
+                </p>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+
+          {uploadQueue.length > 0 ? (
+            <div className="mt-4 space-y-2">
+              {uploadQueue.map((item, index) => (
+                <div
+                  key={index}
+                  className={`flex items-center gap-2 rounded-2xl px-3 py-2 text-xs ${
+                    item.status === "done"
+                      ? "bg-green-50 text-green-700"
+                      : item.status === "error"
+                        ? "bg-red-50 text-red-700"
+                        : "bg-[var(--sabbia-50)] text-foreground-muted"
+                  }`}
+                >
+                  {item.status === "done" ? (
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M3 8l3.5 3.5L13 5" />
+                    </svg>
+                  ) : item.status === "error" ? (
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M4 4l8 8M12 4l-8 8" />
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 16 16" className="animate-spin" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M8 2a6 6 0 015.5 8.5" />
+                    </svg>
+                  )}
+
+                  <span className="flex-1 truncate font-medium">{item.name}</span>
+                  <span className="whitespace-nowrap">{item.message}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="mt-4 rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4 text-xs text-foreground-muted">
+            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-foreground">Image specs</p>
+            <div className="mt-3 grid gap-x-6 gap-y-1 sm:grid-cols-2">
+              <p><span className="font-medium text-foreground">Formats:</span> JPEG, PNG, WebP, HEIC</p>
+              <p><span className="font-medium text-foreground">Max file size:</span> 10 MB per image</p>
+              <p><span className="font-medium text-foreground">Best size:</span> 1200 x 1200 px square</p>
+              <p><span className="font-medium text-foreground">Min recommended:</span> 800 x 800 px</p>
+              <p><span className="font-medium text-foreground">iPhone photos:</span> HEIC auto-converts to JPEG</p>
+              <p><span className="font-medium text-foreground">Auto-optimization:</span> Large images get resized and compressed</p>
+            </div>
+          </div>
+        </AdminSurface>
+
+        <AdminSurface>
+          <AdminSectionHeading
+            title="Library"
+            description="Sort the gallery by type, then quickly rename, hide, reorder, or delete pieces without leaving the page."
+          />
+
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {(["all", "flash", "completed"] as const).map((category) => {
+              const count =
+                category === "all"
+                  ? images.length
+                  : category === "flash"
+                    ? flashCount
+                    : completedCount;
+
+              return (
+                <button
+                  key={category}
+                  onClick={() => setCategoryFilter(category)}
+                  className={`inline-flex min-h-[36px] shrink-0 items-center rounded-full px-3 py-1.5 text-xs transition-colors ${
+                    categoryFilter === category
+                      ? "bg-[var(--ink-900)] text-[var(--sabbia-50)]"
+                      : "bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)]"
+                  }`}
+                >
+                  {CATEGORY_LABELS[category]} ({count})
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-5">
+            {loading ? (
+              <AdminEmptyState
+                title="Loading portfolio"
+                description="Pulling the current library so you can reorder or clean it up without guessing."
+              />
+            ) : filteredImages.length === 0 ? (
+              <AdminEmptyState
+                title={images.length === 0 ? "No images yet" : "Nothing in this filter"}
+                description={
+                  images.length === 0
+                    ? "Upload the first set above and the library will start taking shape here."
+                    : "Try another filter or upload more work in this category."
+                }
+              />
+            ) : (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                {filteredImages.map((img, idx) => (
+                  <div
+                    key={img.id}
+                    className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition-colors ${
+                      !img.is_visible ? "opacity-60" : ""
+                    } ${editingId === img.id ? "border-[var(--trad-red-500)]" : "border-[var(--sabbia-200)]"}`}
+                  >
+                    <div className="relative aspect-square">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={img.url}
+                        alt={img.title || "Portfolio image"}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+
+                      {!img.is_visible ? (
+                        <div className="absolute left-2 top-2 rounded-full bg-gray-800 px-2 py-1 text-[10px] text-white">
+                          Hidden
+                        </div>
+                      ) : null}
+
+                      <div className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-1 text-[10px] text-white">
+                        {img.category === "flash" ? "Flash" : "Completed"}
+                      </div>
+                    </div>
+
+                    <div className="border-t border-[var(--sabbia-200)] p-3">
+                      {editingId === img.id ? (
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={editTitle}
+                            onChange={(event) => setEditTitle(event.target.value)}
+                            placeholder="Title (optional)"
+                            className={`${PORTFOLIO_FIELD_CLASSNAME} min-h-[40px] text-xs`}
+                            style={{ fontSize: "16px" }}
+                          />
+                          <select
+                            value={editCategory}
+                            onChange={(event) => setEditCategory(event.target.value as "flash" | "completed")}
+                            className={`${PORTFOLIO_FIELD_CLASSNAME} min-h-[40px] text-xs`}
+                            style={{ fontSize: "16px" }}
+                          >
+                            <option value="flash">Flash</option>
+                            <option value="completed">Completed</option>
+                          </select>
+                          <div className="flex gap-2">
+                            <AdminButton
+                              type="button"
+                              variant="primary"
+                              className="flex-1"
+                              onClick={() => handleUpdate(img.id, { title: editTitle || null, category: editCategory })}
+                            >
+                              Save
+                            </AdminButton>
+                            <AdminButton
+                              type="button"
+                              variant="ghost"
+                              className="flex-1"
+                              onClick={() => setEditingId(null)}
+                            >
+                              Cancel
+                            </AdminButton>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="truncate text-xs font-medium text-foreground">
+                            {img.title || "Untitled"}
+                          </p>
+                          <p className="mt-1 text-[11px] text-foreground-muted">
+                            Position {idx + 1} in {CATEGORY_LABELS[categoryFilter === "all" ? img.category : categoryFilter].toLowerCase()}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleMove(img.id, "up")}
+                              disabled={idx === 0}
+                              className={PORTFOLIO_CARD_ACTION_CLASSNAME}
+                              title="Move left"
+                            >
+                              Left
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleMove(img.id, "down")}
+                              disabled={idx === filteredImages.length - 1}
+                              className={PORTFOLIO_CARD_ACTION_CLASSNAME}
+                              title="Move right"
+                            >
+                              Right
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingId(img.id);
+                                setEditTitle(img.title || "");
+                                setEditCategory(img.category);
+                              }}
+                              className={PORTFOLIO_CARD_ACTION_CLASSNAME}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdate(img.id, { is_visible: !img.is_visible })}
+                              className={PORTFOLIO_CARD_ACTION_CLASSNAME}
+                            >
+                              {img.is_visible ? "Hide" : "Show"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(img.id)}
+                              className="inline-flex min-h-[36px] items-center justify-center rounded-full border border-red-300 px-3 py-1.5 text-xs text-red-600 transition-colors hover:bg-red-50"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </AdminSurface>
+      </div>
     </AdminShell>
   );
 }

@@ -5,6 +5,7 @@ import {
   LineDivider,
 } from "@/components/decorative/TradDivider";
 import { PortfolioGrid } from "@/components/PortfolioGrid";
+import { getSupabaseUrl } from "@/lib/supabase/config";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getAlternates } from "@/lib/seo";
 
@@ -31,7 +32,7 @@ async function getPortfolioImages(): Promise<PortfolioImage[]> {
     return [];
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseUrl = getSupabaseUrl();
   return (data ?? []).map((img) => ({
     id: img.id,
     title: img.title,

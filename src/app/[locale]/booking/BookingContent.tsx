@@ -15,7 +15,11 @@ const MAX_FILES = 5;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
 
-export default function BookingContent() {
+export default function BookingContent({
+  italyNote,
+}: {
+  italyNote?: string;
+}) {
   const t = useTranslations("booking");
   const [formData, setFormData] = useState({
     type: "",
@@ -293,10 +297,16 @@ export default function BookingContent() {
                   </span>
                   <span className="text-sm font-medium">
                     {t(`location.${loc}`)}
+                    <span className="mt-1 block text-xs font-normal text-foreground-muted normal-case tracking-normal">
+                      {t(`location.${loc}Note`)}
+                    </span>
                   </span>
                 </label>
               ))}
             </div>
+            <p className="text-sm text-foreground-muted leading-relaxed">
+              {italyNote || t("italyNote")}
+            </p>
           </fieldset>
 
           <LineDivider className="max-w-xs mx-auto" />

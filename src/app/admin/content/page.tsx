@@ -1,0 +1,293 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
+import { AdminShell, AdminSurface } from "@/components/admin/AdminShell";
+import { AdminAlert, AdminButton, AdminSectionHeading } from "@/components/admin/AdminPrimitives";
+import type { SiteContentKind, SiteContentKey } from "@/lib/supabase/database.types";
+
+type SiteContentItem = {
+  key: SiteContentKey;
+  title: string | null;
+  description: string | null;
+  source_en: string;
+  it_override: string | null;
+  sv_override: string | null;
+  da_override: string | null;
+  content_kind: SiteContentKind;
+  is_active: boolean;
+};
+
+type PortfolioFeatureItem = {
+  id: string;
+  title: string | null;
+  category: "flash" | "completed";
+  storage_path: string;
+  url: string;
+  display_order: number;
+  is_visible: boolean;
+  featured_on_homepage: boolean;
+};
+
+type EditableCopyField = "source_en" | "it_override" | "sv_override" | "da_override";
+
+export default function AdminContentPage() {
+  const router = useRouter();
+  const [content, setContent] = useState<SiteContentItem[]>([]);
+  const [portfolio, setPortfolio] = useState<PortfolioFeatureItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const fetchContent = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/content");
+      if (res.status === 401) {
+        router.push("/admin/login");
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load content");
+      setContent(data.content);
+      setPortfolio(data.portfolio);
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load content");
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    fetchContent();
+  }, [fetchContent]);
+
+  const homepageCandidates = useMemo(
+    () => portfolio.filter((item) => item.is_visible).slice(0, 24),
+    [portfolio]
+  );
+
+  function updateContentItem(key: SiteContentKey, field: keyof SiteContentItem, value: string | boolean | null) {
+    setContent((current) =>
+      current.map((item) => (item.key === key ? { ...item, [field]: value } : item))
+    );
+  }
+
+  function toggleHomepageFeatured(id: string) {
+    setPortfolio((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, featured_on_homepage: !item.featured_on_homepage } : item
+      )
+    );
+  }
+
+  function renderTextControl(
+    item: SiteContentItem,
+    field: EditableCopyField,
+    label: string,
+    backgroundClassName: string,
+    rows = 5,
+    hint?: string
+  ) {
+    const value = item[field] ?? "";
+    const sharedClassName = `w-full rounded-2xl border border-[var(--sabbia-200)] px-4 py-3 text-sm leading-relaxed text-foreground ${backgroundClassName}`;
+    const handleChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const nextValue = event.target.value;
+      updateContentItem(item.key, field, field === "source_en" ? nextValue : nextValue || null);
+    };
+
+    return (
+      <label className="flex flex-col gap-2">
+        <span className="text-xs font-medium uppercase tracking-[0.15em] text-foreground-muted">{label}</span>
+        {item.content_kind === "textarea" ? (
+          <textarea
+            value={value}
+            onChange={handleChange}
+            rows={rows}
+            className={`${sharedClassName} min-h-[168px] resize-y`}
+          />
+        ) : (
+          <input value={value} onChange={handleChange} className={`${sharedClassName} min-h-[48px]`} />
+        )}
+        {hint ? <span className="text-xs leading-relaxed text-foreground-muted">{hint}</span> : null}
+      </label>
+    );
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch("/api/admin/content", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content,
+          homepage_featured_ids: portfolio.filter((item) => item.featured_on_homepage).map((item) => item.id),
+        }),
+      });
+
+      if (response.status === 401) {
+        router.push("/admin/login");
+        return;
+      }
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to save content");
+
+      setSuccess("Site content saved. Public pages will refresh on the next visit.");
+      fetchContent();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save content");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <AdminShell
+      title="Site Content"
+      description="Let Lia update public text and homepage feature picks without needing a code edit every time a sentence changes."
+      activeTab="content"
+      maxWidth="wide"
+      actions={
+        <AdminButton variant="primary" onClick={handleSave} disabled={saving || loading}>
+          {saving ? "Saving..." : "Save changes"}
+        </AdminButton>
+      }
+      mobileBottomActions={
+        loading ? undefined : (
+          <AdminButton
+            variant="primary"
+            className="w-full sm:w-auto"
+            onClick={handleSave}
+            disabled={saving || loading}
+          >
+            {saving ? "Saving..." : "Save changes"}
+          </AdminButton>
+        )
+      }
+    >
+      <div className="space-y-6">
+        {error ? <AdminAlert>{error}</AdminAlert> : null}
+        {success ? <AdminAlert tone="info">{success}</AdminAlert> : null}
+
+        <AdminSurface>
+          <AdminSectionHeading
+            title="Structured copy"
+            description="English is the canonical source. Italian is the only manual override on this page. Swedish and Danish keep mirroring English automatically unless we decide to open that up later."
+          />
+
+          {loading ? (
+            <p className="text-sm text-foreground-muted">Loading content…</p>
+          ) : (
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4 text-sm text-foreground-muted">
+                <p className="font-medium text-foreground">Editing scope</p>
+                <p className="mt-1">
+                  Lia manages the English source copy, an optional Italian override, and the homepage feature image picks here.
+                </p>
+              </div>
+
+              {content.map((item) => {
+                const isLongform = item.content_kind === "textarea";
+
+                return (
+                  <div key={item.key} className="rounded-2xl border border-[var(--sabbia-200)] p-5">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{item.title ?? item.key}</p>
+                        {item.description ? (
+                          <p className="mt-1 text-xs text-foreground-muted">{item.description}</p>
+                        ) : null}
+                      </div>
+                      <label className="inline-flex items-center gap-2 text-xs text-foreground-muted">
+                        <input
+                          type="checkbox"
+                          checked={item.is_active}
+                          onChange={(event) => updateContentItem(item.key, "is_active", event.target.checked)}
+                        />
+                        Active
+                      </label>
+                    </div>
+
+                    <div className="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+                      <div className="rounded-2xl bg-[var(--sabbia-50)]/80 p-4">
+                        {renderTextControl(
+                          item,
+                          "source_en",
+                          "English source",
+                          "bg-white",
+                          isLongform ? 7 : 5,
+                          "This is the canonical copy all locales fall back to."
+                        )}
+                      </div>
+
+                      <div className="rounded-2xl border border-dashed border-[var(--sabbia-200)] p-4">
+                        {renderTextControl(
+                          item,
+                          "it_override",
+                          "Italian override",
+                          "bg-white",
+                          isLongform ? 6 : 5,
+                          "Leave blank to mirror the English copy automatically."
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </AdminSurface>
+
+        <AdminSurface>
+          <AdminSectionHeading
+            title="Homepage feature picks"
+            description="Choose which visible portfolio images can appear in the homepage preview strip. If none are selected, the site falls back to the latest visible work."
+          />
+
+          {loading ? (
+            <p className="text-sm text-foreground-muted">Loading portfolio…</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+              {homepageCandidates.map((image) => (
+                <button
+                  key={image.id}
+                  type="button"
+                  onClick={() => toggleHomepageFeatured(image.id)}
+                  className={`overflow-hidden rounded-2xl border text-left transition-all ${
+                    image.featured_on_homepage
+                      ? "border-[var(--trad-red-500)] bg-red-50/40"
+                      : "border-[var(--sabbia-200)] bg-white hover:border-[var(--sabbia-300)]"
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={image.url}
+                    alt={image.title || "Portfolio image"}
+                    className="aspect-square w-full object-cover"
+                  />
+                  <div className="space-y-1 p-2">
+                    <p className="truncate text-xs font-medium text-foreground">
+                      {image.title || "Untitled"}
+                    </p>
+                    <p className="text-[11px] text-foreground-muted">
+                      {image.category === "flash" ? "Flash" : "Completed"}
+                    </p>
+                    <p className="text-[11px] text-foreground-muted">
+                      {image.featured_on_homepage ? "Featured on homepage" : "Not featured"}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </AdminSurface>
+      </div>
+    </AdminShell>
+  );
+}

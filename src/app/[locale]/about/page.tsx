@@ -1,4 +1,5 @@
 import { useTranslations } from "next-intl";
+import type { Locale } from "@/i18n/routing";
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import {
   TradDivider,
@@ -6,6 +7,7 @@ import {
   CornerOrnament,
 } from "@/components/decorative/TradDivider";
 import { getAlternates } from "@/lib/seo";
+import { getSiteContent, resolveSiteContent } from "@/lib/site-content";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -26,10 +28,34 @@ export default async function AboutPage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
 
-  return <AboutContent />;
+  const content = await getSiteContent([
+    "about_bio",
+    "about_studios_note",
+    "about_travel_note",
+    "about_italy_note",
+  ]);
+
+  return (
+    <AboutContent
+      bio={resolveSiteContent(content.about_bio, locale as Locale, "")}
+      studiosNote={resolveSiteContent(content.about_studios_note, locale as Locale, "")}
+      travelNote={resolveSiteContent(content.about_travel_note, locale as Locale, "")}
+      italyNote={resolveSiteContent(content.about_italy_note, locale as Locale, "")}
+    />
+  );
 }
 
-function AboutContent() {
+function AboutContent({
+  bio,
+  studiosNote,
+  travelNote,
+  italyNote,
+}: {
+  bio: string;
+  studiosNote: string;
+  travelNote: string;
+  italyNote: string;
+}) {
   const t = useTranslations("about");
 
   return (
@@ -71,10 +97,10 @@ function AboutContent() {
               </div>
 
               <p className="text-base text-ink-900 leading-relaxed text-center">
-                {t("bio")}
+                {bio || t("bio")}
               </p>
               <p className="text-sm text-foreground-muted leading-relaxed text-center">
-                {t("studios")}
+                {studiosNote || t("studios")}
               </p>
             </div>
           </div>
@@ -116,22 +142,26 @@ function AboutContent() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-8">
             <div className="p-6 border border-ink-900/8 bg-sabbia-50">
               <h3 className="font-display text-xl font-normal text-ink-900 mb-1">
-                Studio Diamant
+                Malmö / Diamant studio
               </h3>
-              <p className="text-sm text-foreground-muted">Malmö, Sweden</p>
+              <p className="text-sm text-foreground-muted">Malmö, Sweden · resident base</p>
             </div>
             <div className="p-6 border border-ink-900/8 bg-sabbia-50">
               <h3 className="font-display text-xl font-normal text-ink-900 mb-1">
-                Good Morning Tattoo
+                Copenhagen / Good Morning Tattoo studio
               </h3>
               <p className="text-sm text-foreground-muted">
-                Copenhagen, Denmark
+                Copenhagen, Denmark · guest spot
               </p>
             </div>
           </div>
 
           <p className="text-sm text-foreground-muted italic">
-            {t("travelingNote")}
+            {travelNote || t("travelingNote")}
+          </p>
+
+          <p className="mt-4 text-sm text-foreground-muted leading-relaxed">
+            {italyNote || t("italyNote")}
           </p>
 
           <TradDivider className="w-32 mx-auto mt-8" />

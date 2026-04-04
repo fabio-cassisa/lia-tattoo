@@ -3,8 +3,13 @@
 import { useEffect, useState, useCallback } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { AdminShell } from "@/components/admin/AdminShell";
-import { AdminAlert, AdminButton } from "@/components/admin/AdminPrimitives";
+import {
+  AdminEmptyState,
+  AdminMetricCard,
+  AdminShell,
+  AdminSurface,
+} from "@/components/admin/AdminShell";
+import { AdminAlert, AdminButton, AdminSectionHeading } from "@/components/admin/AdminPrimitives";
 
 // ── Types ────────────────────────────────────────────────
 
@@ -280,6 +285,8 @@ const PRIORITY_CONFIG: Record<InsightPriority, { color: string; bgColor: string;
   "worth-trying": { color: "text-amber-700", bgColor: "bg-amber-50 border-amber-200", label: "worth-trying" },
   "good-to-know": { color: "text-green-700", bgColor: "bg-green-50 border-green-200", label: "good-to-know" },
 };
+const INSIGHT_FIELD_CLASSNAME =
+  "mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)] px-3 py-2 text-sm text-foreground";
 
 // ── Dismissal persistence ───────────────────────────────
 
@@ -318,7 +325,7 @@ function CoachCard({
   const actionLabel = card.action ? t(locale, card.action.labelKey, card.vars) : null;
 
   return (
-    <div className={`border rounded-lg p-4 sm:p-5 ${config.bgColor} transition-all`}>
+    <div className={`rounded-3xl border p-4 shadow-sm transition-all sm:p-5 ${config.bgColor}`}>
       {/* Header row: icon + title + dismiss */}
       <div className="flex items-start gap-3">
         <span className="text-2xl flex-shrink-0 mt-0.5" role="img">
@@ -353,7 +360,7 @@ function CoachCard({
             {card.dataPoints && card.dataPoints.length > 0 && (
               <button
                 onClick={() => setShowData(!showData)}
-                className="text-xs text-ink-900/50 hover:text-ink-900/70 transition-colors min-h-[36px] px-1"
+                className="inline-flex min-h-[36px] items-center rounded-full bg-white/70 px-3 py-1.5 text-xs text-ink-900/50 transition-colors hover:text-ink-900/70"
               >
                 {showData ? t(locale, "hide-details") : t(locale, "show-details")}
               </button>
@@ -414,9 +421,9 @@ function PrioritySection({
 
   return (
     <section className="mb-8">
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <span className={`w-2.5 h-2.5 rounded-full ${dots[priority]}`} />
-        <h2 className={`text-xs font-semibold uppercase tracking-wider ${config.color}`}>
+        <h2 className={`text-xs font-semibold uppercase tracking-[0.2em] ${config.color}`}>
           {t(locale, config.label)}
         </h2>
         <span className="text-xs text-ink-900/30">({cards.length})</span>
@@ -606,15 +613,21 @@ export default function AdminInsights() {
   const actNow = visibleInsights.filter((c) => c.priority === "act-now");
   const worthTrying = visibleInsights.filter((c) => c.priority === "worth-trying");
   const goodToKnow = visibleInsights.filter((c) => c.priority === "good-to-know");
+  const visibleInsightCount = visibleInsights.length;
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block w-8 h-8 border-2 border-ink-900/20 border-t-ink-900/60 rounded-full animate-spin mb-3" />
-          <p className="text-foreground-muted text-sm">Loading your creative coach...</p>
-        </div>
-      </div>
+      <AdminShell
+        title="Creative Coach"
+        description="Instagram and booking signals in one place, translated into actions Lia can actually use instead of spreadsheet archaeology."
+        activeTab="insights"
+        maxWidth="medium"
+      >
+        <AdminEmptyState
+          title="Loading Creative Coach"
+          description="Pulling Instagram, booking, and finance signals into one place so the next move is easier to spot."
+        />
+      </AdminShell>
     );
   }
 
@@ -624,352 +637,378 @@ export default function AdminInsights() {
       description="Instagram and booking signals in one place, translated into actions Lia can actually use instead of spreadsheet archaeology."
       activeTab="insights"
       maxWidth="medium"
+      actions={
+        status && status.connected ? (
+          <AdminButton type="button" variant="secondary" disabled={refreshing} onClick={handleRefresh}>
+            {refreshing ? "Syncing..." : "Sync now"}
+          </AdminButton>
+        ) : undefined
+      }
     >
-
-      {/* Error */}
-      {error && (
-        <div className="mb-4">
+      <div className="space-y-6">
+        {error ? (
           <AdminAlert>
             {error}
             <button onClick={() => setError("")} className="ml-2 underline">
               dismiss
             </button>
           </AdminAlert>
-        </div>
-      )}
+        ) : null}
 
-      {/* ── Not Connected State ──────────────────────── */}
-      {status && !status.connected && (
-        <div className="border border-ink-900/10 rounded-lg p-6 sm:p-10 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--sabbia-100)] mb-6">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-ink-900/40">
-              <rect x="2" y="2" width="20" height="20" rx="5" />
-              <circle cx="12" cy="12" r="5" />
-              <circle cx="17.5" cy="6.5" r="1.5" />
-            </svg>
-          </div>
-
-          <h2 className="text-xl font-semibold tracking-[-0.01em] text-ink-900 mb-2">
-            INSTAGRAM NOT CONNECTED
-          </h2>
-          <p className="text-sm text-foreground-muted max-w-md mx-auto mb-8">
-            {status.reason}
-          </p>
-
-          <div className="text-left max-w-lg mx-auto space-y-4 text-sm text-foreground-muted">
-            <h3 className="font-semibold text-ink-900">Setup steps:</h3>
-            <ol className="list-decimal list-inside space-y-2">
-              <li>
-                Go to{" "}
-                <a
-                  href="https://developers.facebook.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-accent hover:text-accent-hover underline"
+        {/* ── Not Connected State ──────────────────────── */}
+        {status && !status.connected ? (
+          <AdminSurface className="p-6 sm:p-8">
+            <div className="text-center">
+              <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[var(--sabbia-100)]">
+                <svg
+                  width="32"
+                  height="32"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  className="text-ink-900/40"
                 >
-                  Meta Developer Portal
-                </a>{" "}
-                and create an app (type: Business)
-              </li>
-              <li>Add &quot;Instagram Graph API&quot; product to the app</li>
-              <li>
-                Ensure @liagiorgi.one.ttt is a{" "}
-                <strong>Business or Creator</strong> account
-              </li>
-              <li>
-                Generate a short-lived token via the Graph API Explorer with
-                permissions:{" "}
-                <code className="bg-[var(--sabbia-100)] px-1.5 py-0.5 rounded text-xs">
-                  instagram_basic, instagram_manage_insights, pages_show_list, pages_read_engagement
-                </code>
-              </li>
-              <li>
-                Add the Meta app secret to the server as <code className="bg-[var(--sabbia-100)] px-1.5 py-0.5 rounded text-xs">META_APP_SECRET</code>,
-                then use the setup endpoint to exchange the short-lived token for a long-lived one (auto-refreshes every 60 days)
-              </li>
-            </ol>
-
-            <div className="mt-6 rounded-2xl border border-[var(--sabbia-200)] bg-white/90 p-4 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
-                    Final handoff
-                  </p>
-                  <h3 className="mt-1 text-sm font-semibold text-ink-900">
-                    Connect Instagram without touching the browser console
-                  </h3>
-                </div>
-                <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-[11px] text-foreground-muted">
-                  Admin only
-                </span>
+                  <rect x="2" y="2" width="20" height="20" rx="5" />
+                  <circle cx="12" cy="12" r="5" />
+                  <circle cx="17.5" cy="6.5" r="1.5" />
+                </svg>
               </div>
 
-              <p className="mt-3 text-sm text-foreground-muted">
-                Once Meta finally gives you the short-lived token from a trusted session, paste it here and the server will exchange and store the long-lived token for you.
+              <h2 className="mb-2 text-xl font-semibold tracking-[-0.01em] text-ink-900">
+                Instagram not connected
+              </h2>
+              <p className="mx-auto mb-8 max-w-md text-sm text-foreground-muted">
+                {status.reason}
               </p>
-
-              {setupError ? (
-                <div className="mt-4">
-                  <AdminAlert>{setupError}</AdminAlert>
-                </div>
-              ) : null}
-
-              {setupSuccess ? (
-                <div className="mt-4">
-                  <AdminAlert tone="info">{setupSuccess}</AdminAlert>
-                </div>
-              ) : null}
-
-              <form className="mt-4 space-y-4" onSubmit={handleSetupSubmit}>
-                <label className="block text-xs text-foreground-muted">
-                  Short-lived token
-                  <textarea
-                    value={shortLivedToken}
-                    onChange={(event) => setShortLivedToken(event.target.value)}
-                    rows={4}
-                    autoComplete="off"
-                    spellCheck={false}
-                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)] px-3 py-2 text-sm text-foreground"
-                    style={{ fontSize: "16px" }}
-                    placeholder="IGQ..."
-                  />
-                </label>
-
-                <label className="block text-xs text-foreground-muted">
-                  Instagram user ID
-                  <input
-                    value={instagramUserId}
-                    onChange={(event) => setInstagramUserId(event.target.value)}
-                    autoComplete="off"
-                    spellCheck={false}
-                    className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)] px-3 py-2 text-sm text-foreground"
-                    style={{ fontSize: "16px" }}
-                    placeholder="17841400..."
-                  />
-                </label>
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <AdminButton type="submit" variant="primary" disabled={setupLoading}>
-                    {setupLoading ? "Connecting..." : "Connect Instagram"}
-                  </AdminButton>
-                  <p className="text-xs text-foreground-muted">
-                    The Meta app secret stays on the server via <code className="bg-[var(--sabbia-100)] px-1.5 py-0.5 rounded text-xs">META_APP_SECRET</code>.
-                  </p>
-                </div>
-              </form>
             </div>
 
-            <div className="mt-6 p-4 bg-[var(--sabbia-100)] rounded text-xs font-mono">
-              <p className="text-ink-900/60 mb-2">
-                # After getting the short-lived token, call:
-              </p>
-              <p>
-                POST /api/admin/instagram
-              </p>
-              <pre className="mt-1 whitespace-pre-wrap">
+            <div className="mx-auto max-w-2xl space-y-5 text-left text-sm text-foreground-muted">
+              <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                      Final handoff
+                    </p>
+                    <h3 className="mt-1 text-sm font-semibold text-ink-900">
+                      Connect Instagram without touching the browser console
+                    </h3>
+                  </div>
+                  <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-[11px] text-foreground-muted">
+                    Admin only
+                  </span>
+                </div>
+
+                <p className="mt-3 text-sm text-foreground-muted">
+                  Once Meta finally gives you the short-lived token from a trusted session, paste it here and the server will exchange and store the long-lived token for you.
+                </p>
+
+                {setupError ? (
+                  <div className="mt-4">
+                    <AdminAlert>{setupError}</AdminAlert>
+                  </div>
+                ) : null}
+
+                {setupSuccess ? (
+                  <div className="mt-4">
+                    <AdminAlert tone="info">{setupSuccess}</AdminAlert>
+                  </div>
+                ) : null}
+
+                <form className="mt-4 space-y-4" onSubmit={handleSetupSubmit}>
+                  <label className="block text-xs text-foreground-muted">
+                    Short-lived token
+                    <textarea
+                      value={shortLivedToken}
+                      onChange={(event) => setShortLivedToken(event.target.value)}
+                      rows={5}
+                      autoComplete="off"
+                      spellCheck={false}
+                      className={`${INSIGHT_FIELD_CLASSNAME} min-h-[140px] resize-y`}
+                      style={{ fontSize: "16px" }}
+                      placeholder="IGQ..."
+                    />
+                  </label>
+
+                  <label className="block text-xs text-foreground-muted">
+                    Instagram user ID
+                    <input
+                      value={instagramUserId}
+                      onChange={(event) => setInstagramUserId(event.target.value)}
+                      autoComplete="off"
+                      spellCheck={false}
+                      className={`${INSIGHT_FIELD_CLASSNAME} min-h-[44px]`}
+                      style={{ fontSize: "16px" }}
+                      placeholder="17841400..."
+                    />
+                  </label>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <AdminButton type="submit" variant="primary" disabled={setupLoading}>
+                      {setupLoading ? "Connecting..." : "Connect Instagram"}
+                    </AdminButton>
+                    <p className="text-xs text-foreground-muted">
+                      The Meta app secret stays on the server via <code className="bg-[var(--sabbia-100)] px-1.5 py-0.5 rounded text-xs">META_APP_SECRET</code>.
+                    </p>
+                  </div>
+                </form>
+              </div>
+
+              <div className="rounded-2xl bg-[var(--sabbia-50)]/80 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">Setup steps</p>
+                <ol className="mt-3 list-decimal space-y-2 pl-5">
+                  <li>
+                    Go to{" "}
+                    <a
+                      href="https://developers.facebook.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-accent hover:text-accent-hover underline"
+                    >
+                      Meta Developer Portal
+                    </a>{" "}
+                    and create an app (type: Business)
+                  </li>
+                  <li>Add &quot;Instagram Graph API&quot; product to the app</li>
+                  <li>
+                    Ensure @liagiorgi.one.ttt is a <strong>Business or Creator</strong> account
+                  </li>
+                  <li>
+                    Generate a short-lived token via the Graph API Explorer with permissions:{" "}
+                    <code className="bg-[var(--sabbia-100)] px-1.5 py-0.5 rounded text-xs">
+                      instagram_basic, instagram_manage_insights, pages_show_list, pages_read_engagement
+                    </code>
+                  </li>
+                  <li>
+                    Add the Meta app secret to the server as{" "}
+                    <code className="bg-[var(--sabbia-100)] px-1.5 py-0.5 rounded text-xs">
+                      META_APP_SECRET
+                    </code>
+                    , then use the setup endpoint to exchange the short-lived token for a long-lived one (auto-refreshes every 60 days)
+                  </li>
+                </ol>
+              </div>
+
+              <div className="rounded-2xl bg-[var(--sabbia-100)] p-4 text-xs font-mono text-ink-900/70">
+                <p className="mb-2 text-ink-900/60">
+                  # After getting the short-lived token, call:
+                </p>
+                <p>POST /api/admin/instagram</p>
+                <pre className="mt-1 whitespace-pre-wrap">
 {`{
   "action": "setup",
   "shortLivedToken": "IGQ...",
   "instagramUserId": "17841400..."
 }`}
-              </pre>
+                </pre>
+              </div>
+
+              <p className="text-xs text-foreground-muted">
+                The app secret should stay server-side only. Do not paste it into the browser or send it in the request body.
+              </p>
             </div>
 
-            <p className="text-xs text-foreground-muted">
-              The app secret should stay server-side only. Do not paste it into the browser or send it in the request body.
-            </p>
-          </div>
+            {insights && insights.insights.length > 0 ? (
+              <div className="mt-10 border-t border-ink-900/10 pt-8 text-left">
+                <h3 className="mb-4 text-sm font-semibold text-ink-900">
+                  Meanwhile, from your bookings:
+                </h3>
+                {insights.insights
+                  .filter((c) => c.category === "booking" && !dismissed.has(c.id))
+                  .slice(0, 3)
+                  .map((card) => (
+                    <div key={card.id} className="mb-3">
+                      <CoachCard card={card} locale={locale} onDismiss={handleDismiss} />
+                    </div>
+                  ))}
+              </div>
+            ) : null}
+          </AdminSurface>
+        ) : null}
 
-          {/* Even without IG, show booking-only insights */}
-          {insights && insights.insights.length > 0 && (
-            <div className="mt-10 pt-8 border-t border-ink-900/10 text-left">
-              <h3 className="text-sm font-semibold text-ink-900 mb-4">
-                Meanwhile, from your bookings:
-              </h3>
-              {insights.insights
-                .filter((c) => c.category === "booking" && !dismissed.has(c.id))
-                .slice(0, 3)
-                .map((card) => (
-                  <div key={card.id} className="mb-3">
-                    <CoachCard card={card} locale={locale} onDismiss={handleDismiss} />
+        {/* ── Connected State ──────────────────────────── */}
+        {status && status.connected ? (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <AdminMetricCard label="Visible insights" value={visibleInsightCount} detail="Undismissed suggestions right now" />
+              <AdminMetricCard label="Instagram posts" value={insights?.summary.totalPosts ?? 0} detail="Posts in the current coach sample" />
+              <AdminMetricCard label="Bookings" value={insights?.summary.totalBookings ?? 0} detail="Signals feeding the coach" />
+              <AdminMetricCard label="Connection" value="Live" detail={status.lastFetchedAt ? `Synced ${timeAgo(status.lastFetchedAt)}` : "Connected"} tone="success" />
+            </div>
+
+            <AdminSurface>
+              <AdminSectionHeading
+                title="Coach controls"
+                description="Keep the signal source healthy, switch language, and understand what data this coach is actually looking at."
+              />
+
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-foreground-muted">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--sabbia-50)] px-3 py-1.5">
+                    <span className="h-2 w-2 rounded-full bg-green-500" />
+                    Connected
+                  </span>
+                  <span className="rounded-full bg-[var(--sabbia-50)] px-3 py-1.5">
+                    @{status.username}
+                  </span>
+                  <span className="rounded-full bg-[var(--sabbia-50)] px-3 py-1.5">
+                    Token expires {formatDate(status.tokenExpiresAt)}
+                  </span>
+                  <span className="rounded-full bg-[var(--sabbia-50)] px-3 py-1.5">
+                    {status.cachedMediaCount} cached posts
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-foreground-muted">{t(locale, "language-label")}:</span>
+                  {(["en", "it", "sv"] as CoachLocale[]).map((l) => (
+                    <button
+                      key={l}
+                      onClick={() => handleLocaleChange(l)}
+                      className={`inline-flex min-h-[36px] items-center rounded-full px-3 py-1.5 text-xs transition-colors ${
+                        locale === l
+                          ? "bg-[var(--ink-900)] text-[var(--sabbia-50)]"
+                          : "bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)]"
+                      }`}
+                    >
+                      {l.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {insights ? (
+                <div className="mt-4 rounded-2xl bg-[var(--sabbia-50)]/80 p-4 text-xs text-foreground-muted">
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                    <span>{insights.summary.totalPosts} posts</span>
+                    <span>{insights.summary.totalBookings} bookings</span>
+                    <span>{insights.summary.portfolioCount} portfolio items</span>
+                    <span>Avg engagement: {insights.summary.avgEngagementRate}</span>
+                    <span>This week: {insights.summary.bookingsThisWeek} bookings</span>
                   </div>
-                ))}
-            </div>
-          )}
-        </div>
-      )}
+                </div>
+              ) : null}
+            </AdminSurface>
 
-      {/* ── Connected State ──────────────────────────── */}
-      {status && status.connected && (
-        <>
-          {/* Connection bar + language toggle */}
-          <div className="flex flex-wrap items-center gap-3 mb-6 text-xs text-foreground-muted">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-green-500" />
-              Connected
-            </span>
-            {status.lastFetchedAt && (
-              <span>Synced {timeAgo(status.lastFetchedAt)}</span>
+            {financePulse ? (
+              <div className="mb-0 rounded-2xl border border-[var(--sabbia-200)] bg-white/90 p-4 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                      Business pulse
+                    </p>
+                    <h2 className="mt-2 text-base font-semibold tracking-[-0.01em] text-ink-900">
+                      Creative Coach now sees the money pressure too
+                    </h2>
+                  </div>
+                  <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-[11px] text-foreground-muted">
+                    {financePulse.month}
+                  </span>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                  <div className="rounded-xl bg-[var(--sabbia-50)]/80 px-3 py-3">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-foreground-muted">Cash received</p>
+                    <p className="mt-1 text-lg font-medium text-foreground">
+                      {formatMoneyCompact(financePulse.cashReceived, financePulse.currency)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-[var(--sabbia-50)]/80 px-3 py-3">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-foreground-muted">Disposable</p>
+                    <p className="mt-1 text-lg font-medium text-foreground">
+                      {formatMoneyCompact(financePulse.disposableEstimate, financePulse.currency)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-[var(--sabbia-50)]/80 px-3 py-3">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-foreground-muted">Tax + social</p>
+                    <p className="mt-1 text-lg font-medium text-foreground">
+                      {formatMoneyCompact(financePulse.incomeTaxReserve + financePulse.socialReserve, financePulse.currency)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-[var(--sabbia-50)]/80 px-3 py-3">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-foreground-muted">Fixed + variable</p>
+                    <p className="mt-1 text-lg font-medium text-foreground">
+                      {formatMoneyCompact(financePulse.fixedObligations + financePulse.variableCosts, financePulse.currency)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-[var(--sabbia-50)]/80 px-3 py-3">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-foreground-muted">Open invoice drag</p>
+                    <p className="mt-1 text-lg font-medium text-foreground">
+                      {formatMoneyCompact(financePulse.excludedGross, financePulse.currency)}
+                    </p>
+                  </div>
+                </div>
+
+                <p className="mt-4 text-sm text-foreground-muted">
+                  This helps the coach judge timing: if disposable money is tight or too much gross is still not invoiced, pushing booking reminders or high-conversion content matters more than generic engagement vanity.
+                </p>
+              </div>
+            ) : null}
+
+            {visibleInsights.length > 0 ? (
+              <>
+                <PrioritySection
+                  priority="act-now"
+                  cards={actNow}
+                  locale={locale}
+                  onDismiss={handleDismiss}
+                />
+                <PrioritySection
+                  priority="worth-trying"
+                  cards={worthTrying}
+                  locale={locale}
+                  onDismiss={handleDismiss}
+                />
+                <PrioritySection
+                  priority="good-to-know"
+                  cards={goodToKnow}
+                  locale={locale}
+                  onDismiss={handleDismiss}
+                />
+
+                <p className="mb-4 mt-8 text-center text-xs text-ink-900/30">
+                  {t(locale, "powered-by", {
+                    count: String(insights?.summary.totalPosts ?? 0),
+                    bookings: String(insights?.summary.totalBookings ?? 0),
+                  })}
+                </p>
+
+                {dismissed.size > 0 ? (
+                  <div className="mb-8 text-center">
+                    <button
+                      onClick={() => {
+                        localStorage.removeItem("coach-dismissed");
+                        setDismissed(new Set());
+                      }}
+                      className="text-xs text-ink-900/30 transition-colors hover:text-ink-900/50 underline"
+                    >
+                      Show {dismissed.size} dismissed insight{dismissed.size > 1 ? "s" : ""}
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <AdminEmptyState
+                title="No active insights right now"
+                description={t(locale, "no-insights")}
+                action={
+                  dismissed.size > 0 ? (
+                    <button
+                      onClick={() => {
+                        localStorage.removeItem("coach-dismissed");
+                        setDismissed(new Set());
+                      }}
+                      className="text-xs text-ink-900/40 underline transition-colors hover:text-ink-900/60"
+                    >
+                      Show {dismissed.size} dismissed insight{dismissed.size > 1 ? "s" : ""}
+                    </button>
+                  ) : undefined
+                }
+              />
             )}
-            <span>
-              Token expires {formatDate(status.tokenExpiresAt)}
-            </span>
-
-            {/* Spacer */}
-            <div className="flex-1" />
-
-            {/* Language toggle */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-ink-900/40">{t(locale, "language-label")}:</span>
-              {(["en", "it", "sv"] as CoachLocale[]).map((l) => (
-                <button
-                  key={l}
-                  onClick={() => handleLocaleChange(l)}
-                  className={`px-2 py-1 text-xs rounded transition-colors ${
-                    locale === l
-                      ? "bg-[var(--ink-900)] text-[var(--sabbia-50)]"
-                      : "bg-[var(--sabbia-100)] hover:bg-[var(--sabbia-200)]"
-                  }`}
-                >
-                  {l.toUpperCase()}
-                </button>
-              ))}
-            </div>
-
-            {/* Sync button */}
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="px-3 py-1.5 text-xs rounded-full bg-[var(--sabbia-100)] hover:bg-[var(--sabbia-200)] transition-colors disabled:opacity-50"
-            >
-              {refreshing ? "Syncing..." : "Sync now"}
-            </button>
-          </div>
-
-          {/* Summary bar */}
-          {insights && (
-            <div className="flex flex-wrap gap-4 mb-6 p-4 rounded-lg bg-[var(--sabbia-100)]/50 border border-ink-900/5 text-xs text-ink-900/60">
-              <span>{insights.summary.totalPosts} posts</span>
-              <span>{insights.summary.totalBookings} bookings</span>
-              <span>{insights.summary.portfolioCount} portfolio items</span>
-              <span>Avg engagement: {insights.summary.avgEngagementRate}</span>
-              <span>This week: {insights.summary.bookingsThisWeek} bookings</span>
-            </div>
-          )}
-
-          {financePulse && (
-            <div className="mb-6 rounded-2xl border border-[var(--sabbia-200)] bg-white/90 p-4 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
-                    Business pulse
-                  </p>
-                  <h2 className="mt-2 text-base font-semibold tracking-[-0.01em] text-ink-900">
-                    Creative Coach now sees the money pressure too
-                  </h2>
-                </div>
-                <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-[11px] text-foreground-muted">
-                  {financePulse.month}
-                </span>
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <div className="rounded-xl bg-[var(--sabbia-50)]/80 px-3 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-foreground-muted">Cash received</p>
-                  <p className="mt-1 text-lg font-medium text-foreground">{formatMoneyCompact(financePulse.cashReceived, financePulse.currency)}</p>
-                </div>
-                <div className="rounded-xl bg-[var(--sabbia-50)]/80 px-3 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-foreground-muted">Disposable</p>
-                  <p className="mt-1 text-lg font-medium text-foreground">{formatMoneyCompact(financePulse.disposableEstimate, financePulse.currency)}</p>
-                </div>
-                <div className="rounded-xl bg-[var(--sabbia-50)]/80 px-3 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-foreground-muted">Tax + social</p>
-                  <p className="mt-1 text-lg font-medium text-foreground">{formatMoneyCompact(financePulse.incomeTaxReserve + financePulse.socialReserve, financePulse.currency)}</p>
-                </div>
-                <div className="rounded-xl bg-[var(--sabbia-50)]/80 px-3 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-foreground-muted">Fixed + variable</p>
-                  <p className="mt-1 text-lg font-medium text-foreground">{formatMoneyCompact(financePulse.fixedObligations + financePulse.variableCosts, financePulse.currency)}</p>
-                </div>
-                <div className="rounded-xl bg-[var(--sabbia-50)]/80 px-3 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-foreground-muted">Open invoice drag</p>
-                  <p className="mt-1 text-lg font-medium text-foreground">{formatMoneyCompact(financePulse.excludedGross, financePulse.currency)}</p>
-                </div>
-              </div>
-
-              <p className="mt-4 text-sm text-foreground-muted">
-                This helps the coach judge timing: if disposable money is tight or too much gross is still not invoiced, pushing booking reminders or high-conversion content matters more than generic engagement vanity.
-              </p>
-            </div>
-          )}
-
-          {/* Insight cards */}
-          {visibleInsights.length > 0 ? (
-            <>
-              <PrioritySection
-                priority="act-now"
-                cards={actNow}
-                locale={locale}
-                onDismiss={handleDismiss}
-              />
-              <PrioritySection
-                priority="worth-trying"
-                cards={worthTrying}
-                locale={locale}
-                onDismiss={handleDismiss}
-              />
-              <PrioritySection
-                priority="good-to-know"
-                cards={goodToKnow}
-                locale={locale}
-                onDismiss={handleDismiss}
-              />
-
-              {/* Footer attribution */}
-              <p className="text-center text-xs text-ink-900/30 mt-8 mb-4">
-                {t(locale, "powered-by", {
-                  count: String(insights?.summary.totalPosts ?? 0),
-                  bookings: String(insights?.summary.totalBookings ?? 0),
-                })}
-              </p>
-
-              {/* Reset dismissed */}
-              {dismissed.size > 0 && (
-                <div className="text-center mb-8">
-                  <button
-                    onClick={() => {
-                      localStorage.removeItem("coach-dismissed");
-                      setDismissed(new Set());
-                    }}
-                    className="text-xs text-ink-900/30 hover:text-ink-900/50 transition-colors underline"
-                  >
-                    Show {dismissed.size} dismissed insight{dismissed.size > 1 ? "s" : ""}
-                  </button>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-16 text-foreground-muted">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--sabbia-100)] mb-4">
-                <span className="text-3xl">🔮</span>
-              </div>
-              <p className="text-sm max-w-sm mx-auto">
-                {t(locale, "no-insights")}
-              </p>
-              {dismissed.size > 0 && (
-                <button
-                  onClick={() => {
-                    localStorage.removeItem("coach-dismissed");
-                    setDismissed(new Set());
-                  }}
-                  className="mt-4 text-xs text-ink-900/40 hover:text-ink-900/60 underline"
-                >
-                  Show {dismissed.size} dismissed insight{dismissed.size > 1 ? "s" : ""}
-                </button>
-              )}
-            </div>
-          )}
-        </>
-      )}
+          </>
+        ) : null}
+      </div>
     </AdminShell>
   );
 }

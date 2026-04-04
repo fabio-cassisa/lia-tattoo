@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getSupabaseUrl } from "@/lib/supabase/config";
 import { createServerSupabaseClient, createAdminClient } from "@/lib/supabase/server";
 import type { PortfolioCategory } from "@/lib/supabase/database.types";
 
@@ -28,7 +29,7 @@ export async function GET() {
     return Response.json({ error: "Failed to fetch portfolio" }, { status: 500 });
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseUrl = getSupabaseUrl();
   const images = (data ?? []).map((img) => ({
     ...img,
     url: `${supabaseUrl}/storage/v1/object/public/portfolio/${img.storage_path}`,
@@ -127,7 +128,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Failed to save image record" }, { status: 500 });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseUrl = getSupabaseUrl();
     return Response.json({
       message: "Image uploaded",
       image: {
@@ -182,7 +183,7 @@ export async function PATCH(request: NextRequest) {
       return Response.json({ error: "Failed to update image" }, { status: 500 });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseUrl = getSupabaseUrl();
     return Response.json({
       message: "Image updated",
       image: {

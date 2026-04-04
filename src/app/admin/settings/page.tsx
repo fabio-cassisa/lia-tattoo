@@ -10,6 +10,7 @@ import {
 import {
   AdminAlert,
   AdminButton,
+  AdminCheckboxCard,
   AdminSectionHeading,
 } from "@/components/admin/AdminPrimitives";
 import {
@@ -260,6 +261,18 @@ export default function AdminSettingsPage() {
           {saving ? "Saving..." : "Save defaults"}
         </AdminButton>
       }
+      mobileBottomActions={
+        loading || !settings ? undefined : (
+          <AdminButton
+            variant="primary"
+            className="w-full sm:w-auto"
+            onClick={handleSave}
+            disabled={saving || loading || !settings}
+          >
+            {saving ? "Saving..." : "Save defaults"}
+          </AdminButton>
+        )
+      }
     >
       {error ? (
         <div className="mb-4">
@@ -284,7 +297,7 @@ export default function AdminSettingsPage() {
           description="Pulling the current defaults so this page can act like the admin’s quiet brain instead of a random control panel."
         />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-6 [&_input:not([type=checkbox])]:min-h-[44px] [&_select]:min-h-[44px]">
           <AdminSurface>
             <AdminSectionHeading
               title="Work context defaults"
@@ -294,7 +307,7 @@ export default function AdminSettingsPage() {
             <div className="space-y-4">
               {contexts.map((context) => (
                 <div key={context.context} className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
-                  <div className="grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.85fr)] md:items-end">
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(160px,0.85fr)_minmax(160px,0.85fr)_minmax(220px,1fr)] lg:items-end">
                     <label className="text-sm text-foreground-muted">
                       Label
                       <input
@@ -349,18 +362,16 @@ export default function AdminSettingsPage() {
                       />
                     </label>
 
-                    <div>
-                      <span className="block text-sm text-foreground-muted">Status</span>
-                      <label className="mt-1 flex min-h-[42px] items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm text-foreground shadow-sm">
-                        <input
-                          type="checkbox"
-                          checked={context.is_active}
-                          onChange={(event) =>
-                            updateContext(context.context, "is_active", event.target.checked)
-                          }
-                          />
-                          Active context
-                      </label>
+                    <div className="lg:h-full">
+                      <span className="block text-sm text-foreground-muted">Availability</span>
+                      <AdminCheckboxCard
+                        checked={context.is_active}
+                        onChange={(checked) =>
+                          updateContext(context.context, "is_active", checked)
+                        }
+                        label="Visible in admin"
+                        className="mt-1 h-full border-[var(--sabbia-200)] bg-white shadow-none"
+                      />
                     </div>
                   </div>
 
@@ -429,21 +440,18 @@ export default function AdminSettingsPage() {
                   <p className="mt-1">{primaryReportingLabel}</p>
                 </div>
 
-                <label className="flex items-center gap-2 rounded-xl bg-[var(--sabbia-50)] px-4 py-3 text-sm text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={settings.use_live_exchange_rates}
-                    onChange={(event) =>
-                      updateSettings("use_live_exchange_rates", event.target.checked)
-                    }
-                  />
-                  Use live exchange rates for approximate normalized totals
-                </label>
+                <AdminCheckboxCard
+                  checked={settings.use_live_exchange_rates}
+                  onChange={(checked) => updateSettings("use_live_exchange_rates", checked)}
+                  label="Use live exchange rates"
+                  description="Only affects the approximate normalized overview, never the local-currency source data or tax logic."
+                  className="bg-[var(--sabbia-50)] shadow-none"
+                />
 
                 <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4 text-sm text-foreground-muted">
                   <p className="font-medium text-foreground">Bucketing rule</p>
                   <p className="mt-2">
-                    Sweden studio work is bucketed into SEK, Copenhagen studio work into DKK, and guest/private contexts follow their context default even if the client paid in another currency.
+                    Malmö studio work is bucketed into SEK, Copenhagen studio work into DKK, and Friuli, Turin, plus touring contexts default to EUR unless you override the entry.
                   </p>
                 </div>
 
@@ -512,16 +520,13 @@ export default function AdminSettingsPage() {
               />
 
               <div className="space-y-4 text-sm text-foreground-muted">
-                <label className="flex items-center gap-2 rounded-xl bg-[var(--sabbia-50)] px-4 py-3 text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={settings.card_invoice_default}
-                    onChange={(event) =>
-                      updateSettings("card_invoice_default", event.target.checked)
-                    }
-                  />
-                  Card / SumUp payments default to “invoice needed”
-                </label>
+                <AdminCheckboxCard
+                  checked={settings.card_invoice_default}
+                  onChange={(checked) => updateSettings("card_invoice_default", checked)}
+                  label="Card payments need an invoice by default"
+                  description="Still editable on each finance entry when the real-world situation differs."
+                  className="bg-[var(--sabbia-50)] shadow-none"
+                />
 
                 <label className="text-sm text-foreground-muted">
                   SumUp / card processor fee %
@@ -543,18 +548,22 @@ export default function AdminSettingsPage() {
                 </label>
 
                 <p>
-                  This keeps the admin honest without forcing Lia into fake certainty. She can still override the reminder per payment when the real-world situation differs.
+                  This keeps the admin honest without forcing fake certainty into every payment.
                 </p>
 
                 <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4">
                   <p className="font-medium text-foreground">Current confirmed defaults</p>
                   <ul className="mt-2 space-y-2">
-                    <li>Malmö / Studio Diamant: 30%</li>
-                    <li>Copenhagen / Good Morning Tattoo: 30%</li>
+                    <li>Malmö / Diamant studio: 30% · SEK</li>
+                    <li>Copenhagen / Good Morning Tattoo studio: 30% · DKK</li>
+                    <li>Friuli / by appointment: 0% default · EUR</li>
+                    <li>Turin / Studio Etra: 40% · EUR</li>
+                    <li>Touring / guest spots: 40% · EUR</li>
                     <li>Card / SumUp processor fee: 1.95%</li>
-                    <li>Guest spot: configurable, often 40% or 50%</li>
-                    <li>Private / home: often 0%</li>
                   </ul>
+                  <p className="mt-3 text-xs text-foreground-muted">
+                    Friuli stays at 0% by default for home-based work, but Lia can override the fee on any entry when a host studio takes a cut.
+                  </p>
                 </div>
               </div>
             </AdminSurface>
@@ -566,7 +575,7 @@ export default function AdminSettingsPage() {
               />
 
               <div className="space-y-4 text-sm text-foreground-muted">
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] xl:items-start">
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] xl:items-stretch">
                   <label className="text-sm text-foreground-muted">
                     Active real-world framework
                     <select
@@ -758,33 +767,25 @@ export default function AdminSettingsPage() {
                     </div>
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <label className="flex items-start gap-2 rounded-xl bg-white px-4 py-3 text-foreground">
-                        <input
-                          type="checkbox"
-                          checked={settings.italy_is_startup_eligible}
-                          onChange={(event) =>
-                            updateSettings(
-                              "italy_is_startup_eligible",
-                              event.target.checked
-                            )
-                          }
-                        />
-                        Apply startup substitute tax
-                      </label>
+                      <AdminCheckboxCard
+                        checked={settings.italy_is_startup_eligible}
+                        onChange={(checked) =>
+                          updateSettings("italy_is_startup_eligible", checked)
+                        }
+                        label="Startup substitute tax"
+                        description="Use the reduced startup-rate model."
+                        className="bg-white shadow-none"
+                      />
 
-                      <label className="flex items-start gap-2 rounded-xl bg-white px-4 py-3 text-foreground">
-                        <input
-                          type="checkbox"
-                          checked={settings.italy_apply_forfettario_inps_reduction}
-                          onChange={(event) =>
-                            updateSettings(
-                              "italy_apply_forfettario_inps_reduction",
-                              event.target.checked
-                            )
-                          }
-                        />
-                        Apply 35% INPS reduction
-                      </label>
+                      <AdminCheckboxCard
+                        checked={settings.italy_apply_forfettario_inps_reduction}
+                        onChange={(checked) =>
+                          updateSettings("italy_apply_forfettario_inps_reduction", checked)
+                        }
+                        label="35% INPS reduction"
+                        description="Apply the forfettario contribution reduction."
+                        className="bg-white shadow-none"
+                      />
                     </div>
                   </div>
 
@@ -996,30 +997,21 @@ export default function AdminSettingsPage() {
                       </div>
 
                       <div className="grid gap-3 xl:min-w-[220px]">
-                        <label className="flex items-start gap-2 rounded-xl bg-white px-4 py-3 text-foreground">
-                          <input
-                            type="checkbox"
-                            checked={cost.already_counted_in_tax_model}
-                            onChange={(event) =>
-                              updateFixedCost(
-                                cost.id,
-                                "already_counted_in_tax_model",
-                                event.target.checked
-                              )
-                            }
-                          />
-                          Already counted in tax model
-                        </label>
-                        <label className="flex items-start gap-2 rounded-xl bg-white px-4 py-3 text-foreground">
-                          <input
-                            type="checkbox"
-                            checked={cost.is_active}
-                            onChange={(event) =>
-                              updateFixedCost(cost.id, "is_active", event.target.checked)
-                            }
-                          />
-                          Active
-                        </label>
+                        <AdminCheckboxCard
+                          checked={cost.already_counted_in_tax_model}
+                          onChange={(checked) =>
+                            updateFixedCost(cost.id, "already_counted_in_tax_model", checked)
+                          }
+                          label="Included in tax model"
+                          description="Prevents the same cost from being counted twice."
+                          className="bg-white shadow-none"
+                        />
+                        <AdminCheckboxCard
+                          checked={cost.is_active}
+                          onChange={(checked) => updateFixedCost(cost.id, "is_active", checked)}
+                          label="Active cost"
+                          className="bg-white shadow-none"
+                        />
                       </div>
                     </div>
 

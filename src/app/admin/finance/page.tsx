@@ -12,6 +12,7 @@ import {
 import {
   AdminAlert,
   AdminButton,
+  AdminCheckboxCard,
   AdminSectionHeading,
 } from "@/components/admin/AdminPrimitives";
 import {
@@ -74,6 +75,8 @@ type VariableExpenseFormState = {
   notes: string;
 };
 
+type BulkEntryMode = "single" | "multiple";
+
 type EditingFinanceEntry = {
   projectId: string;
   paymentId: string;
@@ -84,6 +87,7 @@ type FinanceWorkspaceView = "operations" | "insights";
 const DEFAULT_MONTH = normalizeMonthKey();
 const REPORTING_CURRENCIES: FinanceCurrency[] = ["SEK", "DKK", "EUR"];
 const DAY_IN_MS = 86400000;
+const DEFAULT_VISIBLE_PROJECTS = 4;
 
 function formatMoney(amount: number, currency: FinanceCurrency): string {
   return new Intl.NumberFormat("en-GB", {
@@ -119,13 +123,15 @@ function parseNumberInput(value: string): number | null {
 function getOwnerPayoutLabel(workContext: FinanceWorkContext): string {
   switch (workContext) {
     case "malmo_studio":
-      return "Pay Diamant owner";
+      return "Pay Diamant studio";
     case "copenhagen_studio":
-      return "Pay Good Morning";
+      return "Pay Good Morning Tattoo studio";
+    case "torino_studio":
+      return "Pay Studio Etra";
     case "guest_spot":
-      return "Guest-spot fee reserve";
+      return "Touring fee reserve";
     case "private_home":
-      return "Private / home fee reserve";
+      return "Friuli fee reserve";
   }
 }
 
@@ -238,9 +244,80 @@ function buildDefaultFormState(
   };
 }
 
-function getTrendBarHeight(value: number, maxValue: number): string {
-  if (maxValue <= 0) return "10%";
-  return `${Math.max(10, (value / maxValue) * 100)}%`;
+function buildFormStateFromExistingEntry(
+  project: FinanceProjectWithPayments,
+  payment: FinanceProjectWithPayments["payments"][number]
+): FinanceFormState {
+  return {
+    booking_id: project.booking_id ?? "",
+    client_name: project.client_name,
+    project_label: project.project_label,
+    session_date: project.session_date ?? "",
+    work_context: project.work_context,
+    payment_label: payment.payment_label,
+    payment_date: payment.payment_date,
+    gross_amount: String(payment.gross_amount),
+    currency: payment.currency,
+    reporting_currency: payment.reporting_currency,
+    payment_method: payment.payment_method,
+    fee_percentage: String(payment.fee_percentage),
+    studio_fee_base_amount:
+      payment.studio_fee_base_amount !== null ? String(payment.studio_fee_base_amount) : "",
+    studio_fee_base_currency: payment.studio_fee_base_currency ?? "",
+    processor_fee_percentage: String(payment.processor_fee_percentage),
+    invoice_needed: payment.invoice_needed,
+    invoice_done: payment.invoice_done,
+    invoice_reference: payment.invoice_reference ?? "",
+    project_notes: project.notes ?? "",
+    payment_notes: payment.notes ?? "",
+  };
+}
+
+function getReportingBucketGridClass(bucketCount: number): string {
+  if (bucketCount <= 1) return "grid-cols-1";
+  if (bucketCount === 2) return "grid-cols-1 lg:grid-cols-2";
+  return "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
+}
+
+function getNextMonthKey(monthKey: string): string {
+  const [year, month] = monthKey.split("-").map(Number);
+  const nextMonth = new Date(year, month, 1);
+
+  return `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatShortMonthLabel(monthKey: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    month: "short",
+  }).format(new Date(`${monthKey}-01T00:00:00`));
+}
+
+type FinanceTrendProjection = {
+  month: string;
+  net_total: number;
+  based_on_months: number;
+  delta_from_latest: number;
+};
+
+function getTrendProjection(
+  points: FinanceMonthlyTrendPoint[]
+): FinanceTrendProjection | null {
+  if (points.length < 2) return null;
+
+  const basisPoints = points.slice(-Math.min(points.length, 3));
+  const latestPoint = basisPoints.at(-1);
+
+  if (!latestPoint) return null;
+
+  const projectedNet =
+    basisPoints.reduce((sum, point) => sum + point.net_total, 0) / basisPoints.length;
+
+  return {
+    month: getNextMonthKey(latestPoint.month),
+    net_total: projectedNet,
+    based_on_months: basisPoints.length,
+    delta_from_latest: projectedNet - latestPoint.net_total,
+  };
 }
 
 function getRelativeBarWidth(value: number, maxValue: number, minPercent = 10): string {
@@ -264,18 +341,50 @@ function CollapsibleFinanceSection({
   description,
   children,
   defaultOpen = false,
+  collapsedPreview,
 }: {
   title: string;
   description: string;
   children: ReactNode;
   defaultOpen?: boolean;
+  collapsedPreview?: ReactNode;
 }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
   return (
-    <details className="rounded-3xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm" open={defaultOpen}>
-      <summary className="cursor-pointer list-none">
-        <div className="pr-8">
-          <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
-          <p className="mt-1 text-sm text-foreground-muted">{description}</p>
+    <details className="rounded-3xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm" open={isOpen}>
+      <summary
+        className="cursor-pointer list-none"
+        onClick={(event) => {
+          event.preventDefault();
+          setIsOpen((current) => !current);
+        }}
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 pr-0 sm:pr-6">
+            <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
+            <p className="mt-1 text-sm text-foreground-muted">{description}</p>
+            {!isOpen && collapsedPreview ? <div className="mt-3">{collapsedPreview}</div> : null}
+          </div>
+
+          <span className="inline-flex shrink-0 items-center gap-2 self-start rounded-full bg-[var(--sabbia-50)] px-3 py-1.5 text-xs font-medium text-foreground shadow-sm">
+            {isOpen ? "Collapse" : "Expand"}
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
+            >
+              <path
+                d="M2.5 4.5 6 8l3.5-3.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
         </div>
       </summary>
       <div className="mt-4">{children}</div>
@@ -383,6 +492,147 @@ function MoneyFlowBar({
   );
 }
 
+function FinanceTrendLineChart({
+  points,
+  projection,
+  currency,
+}: {
+  points: FinanceMonthlyTrendPoint[];
+  projection: FinanceTrendProjection | null;
+  currency: FinanceCurrency;
+}) {
+  const data = [
+    ...points.map((point) => ({
+      key: point.month,
+      label: formatShortMonthLabel(point.month),
+      fullLabel: point.label,
+      value: point.net_total,
+      projected: false,
+    })),
+    ...(projection
+      ? [
+          {
+            key: `${projection.month}:projection`,
+            label: `${formatShortMonthLabel(projection.month)} proj`,
+            fullLabel: `Projected ${formatMonthLabel(projection.month)}`,
+            value: projection.net_total,
+            projected: true,
+          },
+        ]
+      : []),
+  ];
+
+  const chartWidth = 100;
+  const chartHeight = 64;
+  const paddingX = data.length === 1 ? 50 : 8;
+  const paddingY = 6;
+  const baselineY = chartHeight - paddingY;
+  const maxValue = Math.max(...data.map((point) => point.value), 1);
+  const usableWidth = chartWidth - paddingX * 2;
+  const usableHeight = chartHeight - paddingY * 2;
+
+  const coordinates = data.map((point, index) => ({
+    ...point,
+    x:
+      data.length === 1
+        ? chartWidth / 2
+        : paddingX + (usableWidth * index) / Math.max(data.length - 1, 1),
+    y: baselineY - (point.value / maxValue) * usableHeight,
+  }));
+
+  const actualCoordinates = coordinates.filter((point) => !point.projected);
+  const projectedCoordinate = coordinates.find((point) => point.projected) ?? null;
+  const actualPath = actualCoordinates
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
+    .join(" ");
+  const areaPath =
+    actualCoordinates.length > 0
+      ? `${actualPath} L ${actualCoordinates.at(-1)?.x ?? 0} ${baselineY} L ${actualCoordinates[0].x} ${baselineY} Z`
+      : "";
+  const projectionPath =
+    projectedCoordinate && actualCoordinates.length > 0
+      ? `M ${actualCoordinates.at(-1)?.x ?? 0} ${actualCoordinates.at(-1)?.y ?? 0} L ${projectedCoordinate.x} ${projectedCoordinate.y}`
+      : "";
+
+  return (
+    <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm">
+      <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="h-48 w-full" aria-hidden="true">
+        {[0.25, 0.5, 0.75].map((ratio) => {
+          const y = baselineY - usableHeight * ratio;
+
+          return (
+            <line
+              key={ratio}
+              x1={paddingX}
+              y1={y}
+              x2={chartWidth - paddingX}
+              y2={y}
+              stroke="var(--sabbia-200)"
+              strokeWidth="0.6"
+              strokeDasharray="2 2"
+            />
+          );
+        })}
+
+        {actualCoordinates.length > 1 ? (
+          <path d={areaPath} fill="var(--sabbia-100)" opacity="0.9" />
+        ) : null}
+
+        {actualCoordinates.length > 1 ? (
+          <path d={actualPath} fill="none" stroke="var(--ink-900)" strokeWidth="2.4" />
+        ) : null}
+
+        {projectionPath ? (
+          <path
+            d={projectionPath}
+            fill="none"
+            stroke="var(--trad-red-500)"
+            strokeWidth="2"
+            strokeDasharray="3 3"
+          />
+        ) : null}
+
+        {actualCoordinates.map((point) => (
+          <circle
+            key={point.key}
+            cx={point.x}
+            cy={point.y}
+            r="1.8"
+            fill="var(--ink-900)"
+          />
+        ))}
+
+        {projectedCoordinate ? (
+          <circle
+            cx={projectedCoordinate.x}
+            cy={projectedCoordinate.y}
+            r="2"
+            fill="white"
+            stroke="var(--trad-red-500)"
+            strokeWidth="1.6"
+          />
+        ) : null}
+      </svg>
+
+      <div
+        className="mt-4 grid gap-2 text-xs text-foreground-muted"
+        style={{ gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))` }}
+      >
+        {data.map((point) => (
+          <div
+            key={point.key}
+            className={`rounded-xl px-3 py-2 ${point.projected ? "bg-amber-50" : "bg-[var(--sabbia-50)]/80"}`}
+          >
+            <p className="font-medium text-foreground">{point.label}</p>
+            <p className="mt-1">{formatMoney(point.value, currency)}</p>
+            <p className="mt-1 text-[11px]">{point.fullLabel}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminFinancePage() {
   const router = useRouter();
   const [month, setMonth] = useState(DEFAULT_MONTH);
@@ -395,9 +645,16 @@ export default function AdminFinancePage() {
   const [showForm, setShowForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [editingEntry, setEditingEntry] = useState<EditingFinanceEntry | null>(null);
+  const [entryFormScrollKey, setEntryFormScrollKey] = useState(0);
   const [sessionTotalAmount, setSessionTotalAmount] = useState("");
   const [showStudioSplitOverride, setShowStudioSplitOverride] = useState(false);
+  const [projectSearch, setProjectSearch] = useState("");
+  const [expandedProjectIds, setExpandedProjectIds] = useState<string[]>([]);
+  const [visibleProjectCount, setVisibleProjectCount] = useState(DEFAULT_VISIBLE_PROJECTS);
+  const [bulkEntryMode, setBulkEntryMode] = useState<BulkEntryMode>("single");
+  const [bulkEntryDates, setBulkEntryDates] = useState("");
   const financeEntryAnchorRef = useRef<HTMLDivElement | null>(null);
+  const financeFormRef = useRef<HTMLDivElement | null>(null);
   const [form, setForm] = useState<FinanceFormState>(
     buildDefaultFormState(null, DEFAULT_MONTH)
   );
@@ -483,6 +740,29 @@ export default function AdminFinancePage() {
       (dashboard?.variable_expenses ?? []).filter((expense) => expense.expense_date.startsWith(month)),
     [dashboard?.variable_expenses, month]
   );
+  const normalizedProjectSearch = projectSearch.trim().toLowerCase();
+  const filteredMonthlyProjects = useMemo(() => {
+    if (!normalizedProjectSearch) return monthlyProjects;
+
+    return monthlyProjects.filter((project) => {
+      const searchableText = [
+        project.project_label,
+        project.client_name,
+        project.session_date,
+        getContextLabel(project.work_context, dashboard?.context_settings),
+        ...project.payments.flatMap((payment) => [
+          payment.payment_label,
+          payment.payment_date,
+          FINANCE_PAYMENT_METHOD_LABELS[payment.payment_method],
+        ]),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(normalizedProjectSearch);
+    });
+  }, [dashboard?.context_settings, monthlyProjects, normalizedProjectSearch]);
 
   const selectedBooking = useMemo(
     () => bookings.find((booking) => booking.id === form.booking_id) ?? null,
@@ -518,8 +798,22 @@ export default function AdminFinancePage() {
 
   useEffect(() => {
     if (!showForm || financeView !== "operations") return;
-    financeEntryAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [financeView, showForm]);
+
+    const timeout = window.setTimeout(() => {
+      if (document.activeElement instanceof HTMLButtonElement) {
+        document.activeElement.blur();
+      }
+
+      const scrollTarget = financeFormRef.current ?? financeEntryAnchorRef.current;
+      scrollTarget?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+
+    return () => window.clearTimeout(timeout);
+  }, [financeView, showForm, entryFormScrollKey]);
+
+  useEffect(() => {
+    setVisibleProjectCount(DEFAULT_VISIBLE_PROJECTS);
+  }, [month, normalizedProjectSearch]);
 
   const reportingBucketCurrencies = useMemo(
     () =>
@@ -534,11 +828,6 @@ export default function AdminFinancePage() {
     [summary]
   );
 
-  const trendMax = useMemo(() => {
-    const points = summary?.monthly_trend ?? [];
-    return points.reduce((max, point) => Math.max(max, point.net_total), 0);
-  }, [summary?.monthly_trend]);
-
   const monthlyPulseMaxTotal = useMemo(() => {
     const points = summary?.monthly_trend ?? [];
     return points.reduce(
@@ -552,6 +841,15 @@ export default function AdminFinancePage() {
     const points = summary?.monthly_trend ?? [];
     return points.reduce((max, point) => Math.max(max, point.open_invoice_count), 0);
   }, [summary?.monthly_trend]);
+  const projectPaymentCount = useMemo(
+    () => monthlyProjects.reduce((sum, project) => sum + project.payments.length, 0),
+    [monthlyProjects]
+  );
+  const visibleMonthlyProjects = useMemo(
+    () => filteredMonthlyProjects.slice(0, visibleProjectCount),
+    [filteredMonthlyProjects, visibleProjectCount]
+  );
+  const hasHiddenProjects = filteredMonthlyProjects.length > visibleProjectCount;
 
   const ownerPayoutRows = useMemo(() => {
     if (!summary || !dashboard) return [];
@@ -599,6 +897,10 @@ export default function AdminFinancePage() {
     if (!latestTrendPoint || !previousTrendPoint) return null;
     return latestTrendPoint.open_invoice_count - previousTrendPoint.open_invoice_count;
   }, [latestTrendPoint, previousTrendPoint]);
+  const trendProjection = useMemo(
+    () => getTrendProjection(summary?.monthly_trend ?? []),
+    [summary?.monthly_trend]
+  );
 
   const monthlyPulseExportRows = useMemo(() => {
     if (!summary) return [];
@@ -656,6 +958,19 @@ export default function AdminFinancePage() {
     setEditingEntry(null);
     setSessionTotalAmount("");
     setShowStudioSplitOverride(false);
+    setBulkEntryMode("single");
+    setBulkEntryDates("");
+  }
+
+  function revealEntryForm() {
+    setFinanceView("operations");
+    setShowForm(true);
+    setEntryFormScrollKey((current) => current + 1);
+  }
+
+  function hideEntryForm(nextMonth = month, nextDashboard = dashboard) {
+    setShowForm(false);
+    resetForm(nextMonth, nextDashboard);
   }
 
   function resetExpenseForm(nextDashboard = dashboard, nextMonth = month) {
@@ -685,6 +1000,26 @@ export default function AdminFinancePage() {
   const financeFormDescription = editingEntry
     ? "Adjust the existing project/payment details without re-entering the whole month by hand."
     : "Keep the required fields brutally short, then let Lia override the defaults only when reality demands it.";
+  const parsedBulkEntryDates = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          bulkEntryDates
+            .split(/[\n,]+/)
+            .map((value) => value.trim())
+            .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
+        )
+      ),
+    [bulkEntryDates]
+  );
+  const bulkEntryInvalidTokens = useMemo(
+    () =>
+      bulkEntryDates
+        .split(/[\n,]+/)
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0 && !/^\d{4}-\d{2}-\d{2}$/.test(value)),
+    [bulkEntryDates]
+  );
 
   function applyBookingPrefill(bookingId: string) {
     if (!dashboard) return;
@@ -764,38 +1099,61 @@ export default function AdminFinancePage() {
     });
   }
 
+  function openEntryFormWithDraft(nextForm: FinanceFormState) {
+    revealEntryForm();
+    setEditingEntry(null);
+    setSessionTotalAmount("");
+    setShowStudioSplitOverride(nextForm.studio_fee_base_amount.trim().length > 0);
+    setBulkEntryMode("single");
+    setBulkEntryDates("");
+    setForm(nextForm);
+  }
+
+  function startDuplicatePayment(project: FinanceProjectWithPayments, paymentId: string) {
+    const payment = project.payments.find((item) => item.id === paymentId);
+    if (!payment) return;
+
+    const nextMonthDate = `${month}-01`;
+    const clonedForm = buildFormStateFromExistingEntry(project, payment);
+
+    openEntryFormWithDraft({
+      ...clonedForm,
+      booking_id: project.booking_id ?? "",
+      payment_date: nextMonthDate,
+      session_date: project.session_date?.startsWith(month)
+        ? project.session_date ?? ""
+        : "",
+      invoice_reference: "",
+    });
+  }
+
+  function startSimilarProject(project: FinanceProjectWithPayments, paymentId: string) {
+    const payment = project.payments.find((item) => item.id === paymentId);
+    if (!payment) return;
+
+    const nextMonthDate = `${month}-01`;
+    const clonedForm = buildFormStateFromExistingEntry(project, payment);
+
+    openEntryFormWithDraft({
+      ...clonedForm,
+      booking_id: "",
+      client_name: project.client_name,
+      project_label: project.project_label,
+      session_date: "",
+      payment_date: nextMonthDate,
+      invoice_reference: "",
+    });
+  }
+
   function startEditingEntry(project: FinanceProjectWithPayments, paymentId: string) {
     const payment = project.payments.find((item) => item.id === paymentId);
     if (!payment || !dashboard) return;
 
-    setFinanceView("operations");
-    setShowForm(true);
+    revealEntryForm();
     setEditingEntry({ projectId: project.id, paymentId: payment.id });
     setSessionTotalAmount("");
     setShowStudioSplitOverride(payment.studio_fee_base_amount !== null);
-    setForm({
-      booking_id: project.booking_id ?? "",
-      client_name: project.client_name,
-      project_label: project.project_label,
-      session_date: project.session_date ?? "",
-      work_context: project.work_context,
-      payment_label: payment.payment_label,
-      payment_date: payment.payment_date,
-      gross_amount: String(payment.gross_amount),
-      currency: payment.currency,
-      reporting_currency: payment.reporting_currency,
-      payment_method: payment.payment_method,
-      fee_percentage: String(payment.fee_percentage),
-      studio_fee_base_amount:
-        payment.studio_fee_base_amount !== null ? String(payment.studio_fee_base_amount) : "",
-      studio_fee_base_currency: payment.studio_fee_base_currency ?? "",
-      processor_fee_percentage: String(payment.processor_fee_percentage),
-      invoice_needed: payment.invoice_needed,
-      invoice_done: payment.invoice_done,
-      invoice_reference: payment.invoice_reference ?? "",
-      project_notes: project.notes ?? "",
-      payment_notes: payment.notes ?? "",
-    });
+    setForm(buildFormStateFromExistingEntry(project, payment));
   }
 
   function startEditingExpense(expense: typeof monthlyVariableExpenses[number]) {
@@ -818,7 +1176,95 @@ export default function AdminFinancePage() {
     setSuccess("");
 
     try {
+      if (showStudioSplitOverride) {
+        if (!form.studio_fee_base_amount.trim()) {
+          throw new Error("Add a studio split amount or turn off the custom split override");
+        }
+
+        if (!form.studio_fee_base_currency) {
+          throw new Error("Select a studio split currency for the custom split amount");
+        }
+      }
+
       const isEditing = editingEntry !== null;
+      const basePayload = {
+        ...form,
+        booking_id: form.booking_id || null,
+        client_name: form.client_name || null,
+        project_label: form.project_label || null,
+        gross_amount: Number(form.gross_amount),
+        fee_percentage: Number(form.fee_percentage),
+        studio_fee_base_amount:
+          form.studio_fee_base_amount.trim().length > 0
+            ? Number(form.studio_fee_base_amount)
+            : null,
+        studio_fee_base_currency:
+          form.studio_fee_base_amount.trim().length > 0 && form.studio_fee_base_currency
+            ? form.studio_fee_base_currency
+            : null,
+        processor_fee_percentage: Number(form.processor_fee_percentage),
+        invoice_reference: form.invoice_reference || null,
+        project_notes: form.project_notes || null,
+        payment_notes: form.payment_notes || null,
+      };
+
+      if (!isEditing && basePayload.studio_fee_base_amount === null) {
+        delete (basePayload as { studio_fee_base_amount?: number | null }).studio_fee_base_amount;
+      }
+
+      if (!isEditing && basePayload.studio_fee_base_currency === null) {
+        delete (basePayload as { studio_fee_base_currency?: FinanceCurrency | null }).studio_fee_base_currency;
+      }
+
+      if (!isEditing && bulkEntryMode === "multiple") {
+        if (parsedBulkEntryDates.length === 0) {
+          throw new Error("Add at least one valid payment date for the multi-entry helper");
+        }
+
+        if (bulkEntryInvalidTokens.length > 0) {
+          throw new Error("One or more bulk dates are invalid. Use YYYY-MM-DD.");
+        }
+
+        let latestDashboard: FinanceDashboardResponse | null = null;
+
+        for (const paymentDate of parsedBulkEntryDates) {
+          const response = await fetch("/api/admin/finance", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...basePayload,
+              payment_date: paymentDate,
+              session_date:
+                form.session_date && form.session_date.startsWith(month) ? paymentDate : form.session_date,
+            }),
+          });
+
+          if (response.status === 401) {
+            router.push("/admin/login");
+            return;
+          }
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || "Failed to create finance entries");
+          }
+
+          latestDashboard = data as FinanceDashboardResponse;
+        }
+
+        if (!latestDashboard) {
+          throw new Error("No finance entries were created");
+        }
+
+        setDashboard(latestDashboard);
+        setMonth(latestDashboard.month);
+        hideEntryForm(latestDashboard.month, latestDashboard);
+        setSuccess(
+          `${parsedBulkEntryDates.length} similar finance entr${parsedBulkEntryDates.length === 1 ? "y" : "ies"} saved.`
+        );
+        return;
+      }
+
       const response = await fetch("/api/admin/finance", {
         method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -829,24 +1275,7 @@ export default function AdminFinancePage() {
                 project_id: editingEntry?.projectId,
               }
             : {}),
-          ...form,
-          booking_id: form.booking_id || null,
-          client_name: form.client_name || null,
-          project_label: form.project_label || null,
-          gross_amount: Number(form.gross_amount),
-          fee_percentage: Number(form.fee_percentage),
-          studio_fee_base_amount:
-            form.studio_fee_base_amount.trim().length > 0
-              ? Number(form.studio_fee_base_amount)
-              : null,
-          studio_fee_base_currency:
-            form.studio_fee_base_amount.trim().length > 0 && form.studio_fee_base_currency
-              ? form.studio_fee_base_currency
-              : null,
-          processor_fee_percentage: Number(form.processor_fee_percentage),
-          invoice_reference: form.invoice_reference || null,
-          project_notes: form.project_notes || null,
-          payment_notes: form.payment_notes || null,
+          ...basePayload,
         }),
       });
 
@@ -863,8 +1292,7 @@ export default function AdminFinancePage() {
       const nextDashboard = data as FinanceDashboardResponse;
       setDashboard(nextDashboard);
       setMonth(nextDashboard.month);
-      setShowForm(false);
-      resetForm(nextDashboard.month, nextDashboard);
+      hideEntryForm(nextDashboard.month, nextDashboard);
       setSuccess(isEditing ? "Finance entry updated." : "Finance entry saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save finance entry");
@@ -944,8 +1372,7 @@ export default function AdminFinancePage() {
 
       setDashboard(data as FinanceDashboardResponse);
       if (editingEntry?.paymentId === paymentId) {
-        resetForm((data as FinanceDashboardResponse).month, data as FinanceDashboardResponse);
-        setShowForm(false);
+        hideEntryForm((data as FinanceDashboardResponse).month, data as FinanceDashboardResponse);
       }
       setSuccess("Finance entry removed.");
     } catch (err) {
@@ -1080,8 +1507,8 @@ export default function AdminFinancePage() {
 
     const takeHome = summary.net_totals_by_reporting_currency[currency];
     const studioFees = summary.studio_fee_totals_by_reporting_currency[currency];
-    const cardFees = summary.processor_fee_approx_totals_by_reporting_currency[currency];
-    const bucketTotal = takeHome + studioFees + cardFees;
+    const paymentFees = summary.processor_fee_approx_totals_by_reporting_currency[currency];
+    const bucketTotal = takeHome + studioFees + paymentFees;
     const bucketSegments = [
       {
         label: "Studio fees",
@@ -1089,8 +1516,8 @@ export default function AdminFinancePage() {
         color: "var(--trad-red-500)",
       },
       {
-        label: "Card fee drag",
-        value: cardFees,
+        label: "Payment fees",
+        value: paymentFees,
         color: "var(--blush-300)",
       },
       {
@@ -1103,7 +1530,7 @@ export default function AdminFinancePage() {
     return (
       <div
         key={currency}
-        className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4"
+        className="h-full rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4"
       >
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
@@ -1161,30 +1588,11 @@ export default function AdminFinancePage() {
             </span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-foreground-muted">Card fee drag</span>
+            <span className="text-foreground-muted">Payment fees</span>
             <span className="text-foreground">
-              {formatMoney(cardFees, currency)}
+              {formatMoney(paymentFees, currency)}
             </span>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  function renderTrendBar(point: FinanceMonthlyTrendPoint, primaryCurrency: FinanceCurrency) {
-    return (
-      <div key={point.month} className="flex min-w-0 flex-1 flex-col items-center gap-2">
-        <div className="flex h-40 w-full items-end justify-center rounded-2xl bg-[var(--sabbia-50)] px-2 py-3">
-          <div
-            className="w-full max-w-12 rounded-t-xl bg-[var(--ink-900)]/85"
-            style={{ height: getTrendBarHeight(point.net_total, trendMax) }}
-          />
-        </div>
-        <div className="text-center text-xs">
-          <p className="font-medium text-foreground">{point.label}</p>
-          <p className="mt-1 text-foreground-muted">
-            {formatMoney(point.net_total, primaryCurrency)}
-          </p>
         </div>
       </div>
     );
@@ -1209,20 +1617,11 @@ export default function AdminFinancePage() {
             variant={showForm ? "secondary" : "primary"}
             onClick={() => {
               setSuccess("");
-              if (financeView !== "operations") {
-                setFinanceView("operations");
-                if (!showForm) {
-                  setShowForm(true);
-                }
+              if (financeView !== "operations" || !showForm) {
+                revealEntryForm();
                 return;
               }
-              setShowForm((current) => {
-                const next = !current;
-                if (!next) {
-                  resetForm();
-                }
-                return next;
-              });
+              hideEntryForm();
             }}
           >
             {financeEntryButtonLabel}
@@ -1281,19 +1680,6 @@ export default function AdminFinancePage() {
         <div className="mb-6 space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <AdminMetricCard
-              label="This week"
-              value={
-                loading || !summary
-                  ? "..."
-                  : formatMoney(summary.week_total, summary.approx_primary.currency)
-              }
-              detail={
-                loading || !summary
-                  ? ""
-                  : summary.weekly.at(-1)?.label ?? "No payments this week"
-              }
-            />
-            <AdminMetricCard
               label="Cash received"
               tone="success"
               value={
@@ -1304,20 +1690,12 @@ export default function AdminFinancePage() {
               detail={
                 loading || !keepSummary
                   ? ""
-                  : `${keepSummary.payment_count} payment${keepSummary.payment_count === 1 ? "" : "s"} after studio split + card fees`
+                  : `${keepSummary.payment_count} payment${keepSummary.payment_count === 1 ? "" : "s"} after studio split + fees`
               }
-            />
-            <AdminMetricCard
-              label="Payment fees"
-              value={
-                loading || !keepSummary
-                  ? "..."
-                  : formatMoney(keepSummary.active_cashflow.processor_fees, keepSummary.currency)
-              }
-              detail="Only payment methods that actually use a processor."
             />
             <AdminMetricCard
               label="Disposable estimate"
+              tone="accent"
               value={
                 loading || !keepSummary
                   ? "..."
@@ -1329,19 +1707,15 @@ export default function AdminFinancePage() {
                   : `${formatMonthLabel(month)} after reserve + business costs`
               }
             />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <AdminMetricCard
-              label="Studio fees"
-              tone="accent"
+              label="Studio fees due"
               value={
                 loading || !summary
                   ? "..."
                   : `${formatMoney(summary.studio_fee_totals_by_reporting_currency.SEK, "SEK")} · ${formatMoney(summary.studio_fee_totals_by_reporting_currency.DKK, "DKK")} · ${formatMoney(summary.studio_fee_totals_by_reporting_currency.EUR, "EUR")}`
               }
               valueClassName="text-lg leading-tight sm:text-xl"
-              detail="Local payout buckets by studio/context."
+              detail="Grouped by local payout bucket, not forced into one fake currency."
             />
             <AdminMetricCard
               label="SumUp fees"
@@ -1350,7 +1724,23 @@ export default function AdminFinancePage() {
                   ? "..."
                   : formatMoney(summary.processor_fee_totals_by_processor_currency.EUR, "EUR")
               }
-              detail="Raw processor fees stay in EUR."
+              detail="Same fee family as payment fees for now, but kept separate so other processors can later behave differently."
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <AdminMetricCard
+              label="This week"
+              value={
+                loading || !summary
+                  ? "..."
+                  : formatMoney(summary.week_total, summary.approx_primary.currency)
+              }
+              detail={
+                loading || !summary
+                  ? ""
+                  : summary.weekly.at(-1)?.label ?? "No payments this week"
+              }
             />
             <AdminMetricCard
               label="Invoice reminders"
@@ -1367,7 +1757,7 @@ export default function AdminFinancePage() {
               }
             />
             <AdminMetricCard
-              label={`Approx ${summary?.approx_secondary.currency ?? "EUR"}`}
+              label={`Normalized ${summary?.approx_secondary.currency ?? "EUR"}`}
               value={
                 loading || !summary
                   ? "..."
@@ -1379,7 +1769,16 @@ export default function AdminFinancePage() {
               detail={
                 loading || !summary
                   ? ""
-                  : `Normalized overview only · ${getApproxRateSourceLabel(summary.approx_secondary.source)}`
+                  : `Converted cash-kept overview only, not disposable money · ${getApproxRateSourceLabel(summary.approx_secondary.source)}`
+              }
+            />
+            <AdminMetricCard
+              label="Trend direction"
+              value={loading || !summary ? "..." : formatDelta(summary.comparison.percent_delta)}
+              detail={
+                loading || !summary
+                  ? ""
+                  : `${formatMonthLabel(previousMonth)} to ${formatMonthLabel(month)}`
               }
             />
           </div>
@@ -1455,6 +1854,9 @@ export default function AdminFinancePage() {
                       <span>{formatMoney(keepSummary.active_cashflow.variable_expense_reserve, keepSummary.currency)}</span>
                     </div>
                   </div>
+                  <p className="mt-3 text-xs text-foreground-muted">
+                    Payment fees currently mean SumUp drag. The label stays broader so PayPal, bank, or future processor-specific semantics can split out cleanly later.
+                  </p>
                 </div>
 
                 <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm">
@@ -1515,7 +1917,7 @@ export default function AdminFinancePage() {
                       color: "var(--ink-900)",
                     },
                   ]}
-                  note="This split uses all monthly payments. Studio share and processor drag leave first; the rest is the actual cash pool Lia has in hand."
+                  note="This split uses all monthly payments. Studio share and payment fees leave first; the rest is the actual cash pool Lia has in hand."
                 />
 
                 <MoneyFlowBar
@@ -1737,7 +2139,7 @@ export default function AdminFinancePage() {
 
           {showExpenseForm ? (
             <form className="grid gap-4" onSubmit={handleCreateExpense}>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+              <div className="grid gap-4 md:grid-cols-2 md:items-end xl:grid-cols-4 2xl:grid-cols-5">
                 <label className="text-sm text-foreground-muted">
                   Expense date
                   <input
@@ -1924,7 +2326,7 @@ export default function AdminFinancePage() {
                         <div className="mt-2 flex flex-wrap justify-end gap-2">
                           <AdminButton
                             variant="secondary"
-                            className="!min-h-[32px] !px-3 !py-1 text-xs"
+                            className="!min-h-[36px] !px-3 !py-1.5 text-xs"
                             disabled={saving}
                             onClick={() => startEditingExpense(expense)}
                           >
@@ -1932,7 +2334,7 @@ export default function AdminFinancePage() {
                           </AdminButton>
                           <AdminButton
                             variant="ghost"
-                            className="!min-h-[32px] !px-3 !py-1 text-xs"
+                            className="!min-h-[36px] !px-3 !py-1.5 text-xs"
                             disabled={saving}
                             onClick={() => handleDeleteExpense(expense.id)}
                           >
@@ -1959,17 +2361,69 @@ export default function AdminFinancePage() {
       ) : null}
 
       {financeView === "operations" && showForm ? (
-        <AdminSurface className="mb-6">
+        <div ref={financeFormRef}>
+          <AdminSurface className="mb-6">
           <AdminSectionHeading
             title={financeFormHeading}
             description={financeFormDescription}
           />
 
-          <form className="grid gap-5" onSubmit={handleCreateEntry}>
+          <form className="grid gap-5 pb-28 lg:pb-0" onSubmit={handleCreateEntry}>
             <FinanceFormSection
               title="Session setup"
               description="Who, where, and when this payment belongs to."
             >
+              {!editingEntry ? (
+                <div className="mb-4 rounded-2xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AdminButton
+                      type="button"
+                      variant={bulkEntryMode === "single" ? "primary" : "secondary"}
+                      className="!min-h-[36px] !px-3 !py-1.5 text-xs"
+                      onClick={() => setBulkEntryMode("single")}
+                    >
+                      Single entry
+                    </AdminButton>
+                    <AdminButton
+                      type="button"
+                      variant={bulkEntryMode === "multiple" ? "primary" : "secondary"}
+                      className="!min-h-[36px] !px-3 !py-1.5 text-xs"
+                      onClick={() => setBulkEntryMode("multiple")}
+                    >
+                      Multiple similar entries
+                    </AdminButton>
+                  </div>
+
+                  {bulkEntryMode === "multiple" ? (
+                    <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+                      <label className="text-sm text-foreground-muted">
+                        Payment dates
+                        <textarea
+                          value={bulkEntryDates}
+                          onChange={(event) => setBulkEntryDates(event.target.value)}
+                          placeholder={`One date per line\n${month}-01\n${month}-08\n${month}-16`}
+                          className="mt-1 min-h-[120px] w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                          style={{ fontSize: "16px" }}
+                        />
+                      </label>
+
+                      <div className="rounded-xl bg-[var(--sabbia-50)] px-4 py-3 text-sm text-foreground-muted">
+                        <p className="font-medium text-foreground">How it works</p>
+                        <p className="mt-2">
+                          This creates one fresh project + payment per date, using the same details, amount, fee setup, and notes.
+                        </p>
+                        <p className="mt-2 text-xs">
+                          Valid dates: {parsedBulkEntryDates.length}
+                          {bulkEntryInvalidTokens.length > 0
+                            ? ` · Invalid: ${bulkEntryInvalidTokens.join(", ")}`
+                            : " · Format: YYYY-MM-DD"}
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
                 <label className="text-sm text-foreground-muted">
                   Existing booking (optional)
@@ -1986,7 +2440,7 @@ export default function AdminFinancePage() {
                     <option value="">No linked booking</option>
                     {bookings.map((booking) => (
                       <option key={booking.id} value={booking.id}>
-                        {booking.client_name} · {booking.type} · {booking.location}
+                        {booking.client_name} · {booking.type} · {booking.location === "copenhagen" ? "Copenhagen / Good Morning Tattoo studio" : "Malmö / Diamant studio"}
                         {booking.is_linked ? " · linked" : ""}
                       </option>
                     ))}
@@ -2045,10 +2499,10 @@ export default function AdminFinancePage() {
 
             <FinanceFormSection
               title="Money flow"
-              description="Start from what the client actually paid, then override the studio split only when reality is weirder than the default."
+              description="Start from what the client actually paid, then only turn on a separate split base when real life gets messier than the default."
             >
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.95fr)]">
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2 md:items-start">
                   <label className="text-sm text-foreground-muted">
                     {form.payment_method === "card" ? "Client charged amount" : "Payment amount received"}
                     <input
@@ -2140,39 +2594,39 @@ export default function AdminFinancePage() {
 
                 <div className="space-y-4">
                   <div className="rounded-3xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-4">
                       <div>
                         <p className="text-sm font-medium text-foreground">Studio split</p>
                         <p className="mt-1 text-xs text-foreground-muted">
-                          Default: use the same amount as the client payment.
-                          {form.payment_method === "card"
-                            ? " Turn this on only when Lia pays the studio from a different local amount."
-                            : " Turn this on only when the studio percentage should be based on another amount."}
+                          Default: follow the client payment amount and currency.
                         </p>
                       </div>
-                      <label className="flex items-center gap-2 rounded-full bg-[var(--sabbia-50)] px-3 py-1.5 text-sm text-foreground">
-                        <input
-                          type="checkbox"
-                          checked={showStudioSplitOverride}
-                          onChange={(event) => {
-                            const checked = event.target.checked;
-                            setShowStudioSplitOverride(checked);
-                            if (!checked) {
-                              updateForm("studio_fee_base_amount", "");
-                              return;
-                            }
 
-                            if (!form.studio_fee_base_currency) {
-                              updateForm("studio_fee_base_currency", form.reporting_currency);
-                            }
-                          }}
-                        />
-                        Use custom split amount
-                      </label>
+                      <AdminCheckboxCard
+                        checked={showStudioSplitOverride}
+                        onChange={(checked) => {
+                          setShowStudioSplitOverride(checked);
+                          if (!checked) {
+                            updateForm("studio_fee_base_amount", "");
+                            return;
+                          }
+
+                          if (!form.studio_fee_base_currency) {
+                            updateForm("studio_fee_base_currency", form.reporting_currency);
+                          }
+                        }}
+                        label="Use separate split base"
+                        description={
+                          form.payment_method === "card"
+                            ? "Use this when the client pays in one currency, but the studio share should be calculated from another local amount."
+                            : "Use this only when the studio percentage should be based on another amount than the payment received."
+                        }
+                        className="bg-[var(--sabbia-50)] shadow-none"
+                      />
                     </div>
 
                     {showStudioSplitOverride ? (
-                      <div className="mt-4 grid gap-4 md:grid-cols-2">
+                      <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(180px,0.8fr)] md:items-end">
                         <label className="text-sm text-foreground-muted">
                           Studio split amount
                           <input
@@ -2213,7 +2667,7 @@ export default function AdminFinancePage() {
                       </div>
                     ) : (
                       <div className="mt-4 rounded-2xl bg-[var(--sabbia-50)]/80 px-4 py-3 text-sm text-foreground-muted">
-                        Studio split will follow the same amount and currency as the client payment.
+                        Studio split follows the same amount and currency as the client payment.
                       </div>
                     )}
 
@@ -2251,7 +2705,7 @@ export default function AdminFinancePage() {
                     Deposit on this booking: {formatMoney(selectedBookingDeposit, selectedBookingCurrency ?? form.currency)}. If you know the full session total, enter it here and use the helper to fill the payable remainder.
                   </p>
 
-                  <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
+                  <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
                     <label className="text-sm text-foreground-muted">
                       Full session total in {selectedBookingCurrency}
                       <input
@@ -2266,7 +2720,7 @@ export default function AdminFinancePage() {
                       />
                     </label>
 
-                    <div className="flex items-end">
+                    <div className="flex items-end md:pb-0.5">
                       <AdminButton
                         type="button"
                         variant="secondary"
@@ -2423,27 +2877,28 @@ export default function AdminFinancePage() {
               </div>
             </FinanceFormSection>
 
-            <div className="flex flex-wrap gap-2">
-              <AdminButton variant="primary" type="submit" disabled={saving}>
-                {saving
-                  ? "Saving..."
-                  : editingEntry
-                    ? "Save finance changes"
-                    : "Save finance entry"}
-              </AdminButton>
-              <AdminButton
-                variant="secondary"
-                type="button"
-                onClick={() => {
-                  resetForm();
-                  setShowForm(false);
-                }}
-              >
-                Cancel
-              </AdminButton>
+            <div className="sticky bottom-3 z-20 -mx-1 mt-1 px-1 lg:static lg:mx-0 lg:px-0">
+              <div className="flex flex-col gap-2 rounded-2xl border border-[var(--sabbia-200)] bg-white/95 p-3 shadow-lg backdrop-blur sm:flex-row sm:flex-wrap sm:justify-end lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-0">
+                <AdminButton variant="primary" type="submit" disabled={saving} className="w-full sm:w-auto">
+                  {saving
+                    ? "Saving..."
+                    : editingEntry
+                      ? "Save finance changes"
+                      : "Save finance entry"}
+                </AdminButton>
+                <AdminButton
+                  variant="secondary"
+                  type="button"
+                  className="w-full sm:w-auto"
+                  onClick={() => hideEntryForm()}
+                >
+                  Cancel
+                </AdminButton>
+              </div>
             </div>
           </form>
-        </AdminSurface>
+          </AdminSurface>
+        </div>
       ) : null}
 
       {financeView === "operations" ? (
@@ -2458,7 +2913,7 @@ export default function AdminFinancePage() {
             <p className="text-sm text-foreground-muted">Loading reporting buckets...</p>
           ) : summary ? (
             <div className="space-y-4">
-              <div className="grid gap-4 xl:grid-cols-3">
+              <div className={`grid gap-4 ${getReportingBucketGridClass(Math.max(reportingBucketCurrencies.length, 1))}`}>
                 {(reportingBucketCurrencies.length > 0
                   ? reportingBucketCurrencies
                   : REPORTING_CURRENCIES
@@ -2565,7 +3020,7 @@ export default function AdminFinancePage() {
                         <span>{formatMoney(row.gross_total, row.reporting_currency)}</span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
-                        <span>Card fee drag</span>
+                        <span>Payment fees</span>
                         <span>{formatMoney(row.processor_fee_total, row.reporting_currency)}</span>
                       </div>
                     </div>
@@ -2664,20 +3119,63 @@ export default function AdminFinancePage() {
 
         <CollapsibleFinanceSection
           title="Last 6 months"
-          description="Cash-kept trend in the primary reporting currency, so the direction of travel is obvious at a glance."
+          description="Cash-kept trend in the primary reporting currency, with a lightweight next-month projection based on the recent run rate."
+          collapsedPreview={
+            loading || !summary || summary.monthly_trend.length === 0 ? null : (
+              <div className="grid gap-2 text-xs text-foreground-muted sm:grid-cols-3">
+                <div className="rounded-xl bg-[var(--sabbia-50)] px-3 py-2">
+                  <p className="font-medium text-foreground">
+                    {formatMoney(latestTrendPoint?.net_total ?? 0, summary.approx_primary.currency)}
+                  </p>
+                  <p>{latestTrendPoint?.label ?? "Latest month"}</p>
+                </div>
+                <div className="rounded-xl bg-[var(--sabbia-50)] px-3 py-2">
+                  <p className="font-medium text-foreground">{formatDelta(summary.comparison.percent_delta)}</p>
+                  <p>vs last month</p>
+                </div>
+                <div className="rounded-xl bg-[var(--sabbia-50)] px-3 py-2">
+                  <p className="font-medium text-foreground">
+                    {trendProjection
+                      ? formatMoney(trendProjection.net_total, summary.approx_primary.currency)
+                      : "Need 2+ months"}
+                  </p>
+                  <p>{trendProjection ? `${formatShortMonthLabel(trendProjection.month)} projection` : "Projection"}</p>
+                </div>
+              </div>
+            )
+          }
         >
 
           {loading ? (
             <p className="text-sm text-foreground-muted">Loading trend...</p>
           ) : summary && summary.monthly_trend.length > 0 ? (
-            <div>
-              <div className="flex items-end gap-3 overflow-x-auto pb-2">
-                {summary.monthly_trend.map((point) =>
-                  renderTrendBar(point, summary.approx_primary.currency)
-                )}
-              </div>
-              <div className="mt-4 rounded-2xl bg-[var(--sabbia-50)] px-4 py-3 text-xs text-foreground-muted">
-                Dark bars show cash kept. Week and card-fee details stay separate below so the chart doesn’t turn into a spaghetti monster.
+            <div className="space-y-4">
+              <FinanceTrendLineChart
+                points={summary.monthly_trend}
+                projection={trendProjection}
+                currency={summary.approx_primary.currency}
+              />
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl bg-[var(--sabbia-50)] px-4 py-3 text-xs text-foreground-muted">
+                  <p className="font-medium text-foreground">Latest month</p>
+                  <p className="mt-1">
+                    {latestTrendPoint
+                      ? `${latestTrendPoint.label}: ${formatMoney(latestTrendPoint.net_total, summary.approx_primary.currency)}`
+                      : "No completed month yet"}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-[var(--sabbia-50)] px-4 py-3 text-xs text-foreground-muted">
+                  <p className="font-medium text-foreground">Direction</p>
+                  <p className="mt-1">{formatDelta(summary.comparison.percent_delta)}</p>
+                </div>
+                <div className="rounded-2xl bg-[var(--sabbia-50)] px-4 py-3 text-xs text-foreground-muted">
+                  <p className="font-medium text-foreground">Projection</p>
+                  <p className="mt-1">
+                    {trendProjection
+                      ? `${formatShortMonthLabel(trendProjection.month)} around ${formatMoney(trendProjection.net_total, summary.approx_primary.currency)}`
+                      : "Shows after at least 2 months of payments"}
+                  </p>
+                </div>
               </div>
             </div>
           ) : (
@@ -2791,7 +3289,7 @@ export default function AdminFinancePage() {
       <div className="mb-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
         <CollapsibleFinanceSection
           title="Monthly finance pulse"
-          description="Seasonality in one place: cash kept, studio drag, card fee drag, and pending invoice reminders across the last six months."
+            description="Seasonality in one place: cash kept, studio drag, payment-fee drag, and pending invoice reminders across the last six months."
         >
           <div className="mb-4 flex justify-end">
             <AdminButton
@@ -2887,7 +3385,7 @@ export default function AdminFinancePage() {
                     <div className="rounded-xl bg-white px-3 py-2">
                       <span className="flex items-center gap-2">
                         <span className="block h-2.5 w-2.5 rounded-full bg-[var(--blush-300)]" />
-                        SumUp drag
+                        Payment fees
                       </span>
                       <p className="mt-1 font-medium text-foreground">
                         {formatMoney(point.processor_fee_total, summary.approx_primary.currency)}
@@ -2972,7 +3470,7 @@ export default function AdminFinancePage() {
       <div className="mb-6">
         <CollapsibleFinanceSection
           title="Payout history"
-          description="A six-month view of what each studio or context reserve needed per month, with card fee drag attached to that bucket."
+            description="A six-month view of what each studio or context reserve needed per month, with payment-fee drag attached to that bucket."
         >
           <div className="mb-4 flex justify-end">
             <AdminButton
@@ -2997,7 +3495,7 @@ export default function AdminFinancePage() {
                     <th className="px-4 py-3 font-medium">Payout</th>
                     <th className="px-4 py-3 font-medium">Context</th>
                     <th className="px-4 py-3 font-medium">Fee total</th>
-                    <th className="px-4 py-3 font-medium">Card fee drag</th>
+                    <th className="px-4 py-3 font-medium">Payment fees</th>
                     <th className="px-4 py-3 font-medium">Entries</th>
                   </tr>
                 </thead>
@@ -3034,11 +3532,10 @@ export default function AdminFinancePage() {
       ) : null}
 
       {financeView === "operations" ? (
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="space-y-6">
+      <div className="space-y-6">
           <CollapsibleFinanceSection
             title="Studio / context totals"
-            description="Grouped by actual working context and native reporting bucket, so Malmö and Copenhagen stop bleeding into a fake currency view."
+            description="Grouped by actual work context and native reporting bucket, so Malmö, Copenhagen, Friuli, Turin, and touring stop bleeding into a fake currency view."
             defaultOpen
           >
 
@@ -3053,7 +3550,7 @@ export default function AdminFinancePage() {
                       <th className="px-4 py-3 font-medium">Gross</th>
                       <th className="px-4 py-3 font-medium">Studio fee</th>
                       <th className="px-4 py-3 font-medium">Card fee impact</th>
-                    <th className="px-4 py-3 font-medium">Cash kept</th>
+                      <th className="px-4 py-3 font-medium">Cash kept</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3095,133 +3592,348 @@ export default function AdminFinancePage() {
 
           <CollapsibleFinanceSection
             title="Projects this month"
-            description="Each payment shows studio-settlement numbers in the local bucket plus the raw SumUp fee in EUR, so the money trail matches reality."
+            description="Scan the month in wide project rows first, then expand only the ones that need full payment detail."
             defaultOpen
+            collapsedPreview={
+              loading ? null : monthlyProjects.length > 0 ? (
+                <div className="grid gap-2 text-xs text-foreground-muted sm:grid-cols-3">
+                  <div className="rounded-xl bg-[var(--sabbia-50)] px-3 py-2">
+                    <p className="font-medium text-foreground">{filteredMonthlyProjects.length}</p>
+                    <p>project{filteredMonthlyProjects.length === 1 ? "" : "s"} shown</p>
+                  </div>
+                  <div className="rounded-xl bg-[var(--sabbia-50)] px-3 py-2">
+                    <p className="font-medium text-foreground">{projectPaymentCount}</p>
+                    <p>payment line{projectPaymentCount === 1 ? "" : "s"}</p>
+                  </div>
+                  <div className="rounded-xl bg-[var(--sabbia-50)] px-3 py-2">
+                    <p className="font-medium text-foreground">Open project</p>
+                    <p>Each project row opens full payment details</p>
+                  </div>
+                </div>
+              ) : null
+            }
           >
 
             {loading ? (
               <p className="text-sm text-foreground-muted">Loading projects...</p>
             ) : monthlyProjects.length > 0 ? (
               <div className="space-y-4">
-                {monthlyProjects.map((project) => (
-                  <div
-                    key={project.id}
-                    className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/60 p-4"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">
-                          {project.project_label}
-                        </p>
-                        <p className="mt-1 text-xs text-foreground-muted">
-                          {project.client_name} · {getContextLabel(project.work_context, dashboard?.context_settings)}
-                          {project.session_date ? ` · session ${project.session_date}` : ""}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {project.booking_id ? (
-                          <span className="inline-flex rounded-full bg-white px-3 py-1 text-[11px] text-foreground-muted shadow-sm">
-                            linked booking
-                          </span>
-                        ) : null}
-                        <span className="inline-flex rounded-full bg-white px-3 py-1 text-[11px] text-foreground-muted shadow-sm">
-                          {project.payments.length} payment{project.payments.length === 1 ? "" : "s"}
-                        </span>
-                      </div>
-                    </div>
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                  <label className="text-sm text-foreground-muted">
+                    Search this month
+                    <input
+                      value={projectSearch}
+                      onChange={(event) => setProjectSearch(event.target.value)}
+                      placeholder="Client, project, context, payment label"
+                      className="mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
+                      style={{ fontSize: "16px" }}
+                    />
+                  </label>
 
-                    {project.payments.length > 0 ? (
-                      <div className="mt-4 grid gap-3">
-                        {project.payments.map((payment) => (
-                          <div key={payment.id} className="rounded-xl bg-white p-4 shadow-sm">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-foreground">
-                                  {payment.payment_label}
+                  <div className="grid gap-2 text-xs text-foreground-muted sm:grid-cols-3">
+                    <div className="rounded-xl bg-[var(--sabbia-50)] px-3 py-2">
+                      <p className="font-medium text-foreground">{filteredMonthlyProjects.length}</p>
+                      <p>project{filteredMonthlyProjects.length === 1 ? "" : "s"} shown</p>
+                    </div>
+                    <div className="rounded-xl bg-[var(--sabbia-50)] px-3 py-2">
+                      <p className="font-medium text-foreground">{projectPaymentCount}</p>
+                      <p>payment line{projectPaymentCount === 1 ? "" : "s"}</p>
+                    </div>
+                    <div className="rounded-xl bg-[var(--sabbia-50)] px-3 py-2">
+                      <p className="font-medium text-foreground">{invoiceReminderGroups.length}</p>
+                      <p>invoice reminder{invoiceReminderGroups.length === 1 ? "" : "s"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {normalizedProjectSearch && filteredMonthlyProjects.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-[var(--sabbia-300)] bg-[var(--sabbia-50)]/80 px-4 py-5 text-sm text-foreground-muted">
+                    No project matches that search in {formatMonthLabel(month)}.
+                  </div>
+                ) : null}
+
+                <div className="space-y-3">
+                  {visibleMonthlyProjects.map((project) => {
+                    const latestPayment = project.payments[0] ?? null;
+                    const totalGross = project.payments.reduce((sum, payment) => sum + payment.gross_amount, 0);
+                    const totalNetReporting = project.payments.reduce((sum, payment) => sum + payment.net_amount, 0);
+                    const totalFees = project.payments.reduce((sum, payment) => sum + payment.fee_amount, 0);
+                    const totalProcessorFees = project.payments.reduce(
+                      (sum, payment) => sum + payment.processor_fee_amount,
+                      0
+                    );
+                    const openInvoiceCount = project.payments.filter(
+                      (payment) => payment.invoice_needed && !payment.invoice_done
+                    ).length;
+                    const isExpanded = expandedProjectIds.includes(project.id);
+
+                    return (
+                      <details
+                        key={project.id}
+                        open={isExpanded}
+                        onToggle={(event) => {
+                          const nextOpen = (event.currentTarget as HTMLDetailsElement).open;
+                          setExpandedProjectIds((current) =>
+                            nextOpen
+                              ? current.includes(project.id)
+                                ? current
+                                : [...current, project.id]
+                              : current.filter((id) => id !== project.id)
+                          );
+                        }}
+                        className="rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/60 p-4"
+                      >
+                        <summary className="list-none cursor-pointer">
+                          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_auto] lg:items-start">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-sm font-semibold text-foreground">
+                                  {project.project_label}
                                 </p>
-                                <p className="mt-1 text-xs text-foreground-muted">
-                                  {payment.payment_date} · {FINANCE_PAYMENT_METHOD_LABELS[payment.payment_method]}
-                                  {` · paid in ${payment.currency} · reports in ${payment.reporting_currency}`}
-                                </p>
-                              </div>
-                              <div className="grid gap-1 text-right text-xs sm:min-w-56">
-                                <p className="text-foreground-muted">
-                                  Charged {formatMoney(payment.gross_amount, payment.currency)}
-                                </p>
-                                <p className="text-foreground-muted">
-                                  Studio fee {formatMoney(payment.fee_amount, payment.reporting_currency)} in {payment.reporting_currency}
-                                </p>
-                                <p className="text-foreground-muted">
-                                  Card fee {formatMoney(payment.processor_fee_amount, payment.processor_fee_currency)}
-                                </p>
-                                <p className="font-medium text-foreground">
-                                  Cash kept {formatMoney(payment.original_net_amount, payment.currency)}
-                                </p>
-                                {payment.currency !== payment.reporting_currency ? (
-                                  <p className="text-foreground-muted">
-                                    Reporting view {formatMoney(payment.net_amount, payment.reporting_currency)}
-                                  </p>
+                                {project.booking_id ? (
+                                  <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-[11px] text-foreground-muted shadow-sm">
+                                    linked booking
+                                  </span>
+                                ) : null}
+                                {openInvoiceCount > 0 ? (
+                                  <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[11px] text-amber-700">
+                                    {openInvoiceCount} invoice pending
+                                  </span>
                                 ) : null}
                               </div>
-                            </div>
-
-                            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                              <AdminButton
-                                variant="secondary"
-                                className="!min-h-[32px] !px-3 !py-1 text-xs"
-                                disabled={saving}
-                                onClick={() => startEditingEntry(project, payment.id)}
-                              >
-                                Edit
-                              </AdminButton>
-                              <AdminButton
-                                variant="ghost"
-                                className="!min-h-[32px] !px-3 !py-1 text-xs"
-                                disabled={saving}
-                                onClick={() => handleDeleteEntry(project.id, payment.id)}
-                              >
-                                Delete
-                              </AdminButton>
-                              <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-foreground-muted">
-                                {payment.fee_percentage}% studio fee
-                              </span>
-                              <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-foreground-muted">
-                                {payment.processor_fee_percentage}% processor fee
-                              </span>
-                              {payment.invoice_needed ? (
-                                <button
-                                  onClick={() =>
-                                    handleToggleInvoiceDone(project, payment.id, !payment.invoice_done)
-                                  }
-                                  className={`rounded-full px-2.5 py-1 transition-colors ${
-                                    payment.invoice_done
-                                      ? "bg-emerald-100 text-emerald-700"
-                                      : "bg-amber-100 text-amber-700"
-                                  }`}
-                                >
-                                  {payment.invoice_done ? "Invoice done" : "Invoice needed"}
-                                </button>
-                              ) : (
-                                <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-foreground-muted">
-                                  No invoice reminder
-                                </span>
-                              )}
-                              {payment.invoice_reference ? (
-                                <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-foreground-muted">
-                                  Ref {payment.invoice_reference}
-                                </span>
+                              <p className="mt-1 text-xs text-foreground-muted">
+                                {project.client_name} · {getContextLabel(project.work_context, dashboard?.context_settings)}
+                                {project.session_date ? ` · session ${project.session_date}` : ""}
+                              </p>
+                              {latestPayment ? (
+                                <div className="mt-3 rounded-xl bg-white px-3 py-2 text-xs text-foreground-muted shadow-sm">
+                                  <p className="font-medium text-foreground">Latest payment preview</p>
+                                  <p className="mt-1">
+                                    {latestPayment.payment_label} · {latestPayment.payment_date} · {FINANCE_PAYMENT_METHOD_LABELS[latestPayment.payment_method]}
+                                  </p>
+                                  <p className="mt-1">
+                                    Charged {formatMoney(latestPayment.gross_amount, latestPayment.currency)} · kept {formatMoney(latestPayment.original_net_amount, latestPayment.currency)}
+                                  </p>
+                                </div>
                               ) : null}
                             </div>
+
+                            <div className="grid gap-2 text-xs text-foreground-muted sm:grid-cols-2 xl:grid-cols-2">
+                              <div className="rounded-xl bg-white px-3 py-2 shadow-sm">
+                                <p className="font-medium text-foreground">{project.payments.length}</p>
+                                <p>payment{project.payments.length === 1 ? "" : "s"}</p>
+                              </div>
+                              <div className="rounded-xl bg-white px-3 py-2 shadow-sm">
+                                <p className="font-medium text-foreground">
+                                  {latestPayment ? formatMoney(totalGross, latestPayment.currency) : "-"}
+                                </p>
+                                <p>charged total</p>
+                              </div>
+                              <div className="rounded-xl bg-white px-3 py-2 shadow-sm">
+                                <p className="font-medium text-foreground">
+                                  {latestPayment
+                                    ? formatMoney(totalFees, latestPayment.reporting_currency)
+                                    : "-"}
+                                </p>
+                                <p>studio fees</p>
+                              </div>
+                              <div className="rounded-xl bg-white px-3 py-2 shadow-sm">
+                                <p className="font-medium text-foreground">
+                                  {latestPayment
+                                    ? formatMoney(totalNetReporting, latestPayment.reporting_currency)
+                                    : "-"}
+                                </p>
+                                <p>cash kept</p>
+                              </div>
+                            </div>
+
+                            <div className="flex justify-start lg:justify-end">
+                              <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-medium text-foreground shadow-sm">
+                                {isExpanded ? "Hide payments" : `Show ${project.payments.length} payment${project.payments.length === 1 ? "" : "s"}`}
+                                <svg
+                                  width="12"
+                                  height="12"
+                                  viewBox="0 0 12 12"
+                                  fill="none"
+                                  className={`transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                                >
+                                  <path
+                                    d="M2.5 4.5 6 8l3.5-3.5"
+                                    stroke="currentColor"
+                                    strokeWidth="1.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              </span>
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="mt-4 rounded-xl bg-white px-4 py-3 text-sm text-foreground-muted shadow-sm">
-                        Session tracked for this month, but no payment line has been logged yet.
-                      </div>
-                    )}
+                        </summary>
+
+                        {project.payments.length > 0 ? (
+                          <div className="mt-4 space-y-3 border-t border-[var(--sabbia-200)] pt-4">
+                            {project.payments.map((payment) => (
+                              <div key={payment.id} className="rounded-xl bg-white p-4 shadow-sm">
+                                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <p className="text-sm font-medium text-foreground">
+                                        {payment.payment_label}
+                                      </p>
+                                      <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-[11px] text-foreground-muted">
+                                        {FINANCE_PAYMENT_METHOD_LABELS[payment.payment_method]}
+                                      </span>
+                                      <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-[11px] text-foreground-muted">
+                                        {payment.payment_date}
+                                      </span>
+                                    </div>
+                                    <p className="mt-1 text-xs text-foreground-muted">
+                                      Paid in {payment.currency} · reports in {payment.reporting_currency}
+                                      {payment.currency !== payment.reporting_currency
+                                        ? " · converted for local bucket visibility"
+                                        : ""}
+                                    </p>
+                                  </div>
+
+                                  <div className="grid gap-2 text-xs text-foreground-muted sm:grid-cols-2 xl:grid-cols-4">
+                                    <div className="rounded-xl bg-[var(--sabbia-50)] px-3 py-2">
+                                      <p className="font-medium text-foreground">
+                                        {formatMoney(payment.gross_amount, payment.currency)}
+                                      </p>
+                                      <p>charged</p>
+                                    </div>
+                                    <div className="rounded-xl bg-[var(--sabbia-50)] px-3 py-2">
+                                      <p className="font-medium text-foreground">
+                                        {formatMoney(payment.fee_amount, payment.reporting_currency)}
+                                      </p>
+                                      <p>studio fee</p>
+                                    </div>
+                                    <div className="rounded-xl bg-[var(--sabbia-50)] px-3 py-2">
+                                      <p className="font-medium text-foreground">
+                                        {formatMoney(payment.processor_fee_amount, payment.processor_fee_currency)}
+                                      </p>
+                                      <p>payment fee</p>
+                                    </div>
+                                    <div className="rounded-xl bg-[var(--sabbia-50)] px-3 py-2">
+                                      <p className="font-medium text-foreground">
+                                        {formatMoney(payment.original_net_amount, payment.currency)}
+                                      </p>
+                                      <p>cash kept</p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {payment.currency !== payment.reporting_currency ? (
+                                  <p className="mt-3 text-xs text-foreground-muted">
+                                    Reporting view {formatMoney(payment.net_amount, payment.reporting_currency)} · studio fee and bucket totals stay local to {payment.reporting_currency}.
+                                  </p>
+                                ) : null}
+
+                                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                                  <AdminButton
+                                    variant="secondary"
+                                    className="!min-h-[36px] !px-3 !py-1.5 text-xs"
+                                    disabled={saving}
+                                    onClick={() => startEditingEntry(project, payment.id)}
+                                  >
+                                    Edit
+                                  </AdminButton>
+                                  <AdminButton
+                                    variant="secondary"
+                                    className="!min-h-[36px] !px-3 !py-1.5 text-xs"
+                                    disabled={saving}
+                                    onClick={() => startDuplicatePayment(project, payment.id)}
+                                  >
+                                    Duplicate payment
+                                  </AdminButton>
+                                  <AdminButton
+                                    variant="secondary"
+                                    className="!min-h-[36px] !px-3 !py-1.5 text-xs"
+                                    disabled={saving}
+                                    onClick={() => startSimilarProject(project, payment.id)}
+                                  >
+                                    Similar project
+                                  </AdminButton>
+                                  <AdminButton
+                                    variant="ghost"
+                                    className="!min-h-[36px] !px-3 !py-1.5 text-xs"
+                                    disabled={saving}
+                                    onClick={() => handleDeleteEntry(project.id, payment.id)}
+                                  >
+                                    Delete
+                                  </AdminButton>
+                                  <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-foreground-muted">
+                                    {payment.fee_percentage}% studio fee
+                                  </span>
+                                  <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-foreground-muted">
+                                    {payment.processor_fee_percentage}% SumUp fee
+                                  </span>
+                                  {payment.invoice_needed ? (
+                                    <button
+                                      onClick={() =>
+                                        handleToggleInvoiceDone(project, payment.id, !payment.invoice_done)
+                                      }
+                                      className={`inline-flex min-h-[36px] items-center justify-center rounded-full px-3 py-1.5 text-xs transition-colors ${
+                                        payment.invoice_done
+                                          ? "bg-emerald-100 text-emerald-700"
+                                          : "bg-amber-100 text-amber-700"
+                                      }`}
+                                    >
+                                      {payment.invoice_done ? "Invoice done" : "Invoice needed"}
+                                    </button>
+                                  ) : (
+                                    <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-foreground-muted">
+                                      No invoice reminder
+                                    </span>
+                                  )}
+                                  {payment.invoice_reference ? (
+                                    <span className="rounded-full bg-[var(--sabbia-50)] px-2.5 py-1 text-foreground-muted">
+                                      Ref {payment.invoice_reference}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
+                            ))}
+
+                            <div className="grid gap-2 text-xs text-foreground-muted sm:grid-cols-2 xl:grid-cols-4">
+                              <div className="rounded-xl bg-white px-3 py-2 shadow-sm">
+                                <p className="font-medium text-foreground">
+                                  {latestPayment
+                                    ? formatMoney(totalProcessorFees, latestPayment.processor_fee_currency)
+                                    : "-"}
+                                </p>
+                                  <p>total payment fees</p>
+                              </div>
+                              <div className="rounded-xl bg-white px-3 py-2 shadow-sm sm:col-span-2 xl:col-span-3">
+                                <p className="font-medium text-foreground">Fast repeat-entry shortcuts</p>
+                                <p className="mt-1">
+                                  Use “Duplicate payment” when it is basically the same project/payment again. Use “Similar project” when the details are almost identical but it should become a fresh project row.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-4 rounded-xl bg-white px-4 py-3 text-sm text-foreground-muted shadow-sm">
+                            Session tracked for this month, but no payment line has been logged yet.
+                          </div>
+                        )}
+                      </details>
+                    );
+                  })}
+                </div>
+
+                {hasHiddenProjects ? (
+                  <div className="flex justify-center">
+                    <AdminButton
+                      variant="secondary"
+                      onClick={() =>
+                        setVisibleProjectCount((current) => current + DEFAULT_VISIBLE_PROJECTS)
+                      }
+                    >
+                      Show {Math.min(DEFAULT_VISIBLE_PROJECTS, filteredMonthlyProjects.length - visibleProjectCount)} more project{filteredMonthlyProjects.length - visibleProjectCount === 1 ? "" : "s"}
+                    </AdminButton>
                   </div>
-                ))}
+                ) : null}
               </div>
             ) : (
               <AdminEmptyState
@@ -3235,7 +3947,6 @@ export default function AdminFinancePage() {
               />
             )}
           </CollapsibleFinanceSection>
-        </div>
 
         <div className="space-y-6">
           <AdminSurface>
@@ -3307,7 +4018,7 @@ export default function AdminFinancePage() {
                       <div className="flex flex-wrap gap-2">
                         <AdminButton
                           variant="secondary"
-                          className="!min-h-[32px] !px-3 !py-1 text-xs"
+                          className="!min-h-[36px] !px-3 !py-1.5 text-xs"
                           onClick={() =>
                             handleUpdateReminder(
                               payment.id,
@@ -3320,7 +4031,7 @@ export default function AdminFinancePage() {
                         </AdminButton>
                         <AdminButton
                           variant="secondary"
-                          className="!min-h-[32px] !px-3 !py-1 text-xs"
+                          className="!min-h-[36px] !px-3 !py-1.5 text-xs"
                           onClick={() => {
                             const project = monthlyProjects.find(
                               (item) => item.id === payment.project_id

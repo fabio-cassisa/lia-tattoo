@@ -11,10 +11,18 @@ import type {
 } from "@/lib/supabase/database.types";
 
 export const FINANCE_CONTEXT_LABELS: Record<FinanceWorkContext, string> = {
-  malmo_studio: "Malmö studio",
-  copenhagen_studio: "Copenhagen studio",
-  guest_spot: "Guest spot",
-  private_home: "Private / home",
+  malmo_studio: "Malmö / Diamant studio",
+  copenhagen_studio: "Copenhagen / Good Morning Tattoo studio",
+  private_home: "Friuli / by appointment",
+  torino_studio: "Turin / Studio Etra",
+  guest_spot: "Touring / guest spots",
+};
+
+const LEGACY_FINANCE_CONTEXT_LABELS: Partial<Record<FinanceWorkContext, string[]>> = {
+  malmo_studio: ["Malmö studio"],
+  copenhagen_studio: ["Copenhagen studio", "Copenhagen guest spot"],
+  private_home: ["Private / home"],
+  guest_spot: ["Guest spot"],
 };
 
 export const FINANCE_CONTEXT_CURRENCY_DEFAULTS: Record<
@@ -23,8 +31,9 @@ export const FINANCE_CONTEXT_CURRENCY_DEFAULTS: Record<
 > = {
   malmo_studio: "SEK",
   copenhagen_studio: "DKK",
-  guest_spot: "EUR",
   private_home: "EUR",
+  torino_studio: "EUR",
+  guest_spot: "EUR",
 };
 
 export const FINANCE_CONTEXT_FEE_DEFAULTS: Record<
@@ -33,8 +42,9 @@ export const FINANCE_CONTEXT_FEE_DEFAULTS: Record<
 > = {
   malmo_studio: 30,
   copenhagen_studio: 30,
-  guest_spot: 40,
   private_home: 0,
+  torino_studio: 40,
+  guest_spot: 40,
 };
 
 export const FINANCE_PAYMENT_METHOD_LABELS: Record<
@@ -63,9 +73,18 @@ export const FINANCE_PAYMENT_METHOD_OPTIONS: FinancePaymentMethod[] = [
 export const FINANCE_WORK_CONTEXT_OPTIONS: FinanceWorkContext[] = [
   "malmo_studio",
   "copenhagen_studio",
-  "guest_spot",
   "private_home",
+  "torino_studio",
+  "guest_spot",
 ];
+
+export const FINANCE_WORK_CONTEXT_SORT_ORDER: Record<FinanceWorkContext, number> = {
+  malmo_studio: 0,
+  copenhagen_studio: 1,
+  private_home: 2,
+  torino_studio: 3,
+  guest_spot: 4,
+};
 
 export const CARD_INVOICE_PAYMENT_METHODS: FinancePaymentMethod[] = ["card"];
 export const DEFAULT_CARD_PROCESSOR_FEE_PERCENTAGE = 1.95;
@@ -208,8 +227,34 @@ export function getContextLabel(
   context: FinanceWorkContext,
   contextSettings?: FinanceContextSettingsRow[]
 ): string {
+  const savedLabel = contextSettings?.find((item) => item.context === context)?.label;
+  const normalizedSavedLabel = normalizeContextLabel(context, savedLabel);
+
+  if (normalizedSavedLabel) {
+    return normalizedSavedLabel;
+  }
+
+  return FINANCE_CONTEXT_LABELS[context];
+}
+
+export function getFinanceWorkContextSortOrder(context: FinanceWorkContext): number {
+  return FINANCE_WORK_CONTEXT_SORT_ORDER[context] ?? Number.MAX_SAFE_INTEGER;
+}
+
+export function normalizeContextLabel(
+  context: FinanceWorkContext,
+  label: string | null | undefined
+): string | null {
+  if (typeof label !== "string") return null;
+
+  const trimmed = label.trim();
+  if (!trimmed) return null;
+
+  if (LEGACY_FINANCE_CONTEXT_LABELS[context]?.includes(trimmed)) {
+    return FINANCE_CONTEXT_LABELS[context];
+  }
+
   return (
-    contextSettings?.find((item) => item.context === context)?.label ??
-    FINANCE_CONTEXT_LABELS[context]
+    trimmed
   );
 }

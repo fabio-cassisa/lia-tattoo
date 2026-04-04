@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   getDefaultDepositAmount,
   getDepositCurrency,
 } from "@/lib/bookings/deposit";
 import {
+  AdminEmptyState,
   AdminShell,
   AdminMetricCard,
   AdminSurface,
 } from "@/components/admin/AdminShell";
-import { AdminAlert, AdminButton } from "@/components/admin/AdminPrimitives";
+import { AdminAlert, AdminButton, AdminSectionHeading } from "@/components/admin/AdminPrimitives";
 import type {
   BookingStatus,
   BookingLocation,
@@ -86,8 +87,8 @@ const COLOR_LABELS: Record<string, string> = {
 };
 
 const LOCATION_LABELS: Record<string, string> = {
-  malmo: "Malmö",
-  copenhagen: "Copenhagen",
+  malmo: "Malmö / Diamant studio",
+  copenhagen: "Copenhagen / Good Morning Tattoo studio",
 };
 
 const STATUS_COLORS: Record<BookingStatus, string> = {
@@ -107,6 +108,23 @@ const STATUS_LABELS: Record<BookingStatus, string> = {
   completed: "Completed",
   cancelled: "Cancelled",
 };
+
+const BOOKING_CONTROL_CLASSNAME =
+  "mt-1 w-full rounded-xl border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground";
+const BOOKING_TEXTAREA_CLASSNAME = `${BOOKING_CONTROL_CLASSNAME} min-h-[112px] resize-y`;
+const STATUS_ACTION_BUTTON_CLASSNAME =
+  "inline-flex min-h-[44px] w-full items-center justify-center rounded-xl px-4 py-2 text-sm text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50";
+const NEUTRAL_ACTION_BUTTON_CLASSNAME =
+  "inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-[var(--sabbia-300)] bg-white px-4 py-2 text-sm text-foreground-muted transition-colors hover:bg-[var(--sabbia-100)] disabled:cursor-not-allowed disabled:opacity-50";
+const STATUS_FILTERS = [
+  "all",
+  "pending",
+  "approved",
+  "deposit_paid",
+  "completed",
+  "declined",
+  "cancelled",
+] as const;
 
 function buildBookingFormState(booking: Booking): BookingFormState {
   return {
@@ -144,6 +162,7 @@ function getStatusSuccessMessage(status: BookingStatus): string {
 // ── Admin Dashboard ──────────────────────────────────────
 export default function AdminDashboard() {
   const router = useRouter();
+  const editSectionRef = useRef<HTMLDivElement>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -201,6 +220,7 @@ export default function AdminDashboard() {
   }
 
   const fetchBookings = useCallback(async () => {
+    setLoading(true);
     try {
       const params = statusFilter !== "all" ? `?status=${statusFilter}` : "";
       const res = await fetch(`/api/admin/bookings${params}`);
@@ -226,6 +246,17 @@ export default function AdminDashboard() {
     fetchBookings();
   }, [fetchBookings]);
 
+  useEffect(() => {
+    if (!editingBooking || !selectedBooking) return;
+    if (typeof window === "undefined" || window.innerWidth >= 1024) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      editSectionRef.current?.scrollIntoView({ block: "start" });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [editingBooking, selectedBooking]);
+
   async function handleStatusUpdate(
     bookingId: string,
     newStatus: BookingStatus
@@ -247,24 +278,23 @@ export default function AdminDashboard() {
         body: JSON.stringify(body),
       });
 
-        if (res.status === 401) {
-          router.push("/admin/login");
-          return;
-        }
+      if (res.status === 401) {
+        router.push("/admin/login");
+        return;
+      }
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Update failed");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Update failed");
 
-        // Update local state
-        setBookings((prev) =>
-          prev.map((b) => (b.id === bookingId ? data.booking : b))
-        );
-        selectBooking(data.booking);
-        setSuccess(
-          data.calendar_error
-            ? `${getStatusSuccessMessage(newStatus)} Calendar sync may need manual attention.`
-            : getStatusSuccessMessage(newStatus)
-        );
+      setBookings((prev) =>
+        prev.map((b) => (b.id === bookingId ? data.booking : b))
+      );
+      selectBooking(data.booking);
+      setSuccess(
+        data.calendar_error
+          ? `${getStatusSuccessMessage(newStatus)} Calendar sync may need manual attention.`
+          : getStatusSuccessMessage(newStatus)
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update booking");
     } finally {
@@ -432,135 +462,159 @@ export default function AdminDashboard() {
       maxWidth="wide"
       actions={<AdminButton variant="secondary" onClick={fetchBookings}>Refresh</AdminButton>}
     >
-
-      {/* Error */}
-      {error && (
-        <div className="mb-4">
+      <div className="space-y-6">
+        {error ? (
           <AdminAlert>
             {error}
             <button onClick={() => setError("")} className="ml-2 underline">
               dismiss
             </button>
           </AdminAlert>
+        ) : null}
+
+        {success ? <AdminAlert tone="info">{success}</AdminAlert> : null}
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <AdminMetricCard
+            label="Pending"
+            value={pendingCount}
+            tone={pendingCount > 0 ? "warning" : "default"}
+            detail="Needs a reply or a decision"
+          />
+          <AdminMetricCard
+            label="Confirmed"
+            value={depositPaidCount}
+            tone={depositPaidCount > 0 ? "accent" : "default"}
+            detail="Deposit already landed"
+          />
+          <AdminMetricCard label="This week" value={thisWeekCount} detail="New inquiries since Monday" />
+          <AdminMetricCard label="This month" value={thisMonthCount} detail="New inquiries this month" />
         </div>
-      )}
 
-      {success && (
-        <div className="mb-4">
-          <AdminAlert tone="info">{success}</AdminAlert>
-        </div>
-      )}
+        <AdminSurface>
+          <AdminSectionHeading
+            title="Inbox filters"
+            description="Sort the request queue fast, then open one request at a time without losing the broader picture."
+            action={
+              <span className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                {bookings.length} total requests
+              </span>
+            }
+          />
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 sm:mb-6">
-        <AdminMetricCard label="Pending" value={pendingCount} tone={pendingCount > 0 ? "warning" : "default"} />
-        <AdminMetricCard label="Confirmed" value={depositPaidCount} tone={depositPaidCount > 0 ? "accent" : "default"} />
-        <AdminMetricCard label="This week" value={thisWeekCount} />
-        <AdminMetricCard label="This month" value={thisMonthCount} />
-      </div>
-
-      {/* Traffic sources */}
-      {sortedSources.length > 0 && bookings.length > 0 && (
-        <AdminSurface className="mb-4 sm:mb-6">
-          <p className="text-xs text-foreground-muted mb-2">Traffic sources</p>
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {sortedSources.map(([source, count]) => (
-              <div key={source} className="flex items-center gap-1.5 text-sm">
-                <span className="font-medium text-foreground tabular-nums">{count}</span>
-                <span className="text-foreground-muted text-xs">{source}</span>
-                <span className="text-foreground-muted text-[10px]">
-                  ({Math.round((count / bookings.length) * 100)}%)
-                </span>
+          {sortedSources.length > 0 && bookings.length > 0 ? (
+            <div className="rounded-2xl bg-[var(--sabbia-50)]/80 p-4 text-sm text-foreground-muted">
+              <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                Traffic sources
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2.5">
+                {sortedSources.map(([source, count]) => (
+                  <span
+                    key={source}
+                    className="inline-flex items-center gap-2 rounded-full border border-[var(--sabbia-200)] bg-white px-3 py-1.5 text-xs text-foreground"
+                  >
+                    <span className="font-medium tabular-nums">{count}</span>
+                    <span className="text-foreground-muted">{source}</span>
+                    <span className="text-foreground-muted">
+                      {Math.round((count / bookings.length) * 100)}%
+                    </span>
+                  </span>
+                ))}
               </div>
+            </div>
+          ) : null}
+
+          <div className={`flex gap-2 overflow-x-auto pb-1 ${sortedSources.length > 0 && bookings.length > 0 ? "mt-4" : ""}`}>
+            {STATUS_FILTERS.map((status) => (
+              <button
+                key={status}
+                onClick={() => {
+                  setStatusFilter(status);
+                  setSelectedBooking(null);
+                }}
+                className={`inline-flex min-h-[36px] shrink-0 items-center rounded-full px-3 py-1.5 text-xs transition-colors ${
+                  statusFilter === status
+                    ? "bg-[var(--ink-900)] text-[var(--sabbia-50)]"
+                    : "bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)]"
+                }`}
+              >
+                {status === "all" ? "All" : STATUS_LABELS[status]}
+              </button>
             ))}
           </div>
         </AdminSurface>
-      )}
 
-      {/* Refresh row */}
-      <div className="flex items-center justify-between mb-4 text-sm text-foreground-muted">
-        <span>{bookings.length} total bookings</span>
-        <span>Tap a request to open the detail panel</span>
-      </div>
-
-      {/* Status filter tabs — horizontally scrollable on mobile */}
-      <div className="flex gap-2 mb-4 sm:mb-6 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:overflow-visible">
-        {(
-          ["all", "pending", "approved", "deposit_paid", "completed", "declined", "cancelled"] as const
-        ).map((s) => (
-          <button
-            key={s}
-            onClick={() => {
-              setStatusFilter(s);
-              setSelectedBooking(null);
-            }}
-            className={`shrink-0 px-3 py-1.5 text-xs rounded-full transition-colors min-h-[36px] ${
-              statusFilter === s
-                ? "bg-[var(--ink-900)] text-[var(--sabbia-50)]"
-                : "bg-[var(--sabbia-100)] text-foreground-muted hover:bg-[var(--sabbia-200)]"
-            }`}
-          >
-            {s === "all" ? "All" : STATUS_LABELS[s]}
-          </button>
-        ))}
-      </div>
-
-      {/* Main content: list + detail */}
-      <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-col gap-6 lg:flex-row">
         {/* Booking list */}
         <AdminSurface className="flex-1 min-w-0">
+          <AdminSectionHeading
+            title={statusFilter === "all" ? "Requests" : STATUS_LABELS[statusFilter]}
+            description={
+              selectedBooking
+                ? "Switch requests on the left while keeping the detail panel open."
+                : "Pick a request to open the detail panel and keep the workflow moving."
+            }
+          />
+
           {loading ? (
-            <p className="text-sm text-foreground-muted py-8 text-center">
-              Loading...
-            </p>
+            <AdminEmptyState
+              title="Loading requests"
+              description="Pulling the current booking queue so the next move is obvious."
+            />
           ) : bookings.length === 0 ? (
-            <p className="text-sm text-foreground-muted py-8 text-center">
-              No bookings found.
-            </p>
+            <AdminEmptyState
+              title="No requests here"
+              description="Try another status filter or wait for the next inquiry to land."
+            />
           ) : (
             <div className="space-y-2">
               {bookings.map((booking) => (
                 <button
                   key={booking.id}
                   onClick={() => selectBooking(booking)}
-                  className={`w-full text-left p-4 rounded border transition-colors ${
+                  className={`w-full rounded-2xl border p-4 text-left shadow-sm transition-colors ${
                     selectedBooking?.id === booking.id
-                      ? "border-[var(--trad-red-500)] bg-white"
+                      ? "border-[var(--trad-red-500)] bg-[var(--sabbia-50)]/80"
                       : "border-[var(--sabbia-200)] bg-white hover:border-[var(--sabbia-300)]"
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">
                         {booking.client_name}
                       </p>
-                      <p className="text-xs text-foreground-muted mt-0.5">
-                        {TYPE_LABELS[booking.type] || booking.type} &middot;{" "}
-                        {LOCATION_LABELS[booking.location] || booking.location} &middot;{" "}
-                        {new Date(booking.created_at).toLocaleDateString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                        })}
-                        {booking.appointment_date && (
-                          <>
-                            {" "}
-                            &middot;{" "}
-                            <span className="text-blue-600">
-                              {new Date(booking.appointment_date).toLocaleDateString("en-GB", {
-                                day: "numeric",
-                                month: "short",
-                              })}{" "}
-                              {new Date(booking.appointment_date).toLocaleTimeString("en-GB", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </span>
-                          </>
-                        )}
-                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-foreground-muted">
+                        <span className="rounded-full bg-[var(--sabbia-100)] px-2.5 py-1">
+                          {TYPE_LABELS[booking.type] || booking.type}
+                        </span>
+                        <span className="rounded-full bg-[var(--sabbia-100)] px-2.5 py-1">
+                          {LOCATION_LABELS[booking.location] || booking.location}
+                        </span>
+                        <span className="rounded-full bg-[var(--sabbia-100)] px-2.5 py-1">
+                          {new Date(booking.created_at).toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "short",
+                          })}
+                        </span>
+                      </div>
+
+                      {booking.appointment_date ? (
+                        <p className="mt-3 text-xs text-blue-600">
+                          Session booked for{" "}
+                          {new Date(booking.appointment_date).toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "short",
+                          })}{" "}
+                          at{" "}
+                          {new Date(booking.appointment_date).toLocaleTimeString("en-GB", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      ) : null}
                     </div>
                     <span
-                      className={`shrink-0 px-2 py-0.5 text-xs rounded-full ${STATUS_COLORS[booking.status]}`}
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs ${STATUS_COLORS[booking.status]}`}
                     >
                       {STATUS_LABELS[booking.status]}
                     </span>
@@ -571,558 +625,552 @@ export default function AdminDashboard() {
           )}
         </AdminSurface>
 
+        {!selectedBooking ? (
+          <div className="hidden shrink-0 lg:block lg:w-[400px]">
+            <AdminEmptyState
+              title="Open a request"
+              description="Pick a booking from the list to review the brief, set notes, confirm the deposit, and move it forward."
+            />
+          </div>
+        ) : null}
+
         {/* Detail panel — overlay on mobile, sidebar on desktop */}
-        {selectedBooking && (
+        {selectedBooking ? (
           <>
-            {/* Mobile overlay backdrop */}
-              <div
-                className="fixed inset-0 bg-black/30 z-40 lg:hidden"
-                onClick={closeBookingPanel}
-              />
-              <div className="fixed inset-x-0 bottom-0 top-12 z-50 overflow-y-auto bg-[var(--sabbia-50)] lg:static lg:inset-auto lg:z-auto lg:w-[400px] shrink-0">
-                <div className="bg-white border border-[var(--sabbia-200)] rounded-t-xl lg:rounded p-5 lg:sticky lg:top-6 min-h-full lg:min-h-0">
-                  {/* Close button — mobile only */}
-                  <button
-                    onClick={closeBookingPanel}
-                    className="lg:hidden absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-foreground-muted hover:text-foreground rounded-full bg-[var(--sabbia-100)]"
-                    aria-label="Close"
-                  >
+            <div
+              className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+              onClick={closeBookingPanel}
+            />
+            <div className="fixed inset-x-0 bottom-0 top-12 z-50 overflow-y-auto bg-[var(--sabbia-50)] lg:static lg:inset-auto lg:z-auto lg:w-[400px] lg:shrink-0">
+              <div className="relative min-h-full rounded-t-3xl border border-[var(--sabbia-200)] bg-white p-5 shadow-sm sm:p-6 lg:sticky lg:top-6 lg:min-h-0 lg:rounded-3xl">
+                <button
+                  onClick={closeBookingPanel}
+                  className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-[var(--sabbia-100)] text-foreground-muted transition-colors hover:text-foreground lg:hidden"
+                  aria-label="Close"
+                >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M1 1l12 12M13 1L1 13" />
                   </svg>
                 </button>
-              {/* Client info */}
-              <div className="mb-4">
-                <h2 className="text-base font-medium text-foreground">
-                  {selectedBooking.client_name}
-                </h2>
-                <p className="text-xs text-foreground-muted mt-1">
-                  <a
-                    href={`mailto:${selectedBooking.client_email}`}
-                    className="hover:text-[var(--trad-red-500)] transition-colors"
-                  >
-                    {selectedBooking.client_email}
-                  </a>
-                  {selectedBooking.client_phone && (
-                    <>
-                      {" "}
-                      &middot;{" "}
-                      <a
-                        href={`tel:${selectedBooking.client_phone}`}
-                        className="hover:text-[var(--trad-red-500)] transition-colors"
-                      >
-                        {selectedBooking.client_phone}
-                      </a>
-                    </>
-                  )}
-                </p>
-              </div>
 
-              {/* Status badge */}
-              <div className="mb-4">
-                <span
-                  className={`inline-block px-2.5 py-1 text-xs rounded-full ${STATUS_COLORS[selectedBooking.status]}`}
-                >
-                  {STATUS_LABELS[selectedBooking.status]}
-                </span>
-                <span className="text-xs text-foreground-muted ml-2">
-                  {new Date(selectedBooking.created_at).toLocaleDateString(
-                    "en-GB",
-                    {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    }
-                  )}
-                </span>
-              </div>
-
-              {/* Details grid */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm mb-4">
-                <div>
-                  <p className="text-xs text-foreground-muted">Location</p>
-                  <p className="text-foreground">
-                    {LOCATION_LABELS[selectedBooking.location] ||
-                      selectedBooking.location}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-foreground-muted">Type</p>
-                  <p className="text-foreground">
-                    {TYPE_LABELS[selectedBooking.type] || selectedBooking.type}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-foreground-muted">Size</p>
-                  <p className="text-foreground">
-                    {SIZE_LABELS[selectedBooking.size] || selectedBooking.size}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-foreground-muted">Color</p>
-                  <p className="text-foreground">
-                    {COLOR_LABELS[selectedBooking.color] ||
-                      selectedBooking.color}
-                  </p>
-                </div>
-              </div>
-
-              {/* Placement */}
-              {selectedBooking.placement && (
-                <div className="mb-3 text-sm">
-                  <p className="text-xs text-foreground-muted">Placement</p>
-                  <p className="text-foreground">{selectedBooking.placement}</p>
-                </div>
-              )}
-
-              {/* Description */}
-              {selectedBooking.description && (
-                <div className="mb-3 text-sm">
-                  <p className="text-xs text-foreground-muted">Description</p>
-                  <p className="text-foreground whitespace-pre-wrap">
-                    {selectedBooking.description}
-                  </p>
-                </div>
-              )}
-
-              {/* Allergies */}
-              {selectedBooking.allergies && (
-                <div className="mb-3 text-sm">
-                  <p className="text-xs text-foreground-muted">Allergies</p>
-                  <p className="text-red-700">{selectedBooking.allergies}</p>
-                </div>
-              )}
-
-              {/* Admin notes (existing) */}
-              {selectedBooking.admin_notes && selectedBooking.status !== "pending" && (
-                <div className="mb-3 text-sm">
-                  <p className="text-xs text-foreground-muted">Your notes</p>
-                  <p className="text-foreground italic">
-                    {selectedBooking.admin_notes}
-                  </p>
-                </div>
-              )}
-
-              {/* Deposit info */}
-              {selectedBooking.deposit_amount !== null &&
-                selectedBooking.status !== "pending" && (
-                <div className="mb-3 text-sm">
-                  <p className="text-xs text-foreground-muted">Deposit</p>
-                  <p className="text-foreground">
-                    {selectedBooking.deposit_amount}{" "}
-                    {getDepositCurrency(selectedBooking.location)}
-                  </p>
-                </div>
-              )}
-
-              {/* Appointment date/time (Malmö — slot picker) */}
-              {selectedBooking.appointment_date && (
-                <div className="mb-3 text-sm">
-                  <p className="text-xs text-foreground-muted">Appointment</p>
-                  <p className="text-foreground">
-                    {new Date(
-                      selectedBooking.appointment_date
-                    ).toLocaleDateString("en-GB", {
-                      weekday: "long",
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                    {" at "}
-                    {new Date(
-                      selectedBooking.appointment_date
-                    ).toLocaleTimeString("en-GB", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                    {selectedBooking.appointment_end && (
-                      <>
-                        {" – "}
-                        {new Date(
-                          selectedBooking.appointment_end
-                        ).toLocaleTimeString("en-GB", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </>
-                    )}
-                  </p>
-                  {/* Calendar sync indicator */}
-                  {selectedBooking.calendar_event_id ? (
-                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                      <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
-                      Synced to Google Calendar
-                    </p>
-                  ) : selectedBooking.status === "deposit_paid" ? (
-                    <p className="text-xs text-yellow-600 mt-1 flex items-center gap-1">
-                      <span className="inline-block w-2 h-2 rounded-full bg-yellow-500" />
-                      Calendar event pending
-                    </p>
-                  ) : null}
-                </div>
-              )}
-
-              {/* Preferred dates (Copenhagen — free text) */}
-              {selectedBooking.preferred_dates && (
-                <div className="mb-3 text-sm">
-                  <p className="text-xs text-foreground-muted">Preferred dates</p>
-                  <p className="text-foreground whitespace-pre-wrap">
-                    {selectedBooking.preferred_dates}
-                  </p>
-                </div>
-              )}
-
-              {/* Referral source */}
-              {(selectedBooking.referrer || selectedBooking.utm_source) && (
-                <div className="mb-3 text-sm">
-                  <p className="text-xs text-foreground-muted">Came from</p>
-                  <p className="text-foreground">
-                    {classifySource(selectedBooking)}
-                    {selectedBooking.utm_campaign && (
-                      <span className="text-foreground-muted text-xs ml-1">
-                        ({selectedBooking.utm_campaign})
-                      </span>
-                    )}
-                  </p>
-                </div>
-              )}
-
-              {/* Divider */}
-              <hr className="my-4 border-[var(--sabbia-200)]" />
-
-              <div className="mb-4 flex flex-wrap gap-2">
-                {!editingBooking ? (
-                  <AdminButton
-                    variant="secondary"
-                    disabled={actionLoading}
-                    onClick={() => {
-                      setEditingBooking(true);
-                      setBookingForm(buildBookingFormState(selectedBooking));
-                    }}
-                  >
-                    Edit request details
-                  </AdminButton>
-                ) : null}
-
-                <button
-                  type="button"
-                  onClick={() => handleDeleteBooking(selectedBooking)}
-                  disabled={actionLoading}
-                  className="inline-flex min-h-[40px] items-center justify-center rounded-xl border border-red-200 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Delete booking
-                </button>
-              </div>
-
-              {editingBooking && bookingForm ? (
-                <div className="mb-4 rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
+                <div className="pr-12 lg:pr-0">
                   <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
-                    Edit request details
+                    Request details
+                  </p>
+                  <h2 className="mt-2 text-xl font-semibold tracking-[-0.01em] text-ink-900">
+                    {selectedBooking.client_name}
+                  </h2>
+                  <p className="mt-1 text-sm text-foreground-muted">
+                    <a
+                      href={`mailto:${selectedBooking.client_email}`}
+                      className="transition-colors hover:text-[var(--trad-red-500)]"
+                    >
+                      {selectedBooking.client_email}
+                    </a>
+                    {selectedBooking.client_phone ? (
+                      <>
+                        {" "}
+                        · {" "}
+                        <a
+                          href={`tel:${selectedBooking.client_phone}`}
+                          className="transition-colors hover:text-[var(--trad-red-500)]"
+                        >
+                          {selectedBooking.client_phone}
+                        </a>
+                      </>
+                    ) : null}
                   </p>
 
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <label className="text-xs text-foreground-muted">
-                      Client name
-                      <input
-                        value={bookingForm.client_name}
-                        onChange={(event) => updateBookingForm("client_name", event.target.value)}
-                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                        style={{ fontSize: "16px" }}
-                      />
-                    </label>
-
-                    <label className="text-xs text-foreground-muted">
-                      Client email
-                      <input
-                        type="email"
-                        value={bookingForm.client_email}
-                        onChange={(event) => updateBookingForm("client_email", event.target.value)}
-                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                        style={{ fontSize: "16px" }}
-                      />
-                    </label>
-
-                    <label className="text-xs text-foreground-muted">
-                      Client phone
-                      <input
-                        value={bookingForm.client_phone}
-                        onChange={(event) => updateBookingForm("client_phone", event.target.value)}
-                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                        style={{ fontSize: "16px" }}
-                      />
-                    </label>
-
-                    <label className="text-xs text-foreground-muted">
-                      Location
-                      <select
-                        value={bookingForm.location}
-                        onChange={(event) =>
-                          updateBookingForm("location", event.target.value as BookingLocation)
-                        }
-                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                        style={{ fontSize: "16px" }}
-                      >
-                        {(["malmo", "copenhagen"] as const).map((location) => (
-                          <option key={location} value={location}>
-                            {LOCATION_LABELS[location]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="text-xs text-foreground-muted">
-                      Type
-                      <select
-                        value={bookingForm.type}
-                        onChange={(event) =>
-                          updateBookingForm("type", event.target.value as BookingType)
-                        }
-                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                        style={{ fontSize: "16px" }}
-                      >
-                        {(["flash", "custom", "consultation", "coverup", "rework"] as const).map((type) => (
-                          <option key={type} value={type}>
-                            {TYPE_LABELS[type]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="text-xs text-foreground-muted">
-                      Size
-                      <select
-                        value={bookingForm.size}
-                        onChange={(event) =>
-                          updateBookingForm("size", event.target.value as BookingSize)
-                        }
-                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                        style={{ fontSize: "16px" }}
-                      >
-                        {(["small", "medium", "large", "xlarge"] as const).map((size) => (
-                          <option key={size} value={size}>
-                            {SIZE_LABELS[size]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="text-xs text-foreground-muted">
-                      Color
-                      <select
-                        value={bookingForm.color}
-                        onChange={(event) =>
-                          updateBookingForm("color", event.target.value as ColorPreference)
-                        }
-                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                        style={{ fontSize: "16px" }}
-                      >
-                        {(["blackgrey", "color", "both"] as const).map((color) => (
-                          <option key={color} value={color}>
-                            {COLOR_LABELS[color]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-xs ${STATUS_COLORS[selectedBooking.status]}`}>
+                      {STATUS_LABELS[selectedBooking.status]}
+                    </span>
+                    <span className="text-xs text-foreground-muted">
+                      Received{" "}
+                      {new Date(selectedBooking.created_at).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    <span className="rounded-full bg-[var(--sabbia-100)] px-2.5 py-1 font-mono text-[11px] text-foreground-muted">
+                      {selectedBooking.id.slice(0, 8)}
+                    </span>
                   </div>
+                </div>
 
-                  <div className="mt-3 grid gap-3">
-                    <label className="text-xs text-foreground-muted">
-                      Placement
-                      <input
-                        value={bookingForm.placement}
-                        onChange={(event) => updateBookingForm("placement", event.target.value)}
-                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                        style={{ fontSize: "16px" }}
-                      />
-                    </label>
-
-                    <label className="text-xs text-foreground-muted">
-                      Description
-                      <textarea
-                        value={bookingForm.description}
-                        onChange={(event) => updateBookingForm("description", event.target.value)}
-                        rows={4}
-                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                        style={{ fontSize: "16px" }}
-                      />
-                    </label>
-
-                    <label className="text-xs text-foreground-muted">
-                      Allergies
-                      <input
-                        value={bookingForm.allergies}
-                        onChange={(event) => updateBookingForm("allergies", event.target.value)}
-                        className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                        style={{ fontSize: "16px" }}
-                      />
-                    </label>
-
-                    {bookingForm.location === "copenhagen" ? (
-                      <label className="text-xs text-foreground-muted">
-                        Preferred dates
-                        <textarea
-                          value={bookingForm.preferred_dates}
-                          onChange={(event) => updateBookingForm("preferred_dates", event.target.value)}
-                          rows={3}
-                          className="mt-1 w-full rounded border border-[var(--sabbia-200)] bg-white px-3 py-2 text-sm text-foreground"
-                          style={{ fontSize: "16px" }}
-                        />
-                      </label>
-                    ) : null}
+                <div className="mt-5 rounded-2xl bg-[var(--sabbia-50)]/80 p-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-foreground-muted">Location</p>
+                      <p className="mt-1 text-foreground">
+                        {LOCATION_LABELS[selectedBooking.location] || selectedBooking.location}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-foreground-muted">Type</p>
+                      <p className="mt-1 text-foreground">
+                        {TYPE_LABELS[selectedBooking.type] || selectedBooking.type}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-foreground-muted">Size</p>
+                      <p className="mt-1 text-foreground">
+                        {SIZE_LABELS[selectedBooking.size] || selectedBooking.size}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-foreground-muted">Color</p>
+                      <p className="mt-1 text-foreground">
+                        {COLOR_LABELS[selectedBooking.color] || selectedBooking.color}
+                      </p>
+                    </div>
                   </div>
+                </div>
 
-                  {selectedBooking.location !== bookingForm.location && selectedBooking.calendar_event_id ? (
-                    <p className="mt-3 text-[11px] leading-relaxed text-foreground-muted">
-                      Changing this booking away from Malmö will remove its synced Google Calendar event on save.
-                    </p>
+                <div className="mt-5 space-y-4">
+                  {(selectedBooking.placement || selectedBooking.description || selectedBooking.allergies || selectedBooking.preferred_dates) ? (
+                    <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm">
+                      <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                        Tattoo brief
+                      </p>
+
+                      {selectedBooking.placement ? (
+                        <div className="mt-3 text-sm">
+                          <p className="text-xs text-foreground-muted">Placement</p>
+                          <p className="mt-1 text-foreground">{selectedBooking.placement}</p>
+                        </div>
+                      ) : null}
+
+                      {selectedBooking.description ? (
+                        <div className="mt-3 text-sm">
+                          <p className="text-xs text-foreground-muted">Description</p>
+                          <p className="mt-1 whitespace-pre-wrap text-foreground">
+                            {selectedBooking.description}
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {selectedBooking.allergies ? (
+                        <div className="mt-3 text-sm">
+                          <p className="text-xs text-foreground-muted">Allergies</p>
+                          <p className="mt-1 text-red-700">{selectedBooking.allergies}</p>
+                        </div>
+                      ) : null}
+
+                      {selectedBooking.preferred_dates ? (
+                        <div className="mt-3 text-sm">
+                          <p className="text-xs text-foreground-muted">Preferred dates</p>
+                          <p className="mt-1 whitespace-pre-wrap text-foreground">
+                            {selectedBooking.preferred_dates}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
                   ) : null}
 
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  {(selectedBooking.deposit_amount !== null || selectedBooking.appointment_date || selectedBooking.admin_notes || selectedBooking.referrer || selectedBooking.utm_source) ? (
+                    <div className="rounded-2xl border border-[var(--sabbia-200)] bg-white p-4 shadow-sm">
+                      <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                        Operations
+                      </p>
+
+                      {selectedBooking.deposit_amount !== null && selectedBooking.status !== "pending" ? (
+                        <div className="mt-3 text-sm">
+                          <p className="text-xs text-foreground-muted">Deposit</p>
+                          <p className="mt-1 text-foreground">
+                            {selectedBooking.deposit_amount} {getDepositCurrency(selectedBooking.location)}
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {selectedBooking.appointment_date ? (
+                        <div className="mt-3 text-sm">
+                          <p className="text-xs text-foreground-muted">Appointment</p>
+                          <p className="mt-1 text-foreground">
+                            {new Date(selectedBooking.appointment_date).toLocaleDateString("en-GB", {
+                              weekday: "long",
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })}
+                            {" at "}
+                            {new Date(selectedBooking.appointment_date).toLocaleTimeString("en-GB", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                            {selectedBooking.appointment_end ? (
+                              <>
+                                {" – "}
+                                {new Date(selectedBooking.appointment_end).toLocaleTimeString("en-GB", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </>
+                            ) : null}
+                          </p>
+                          {selectedBooking.calendar_event_id ? (
+                            <p className="mt-1 flex items-center gap-1 text-xs text-green-600">
+                              <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                              Synced to Google Calendar
+                            </p>
+                          ) : selectedBooking.status === "deposit_paid" ? (
+                            <p className="mt-1 flex items-center gap-1 text-xs text-yellow-600">
+                              <span className="inline-block h-2 w-2 rounded-full bg-yellow-500" />
+                              Calendar event pending
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {(selectedBooking.referrer || selectedBooking.utm_source) ? (
+                        <div className="mt-3 text-sm">
+                          <p className="text-xs text-foreground-muted">Came from</p>
+                          <p className="mt-1 text-foreground">
+                            {classifySource(selectedBooking)}
+                            {selectedBooking.utm_campaign ? (
+                              <span className="ml-1 text-xs text-foreground-muted">
+                                ({selectedBooking.utm_campaign})
+                              </span>
+                            ) : null}
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {selectedBooking.admin_notes && selectedBooking.status !== "pending" ? (
+                        <div className="mt-3 text-sm">
+                          <p className="text-xs text-foreground-muted">Your notes</p>
+                          <p className="mt-1 italic text-foreground">{selectedBooking.admin_notes}</p>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {!editingBooking ? (
                     <AdminButton
-                      variant="primary"
-                      disabled={actionLoading}
-                      onClick={handleSaveBookingEdits}
-                    >
-                      {actionLoading ? "Saving..." : "Save request changes"}
-                    </AdminButton>
-                    <AdminButton
-                      variant="ghost"
+                      variant="secondary"
                       disabled={actionLoading}
                       onClick={() => {
-                        setEditingBooking(false);
+                        setEditingBooking(true);
                         setBookingForm(buildBookingFormState(selectedBooking));
                       }}
                     >
-                      Cancel
+                      Edit request details
                     </AdminButton>
-                  </div>
-                </div>
-              ) : null}
+                  ) : null}
 
-              {/* Approval inputs */}
-              {selectedBooking.status === "pending" && (
-                <div className="mb-4 space-y-3">
-                  <div>
-                    <label className="block text-xs text-foreground-muted mb-1">
-                      Note for client (optional)
-                    </label>
-                    <textarea
-                      value={adminNote}
-                      onChange={(e) => setAdminNote(e.target.value)}
-                      rows={3}
-                      className="w-full px-3 py-2 border border-[var(--sabbia-200)] rounded text-sm bg-white text-foreground focus:outline-none focus:border-[var(--trad-red-500)]"
-                      style={{ fontSize: "16px" }}
-                      placeholder="Add a personal note..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-foreground-muted mb-1">
-                      Deposit amount ({getDepositCurrency(bookingForm?.location ?? selectedBooking.location)})
-                    </label>
-                    <input
-                      type="number"
-                      value={depositAmount}
-                      onChange={(e) => setDepositAmount(e.target.value)}
-                      className="w-full px-3 py-2 border border-[var(--sabbia-200)] rounded text-sm bg-white text-foreground focus:outline-none focus:border-[var(--trad-red-500)]"
-                      style={{ fontSize: "16px" }}
-                        placeholder={String(
-                          getDefaultDepositAmount(
-                            bookingForm?.location ?? selectedBooking.location,
-                            bookingForm?.size ?? selectedBooking.size
-                          )
-                        )}
-                    />
-                    <p className="mt-1 text-[11px] text-foreground-muted">
-                      Pre-filled from size and location. Override it if needed
-                      before approving.
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteBooking(selectedBooking)}
+                    disabled={actionLoading}
+                    className="inline-flex min-h-[40px] items-center justify-center rounded-xl border border-red-200 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Delete booking
+                  </button>
+                </div>
+
+                {editingBooking && bookingForm ? (
+                  <div
+                    ref={editSectionRef}
+                    className="mt-5 rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4"
+                  >
+                    <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                      Edit request details
                     </p>
-                  </div>
-                </div>
-              )}
 
-              {editingBooking ? (
-                <p className="mb-4 text-[11px] leading-relaxed text-foreground-muted">
-                  Save or cancel the request edits before changing the booking status.
-                </p>
-              ) : null}
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <label className="text-xs text-foreground-muted">
+                        Client name
+                        <input
+                          value={bookingForm.client_name}
+                          onChange={(event) => updateBookingForm("client_name", event.target.value)}
+                          className={BOOKING_CONTROL_CLASSNAME}
+                          style={{ fontSize: "16px" }}
+                        />
+                      </label>
 
-              {/* Action buttons based on status */}
-              <div className="space-y-2">
-                {selectedBooking.status === "pending" && (
-                  <>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() =>
-                          handleStatusUpdate(selectedBooking.id, "approved")
-                        }
-                        disabled={statusActionsDisabled}
-                        className="flex-1 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
+                      <label className="text-xs text-foreground-muted">
+                        Client email
+                        <input
+                          type="email"
+                          value={bookingForm.client_email}
+                          onChange={(event) => updateBookingForm("client_email", event.target.value)}
+                          className={BOOKING_CONTROL_CLASSNAME}
+                          style={{ fontSize: "16px" }}
+                        />
+                      </label>
+
+                      <label className="text-xs text-foreground-muted">
+                        Client phone
+                        <input
+                          value={bookingForm.client_phone}
+                          onChange={(event) => updateBookingForm("client_phone", event.target.value)}
+                          className={BOOKING_CONTROL_CLASSNAME}
+                          style={{ fontSize: "16px" }}
+                        />
+                      </label>
+
+                      <label className="text-xs text-foreground-muted">
+                        Location
+                        <select
+                          value={bookingForm.location}
+                          onChange={(event) =>
+                            updateBookingForm("location", event.target.value as BookingLocation)
+                          }
+                          className={BOOKING_CONTROL_CLASSNAME}
+                          style={{ fontSize: "16px" }}
+                        >
+                          {(["malmo", "copenhagen"] as const).map((location) => (
+                            <option key={location} value={location}>
+                              {LOCATION_LABELS[location]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="text-xs text-foreground-muted">
+                        Type
+                        <select
+                          value={bookingForm.type}
+                          onChange={(event) =>
+                            updateBookingForm("type", event.target.value as BookingType)
+                          }
+                          className={BOOKING_CONTROL_CLASSNAME}
+                          style={{ fontSize: "16px" }}
+                        >
+                          {(["flash", "custom", "consultation", "coverup", "rework"] as const).map((type) => (
+                            <option key={type} value={type}>
+                              {TYPE_LABELS[type]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="text-xs text-foreground-muted">
+                        Size
+                        <select
+                          value={bookingForm.size}
+                          onChange={(event) =>
+                            updateBookingForm("size", event.target.value as BookingSize)
+                          }
+                          className={BOOKING_CONTROL_CLASSNAME}
+                          style={{ fontSize: "16px" }}
+                        >
+                          {(["small", "medium", "large", "xlarge"] as const).map((size) => (
+                            <option key={size} value={size}>
+                              {SIZE_LABELS[size]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="text-xs text-foreground-muted sm:col-span-2">
+                        Color
+                        <select
+                          value={bookingForm.color}
+                          onChange={(event) =>
+                            updateBookingForm("color", event.target.value as ColorPreference)
+                          }
+                          className={BOOKING_CONTROL_CLASSNAME}
+                          style={{ fontSize: "16px" }}
+                        >
+                          {(["blackgrey", "color", "both"] as const).map((color) => (
+                            <option key={color} value={color}>
+                              {COLOR_LABELS[color]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    <div className="mt-3 grid gap-3">
+                      <label className="text-xs text-foreground-muted">
+                        Placement
+                        <input
+                          value={bookingForm.placement}
+                          onChange={(event) => updateBookingForm("placement", event.target.value)}
+                          className={BOOKING_CONTROL_CLASSNAME}
+                          style={{ fontSize: "16px" }}
+                        />
+                      </label>
+
+                      <label className="text-xs text-foreground-muted">
+                        Description
+                        <textarea
+                          value={bookingForm.description}
+                          onChange={(event) => updateBookingForm("description", event.target.value)}
+                          rows={5}
+                          className={BOOKING_TEXTAREA_CLASSNAME}
+                          style={{ fontSize: "16px" }}
+                        />
+                      </label>
+
+                      <label className="text-xs text-foreground-muted">
+                        Allergies
+                        <input
+                          value={bookingForm.allergies}
+                          onChange={(event) => updateBookingForm("allergies", event.target.value)}
+                          className={BOOKING_CONTROL_CLASSNAME}
+                          style={{ fontSize: "16px" }}
+                        />
+                      </label>
+
+                      {bookingForm.location === "copenhagen" ? (
+                        <label className="text-xs text-foreground-muted">
+                          Preferred dates
+                          <textarea
+                            value={bookingForm.preferred_dates}
+                            onChange={(event) => updateBookingForm("preferred_dates", event.target.value)}
+                            rows={4}
+                            className={BOOKING_TEXTAREA_CLASSNAME}
+                            style={{ fontSize: "16px" }}
+                          />
+                        </label>
+                      ) : null}
+                    </div>
+
+                    {selectedBooking.location !== bookingForm.location && selectedBooking.calendar_event_id ? (
+                      <p className="mt-3 text-[11px] leading-relaxed text-foreground-muted">
+                        Changing this booking away from Malmö resident slots will remove its synced Google Calendar event on save.
+                      </p>
+                    ) : null}
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <AdminButton
+                        variant="primary"
+                        disabled={actionLoading}
+                        onClick={handleSaveBookingEdits}
                       >
-                        {actionLoading ? "..." : "Approve"}
+                        {actionLoading ? "Saving..." : "Save request changes"}
+                      </AdminButton>
+                      <AdminButton
+                        variant="ghost"
+                        disabled={actionLoading}
+                        onClick={() => {
+                          setEditingBooking(false);
+                          setBookingForm(buildBookingFormState(selectedBooking));
+                        }}
+                      >
+                        Cancel
+                      </AdminButton>
+                    </div>
+                  </div>
+                ) : null}
+
+                {selectedBooking.status === "pending" ? (
+                  <div className="mt-5 rounded-2xl border border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/80 p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+                      Decision helper
+                    </p>
+
+                    <div className="mt-4 space-y-3">
+                      <label className="block text-xs text-foreground-muted">
+                        Note for client (optional)
+                        <textarea
+                          value={adminNote}
+                          onChange={(event) => setAdminNote(event.target.value)}
+                          rows={4}
+                          className={BOOKING_TEXTAREA_CLASSNAME}
+                          style={{ fontSize: "16px" }}
+                          placeholder="Add a personal note..."
+                        />
+                      </label>
+
+                      <label className="block text-xs text-foreground-muted">
+                        Deposit amount ({getDepositCurrency(bookingForm?.location ?? selectedBooking.location)})
+                        <input
+                          type="number"
+                          value={depositAmount}
+                          onChange={(event) => setDepositAmount(event.target.value)}
+                          className={BOOKING_CONTROL_CLASSNAME}
+                          style={{ fontSize: "16px" }}
+                          placeholder={String(
+                            getDefaultDepositAmount(
+                              bookingForm?.location ?? selectedBooking.location,
+                              bookingForm?.size ?? selectedBooking.size
+                            )
+                          )}
+                        />
+                        <span className="mt-1 block text-[11px] text-foreground-muted">
+                          Pre-filled from size and location. Override it only when the real quote differs.
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                ) : null}
+
+                {editingBooking ? (
+                  <p className="mt-4 text-[11px] leading-relaxed text-foreground-muted">
+                    Save or cancel the request edits before changing the booking status.
+                  </p>
+                ) : null}
+
+                <div className="mt-5 space-y-2">
+                  {selectedBooking.status === "pending" ? (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => handleStatusUpdate(selectedBooking.id, "approved")}
+                        disabled={statusActionsDisabled}
+                        className={`${STATUS_ACTION_BUTTON_CLASSNAME} bg-emerald-600 hover:bg-emerald-700`}
+                      >
+                        {actionLoading ? "Working..." : "Approve"}
                       </button>
                       <button
-                        onClick={() =>
-                          handleStatusUpdate(selectedBooking.id, "declined")
-                        }
+                        type="button"
+                        onClick={() => handleStatusUpdate(selectedBooking.id, "declined")}
                         disabled={statusActionsDisabled}
-                        className="flex-1 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 transition-colors"
+                        className={`${STATUS_ACTION_BUTTON_CLASSNAME} bg-red-600 hover:bg-red-700`}
                       >
-                        {actionLoading ? "..." : "Decline"}
+                        {actionLoading ? "Working..." : "Decline"}
                       </button>
                     </div>
-                  </>
-                )}
+                  ) : null}
 
-                {selectedBooking.status === "approved" && (
-                  <button
-                    onClick={() =>
-                      handleStatusUpdate(selectedBooking.id, "deposit_paid")
-                    }
-                    disabled={statusActionsDisabled}
-                    className="w-full py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                  >
-                    {actionLoading ? "..." : "Mark Deposit Paid"}
-                  </button>
-                )}
-
-                {(selectedBooking.status === "deposit_paid" ||
-                  selectedBooking.status === "approved") && (
-                  <button
-                    onClick={() =>
-                      handleStatusUpdate(selectedBooking.id, "completed")
-                    }
-                    disabled={statusActionsDisabled}
-                    className="w-full py-2 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 transition-colors"
-                  >
-                    {actionLoading ? "..." : "Mark Completed (sends aftercare email)"}
-                  </button>
-                )}
-
-                {selectedBooking.status !== "cancelled" &&
-                  selectedBooking.status !== "completed" &&
-                  selectedBooking.status !== "declined" && (
+                  {selectedBooking.status === "approved" ? (
                     <button
-                      onClick={() =>
-                        handleStatusUpdate(selectedBooking.id, "cancelled")
-                      }
+                      type="button"
+                      onClick={() => handleStatusUpdate(selectedBooking.id, "deposit_paid")}
                       disabled={statusActionsDisabled}
-                      className="w-full py-2 text-sm border border-gray-300 text-gray-500 rounded hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                      className={`${STATUS_ACTION_BUTTON_CLASSNAME} bg-blue-600 hover:bg-blue-700`}
+                    >
+                      {actionLoading ? "Working..." : "Mark deposit paid"}
+                    </button>
+                  ) : null}
+
+                  {(selectedBooking.status === "deposit_paid" || selectedBooking.status === "approved") ? (
+                    <button
+                      type="button"
+                      onClick={() => handleStatusUpdate(selectedBooking.id, "completed")}
+                      disabled={statusActionsDisabled}
+                      className={`${STATUS_ACTION_BUTTON_CLASSNAME} bg-purple-600 hover:bg-purple-700`}
+                    >
+                      {actionLoading ? "Working..." : "Mark completed and send aftercare"}
+                    </button>
+                  ) : null}
+
+                  {selectedBooking.status !== "cancelled" &&
+                  selectedBooking.status !== "completed" &&
+                  selectedBooking.status !== "declined" ? (
+                    <button
+                      type="button"
+                      onClick={() => handleStatusUpdate(selectedBooking.id, "cancelled")}
+                      disabled={statusActionsDisabled}
+                      className={NEUTRAL_ACTION_BUTTON_CLASSNAME}
                     >
                       Cancel booking
                     </button>
-                  )}
+                  ) : null}
+                </div>
               </div>
-
-              {/* Booking ID */}
-              <p className="mt-4 text-xs text-foreground-muted text-center font-mono">
-                {selectedBooking.id.slice(0, 8)}
-              </p>
             </div>
-          </div>
           </>
-        )}
+        ) : null}
+        </div>
       </div>
     </AdminShell>
   );

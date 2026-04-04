@@ -15,6 +15,8 @@ import {
   DEFAULT_SWEDEN_STATE_TAX_RATE,
   DEFAULT_SWEDEN_STATE_TAX_THRESHOLD,
   DEFAULT_SWEDEN_TAX_LABEL,
+  FINANCE_WORK_CONTEXT_OPTIONS,
+  getFinanceWorkContextSortOrder,
 } from "@/lib/finance/config";
 import type {
   FinanceCurrency,
@@ -1051,7 +1053,8 @@ export function getFeeTotalsByContext(
       return a.reporting_currency.localeCompare(b.reporting_currency);
     }
 
-    return a.work_context.localeCompare(b.work_context);
+    return getFinanceWorkContextSortOrder(a.work_context) -
+      getFinanceWorkContextSortOrder(b.work_context);
   });
 }
 
@@ -1123,7 +1126,8 @@ export function buildMonthlyTrend(
   projects: FinanceProjectWithPayments[],
   rates: ResolvedExchangeRates,
   primaryCurrency: FinanceCurrency,
-  monthsToInclude = 6
+  monthsToInclude = 6,
+  endMonthKey?: string
 ): FinanceMonthlyTrendPoint[] {
   const monthMap = new Map<string, FinanceMonthlyTrendPoint>();
 
@@ -1170,9 +1174,18 @@ export function buildMonthlyTrend(
     }
   }
 
-  return [...monthMap.values()]
-    .sort((a, b) => a.month.localeCompare(b.month))
-    .slice(-monthsToInclude);
+  const sortedPoints = [...monthMap.values()].sort((a, b) => a.month.localeCompare(b.month));
+
+  if (!endMonthKey) {
+    return sortedPoints.slice(-monthsToInclude);
+  }
+
+  const endIndex = sortedPoints.findIndex((point) => point.month === endMonthKey);
+  if (endIndex === -1) {
+    return sortedPoints.slice(-monthsToInclude);
+  }
+
+  return sortedPoints.slice(Math.max(0, endIndex - (monthsToInclude - 1)), endIndex + 1);
 }
 
 export function buildMonthlyContextPayouts(
@@ -1209,11 +1222,12 @@ export function buildMonthlyContextPayouts(
     .sort((a, b) => {
       if (a.month !== b.month) return a.month.localeCompare(b.month);
       if (a.work_context !== b.work_context) {
-        return a.work_context.localeCompare(b.work_context);
+        return getFinanceWorkContextSortOrder(a.work_context) -
+          getFinanceWorkContextSortOrder(b.work_context);
       }
       return a.reporting_currency.localeCompare(b.reporting_currency);
     })
-    .slice(-monthsToInclude * 4);
+    .slice(-monthsToInclude * FINANCE_WORK_CONTEXT_OPTIONS.length);
 }
 
 function formatTrendMonth(monthKey: string): string {

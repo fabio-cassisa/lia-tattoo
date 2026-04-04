@@ -192,7 +192,9 @@ async function buildDashboardResponse(monthKey: string): Promise<FinanceDashboar
   const monthlyTrend = buildMonthlyTrend(
     projectsWithPayments,
     rates,
-    settings.reporting_currency_primary
+    settings.reporting_currency_primary,
+    6,
+    monthKey
   );
   const monthlyContextPayouts = buildMonthlyContextPayouts(projectsWithPayments);
   const approxPrimary = getApproxTotal(
@@ -291,6 +293,7 @@ function getString(value: unknown): string | null {
 }
 
 function getNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
   if (typeof value === "string" && value.trim().length === 0) return null;
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : null;
@@ -304,8 +307,9 @@ function isFinanceWorkContext(value: unknown): value is FinanceWorkContext {
   return [
     "malmo_studio",
     "copenhagen_studio",
-    "guest_spot",
     "private_home",
+    "torino_studio",
+    "guest_spot",
   ].includes(String(value));
 }
 
@@ -447,10 +451,11 @@ export async function POST(request: NextRequest) {
           DEFAULT_CARD_PROCESSOR_FEE_PERCENTAGE
         : 0);
     const invoiceDone = getBoolean(body.invoice_done) ?? false;
+    const explicitInvoiceNeeded = getBoolean(body.invoice_needed);
     const invoiceNeeded =
       invoiceDone ||
-      getBoolean(body.invoice_needed) ||
-      (settings.card_invoice_default
+      explicitInvoiceNeeded ||
+      (explicitInvoiceNeeded === null && settings.card_invoice_default
         ? paymentMethodNeedsInvoiceByDefault(paymentMethod)
         : false);
     const studioFeeBaseAmount = getNumber(body.studio_fee_base_amount);

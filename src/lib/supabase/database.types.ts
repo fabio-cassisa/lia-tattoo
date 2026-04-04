@@ -41,6 +41,7 @@ export type FinancePaymentMethod =
 export type FinanceWorkContext =
   | "malmo_studio"
   | "copenhagen_studio"
+  | "torino_studio"
   | "guest_spot"
   | "private_home";
 
@@ -136,6 +137,7 @@ export type PortfolioImageRow = {
   storage_path: string;
   display_order: number;
   is_visible: boolean;
+  featured_on_homepage: boolean;
   width: number | null;
   height: number | null;
 };
@@ -146,8 +148,47 @@ export type PortfolioImageInsert = {
   storage_path: string;
   display_order?: number;
   is_visible?: boolean;
+  featured_on_homepage?: boolean;
   width?: number | null;
   height?: number | null;
+};
+
+export type SiteContentKind = "text" | "textarea";
+
+export type SiteContentKey =
+  | "booking_italy_note"
+  | "about_italy_note"
+  | "about_bio"
+  | "about_studios_note"
+  | "about_travel_note"
+  | "home_quote"
+  | "home_quote_highlight"
+  | "home_booking_cta_subtitle";
+
+export type SiteContentRow = {
+  key: SiteContentKey;
+  created_at: string;
+  updated_at: string;
+  title: string | null;
+  description: string | null;
+  source_en: string;
+  it_override: string | null;
+  sv_override: string | null;
+  da_override: string | null;
+  content_kind: SiteContentKind;
+  is_active: boolean;
+};
+
+export type SiteContentInsert = {
+  key: SiteContentKey;
+  title?: string | null;
+  description?: string | null;
+  source_en: string;
+  it_override?: string | null;
+  sv_override?: string | null;
+  da_override?: string | null;
+  content_kind?: SiteContentKind;
+  is_active?: boolean;
 };
 
 // ── Instagram cache types ────────────────────────────────
@@ -407,6 +448,12 @@ export type Database = {
         Row: PortfolioImageRow;
         Insert: PortfolioImageInsert;
         Update: Partial<PortfolioImageRow>;
+        Relationships: [];
+      };
+      site_content: {
+        Row: SiteContentRow;
+        Insert: SiteContentInsert;
+        Update: Partial<SiteContentRow>;
         Relationships: [];
       };
       instagram_media_cache: {

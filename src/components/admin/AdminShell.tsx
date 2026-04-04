@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-type AdminTab = "bookings" | "portfolio" | "insights" | "finance" | "settings";
+type AdminTab = "bookings" | "portfolio" | "content" | "insights" | "finance" | "settings";
 type AdminShellWidth = "narrow" | "medium" | "wide";
 type AdminMetricTone = "default" | "accent" | "warning" | "success";
 
@@ -14,6 +14,7 @@ type AdminShellProps = {
   activeTab: AdminTab;
   children: ReactNode;
   actions?: ReactNode;
+  mobileBottomActions?: ReactNode;
   maxWidth?: AdminShellWidth;
 };
 
@@ -40,6 +41,7 @@ type AdminEmptyStateProps = {
 const NAV_ITEMS: Array<{ key: AdminTab; label: string; href: string }> = [
   { key: "bookings", label: "Bookings", href: "/admin" },
   { key: "portfolio", label: "Portfolio", href: "/admin/portfolio" },
+  { key: "content", label: "Site Content", href: "/admin/content" },
   { key: "insights", label: "Creative Coach", href: "/admin/insights" },
   { key: "finance", label: "Finance", href: "/admin/finance" },
   { key: "settings", label: "Settings", href: "/admin/settings" },
@@ -64,9 +66,15 @@ export function AdminShell({
   activeTab,
   children,
   actions,
+  mobileBottomActions,
   maxWidth = "wide",
 }: AdminShellProps) {
   const router = useRouter();
+  const widthClass = WIDTH_CLASSES[maxWidth];
+  const hasMobileBottomActions = Boolean(mobileBottomActions);
+  const containerSpacingClass = hasMobileBottomActions
+    ? "px-4 pt-4 pb-28 sm:px-6 sm:pt-6 sm:pb-32 lg:py-6"
+    : "px-4 py-4 sm:px-6 sm:py-6";
 
   async function handleLogout() {
     await fetch("/api/admin/auth", { method: "DELETE" });
@@ -77,7 +85,7 @@ export function AdminShell({
 
   return (
     <div className="min-h-screen">
-      <div className={`mx-auto w-full ${WIDTH_CLASSES[maxWidth]} px-4 py-4 sm:px-6 sm:py-6`}>
+      <div className={`mx-auto w-full ${widthClass} ${containerSpacingClass}`}>
         <header className="mb-6 border-b border-ink-900/10 pb-4 sm:pb-6">
           <div className="flex flex-col gap-4 sm:gap-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -138,6 +146,16 @@ export function AdminShell({
 
         {children}
       </div>
+
+      {hasMobileBottomActions ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--sabbia-200)] bg-[var(--sabbia-50)]/96 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:hidden">
+          <div className={`mx-auto w-full ${widthClass} px-4 py-3 sm:px-6`}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              {mobileBottomActions}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

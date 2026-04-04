@@ -1,3 +1,4 @@
+import { getSupabaseUrl } from "@/lib/supabase/config";
 import { createAdminClient } from "@/lib/supabase/server";
 
 /**
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
   }
 
   // Add public URLs for each image
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseUrl = getSupabaseUrl();
   const images = (data ?? []).map((img) => ({
     ...img,
     url: `${supabaseUrl}/storage/v1/object/public/portfolio/${img.storage_path}`,

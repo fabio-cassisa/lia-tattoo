@@ -44,6 +44,41 @@ export function AdminButton({
   );
 }
 
+export function AdminCheckboxCard({
+  checked,
+  onChange,
+  label,
+  description,
+  className = "",
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  description?: string;
+  className?: string;
+}) {
+  return (
+    <label
+      className={`flex min-h-[52px] cursor-pointer gap-3 rounded-2xl border border-[var(--sabbia-200)] bg-white px-4 py-3 text-left text-foreground shadow-sm ${className}`.trim()}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="mt-1 h-4 w-4 shrink-0 accent-[var(--ink-900)]"
+      />
+      <span className="min-w-0">
+        <span className="block text-sm font-medium leading-5 text-foreground">{label}</span>
+        {description ? (
+          <span className="mt-1 block text-xs leading-relaxed text-foreground-muted">
+            {description}
+          </span>
+        ) : null}
+      </span>
+    </label>
+  );
+}
+
 export function AdminSectionHeading({
   title,
   description,
@@ -54,7 +89,7 @@ export function AdminSectionHeading({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
           {title}
@@ -63,7 +98,7 @@ export function AdminSectionHeading({
           <p className="mt-1 text-sm text-foreground-muted">{description}</p>
         ) : null}
       </div>
-      {action ? <div className="flex flex-wrap gap-2">{action}</div> : null}
+      {action ? <div className="flex flex-wrap gap-2 sm:pt-1">{action}</div> : null}
     </div>
   );
 }

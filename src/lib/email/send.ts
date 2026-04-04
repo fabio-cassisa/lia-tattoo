@@ -32,8 +32,8 @@ const COLOR_LABELS: Record<string, string> = {
 };
 
 const LOCATION_LABELS: Record<string, string> = {
-  malmo: "Malmö — Studio Diamant",
-  copenhagen: "Copenhagen — Good Morning Tattoo",
+  malmo: "Malmö / Diamant studio",
+  copenhagen: "Copenhagen / Good Morning Tattoo studio",
 };
 
 function getQrImageUrl(text: string): string {

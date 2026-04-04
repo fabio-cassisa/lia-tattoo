@@ -50,7 +50,7 @@ export function emailWrapper(content: string): string {
                 <a href="https://instagram.com/liagiorgi.one.ttt" style="color: ${BRAND.mutedText}; text-decoration: none;">@liagiorgi.one.ttt</a>
               </p>
               <p style="margin: 8px 0 0; font-size: 11px; color: ${BRAND.mutedText};">
-                Studio Diamant, Malm&ouml; &middot; Good Morning Tattoo, Copenhagen
+                Malm&ouml; / Diamant studio &middot; Copenhagen / Good Morning Tattoo studio
               </p>
             </td>
           </tr>
