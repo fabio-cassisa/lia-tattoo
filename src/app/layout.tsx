@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     template: "%s | liagiorgi.one.ttt",
   },
   description:
-    "Book your tattoo session with liagiorgi.one.ttt. Traditional & Old School tattoo art based in Malmö, with selected guest-spot dates in Copenhagen.",
+    "Book your tattoo session with liagiorgi.one.ttt. Traditional & Old School tattoo art based in Malmö, with selected dates at Good Morning Tattoo in Copenhagen.",
   keywords: [
     "tattoo",
     "traditional tattoo",
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "liagiorgi.one.ttt — Malmö · Copenhagen based",
     description:
-      "Traditional & Old School tattoo art based in Malmö, with selected guest-spot dates in Copenhagen.",
+      "Traditional & Old School tattoo art based in Malmö, with selected dates at Good Morning Tattoo in Copenhagen.",
     type: "website",
     siteName: "liagiorgi.one.ttt",
     locale: "en",
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "liagiorgi.one.ttt — Malmö · Copenhagen based",
     description:
-      "Traditional & Old School tattoo art based in Malmö, with selected guest-spot dates in Copenhagen.",
+      "Traditional & Old School tattoo art based in Malmö, with selected dates at Good Morning Tattoo in Copenhagen.",
   },
   robots: {
     index: true,

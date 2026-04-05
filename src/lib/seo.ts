@@ -34,7 +34,7 @@ export function getWebSiteJsonLd() {
     alternateName: "Lia Giorgi Tattoo",
     url: SITE_URL,
     description:
-      "Traditional & Old School tattoo art based in Malmö, with selected guest-spot dates in Copenhagen.",
+      "Traditional & Old School tattoo art based in Malmö, with selected dates at Good Morning Tattoo in Copenhagen.",
     inLanguage: ["en", "sv", "it", "da"],
   };
 }
@@ -49,7 +49,7 @@ export function getLocalBusinessJsonLd() {
     "@type": "TattooParlor",
     name: "liagiorgi.one.ttt",
     description:
-      "Traditional & Old School tattoo artist. Flash designs, custom work, consultations, cover-ups.",
+      "Traditional & Old School tattoo artist working from Studio Diamant in Malmö and Good Morning Tattoo in Copenhagen. Flash designs, custom work, consultations, cover-ups.",
     url: SITE_URL,
     image: `${SITE_URL}/opengraph-image`,
     priceRange: "$$",
@@ -78,7 +78,7 @@ export function getLocalBusinessJsonLd() {
     founder: {
       "@type": "Person",
       name: "Lia Giorgi",
-      jobTitle: "Traditional Tattoo Artist",
+      jobTitle: "Tattoo Artist",
       sameAs: ["https://www.instagram.com/liagiorgi.one.ttt/"],
     },
     openingHoursSpecification: {

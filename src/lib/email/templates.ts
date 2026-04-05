@@ -33,7 +33,7 @@ export function emailWrapper(content: string): string {
                 liagiorgi.one.ttt
               </h1>
               <p style="margin: 4px 0 0; font-size: 11px; color: ${BRAND.mutedText}; letter-spacing: 0.15em; text-transform: uppercase;">
-                &#10043; Traditional Tattoo Artist &#10043;
+                Malm&ouml; &middot; Copenhagen based
               </p>
             </td>
           </tr>
@@ -50,7 +50,7 @@ export function emailWrapper(content: string): string {
                 <a href="https://instagram.com/liagiorgi.one.ttt" style="color: ${BRAND.mutedText}; text-decoration: none;">@liagiorgi.one.ttt</a>
               </p>
               <p style="margin: 8px 0 0; font-size: 11px; color: ${BRAND.mutedText};">
-                Malm&ouml; / Diamant studio &middot; Copenhagen / Good Morning Tattoo studio
+                Studio Diamant, Malm&ouml; &middot; Good Morning Tattoo, Copenhagen
               </p>
             </td>
           </tr>

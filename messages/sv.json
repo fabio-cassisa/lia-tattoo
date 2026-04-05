@@ -1,15 +1,15 @@
 {
   "meta": {
     "title": "liagiorgi.one.ttt — Malmö · Copenhagen based",
-    "description": "Boka din tatueringssession med liagiorgi.one.ttt. Traditionella & Old School tatueringar med bas i Malmö, med utvalda guest spot-dagar i Köpenhamn.",
+    "description": "Boka din tatueringssession med liagiorgi.one.ttt. Traditionella & Old School tatueringar med bas i Malmö, med utvalda dagar på Good Morning Tattoo i Köpenhamn.",
     "homeTitle": "liagiorgi.one.ttt — Malmö · Copenhagen based",
-    "homeDescription": "Boka din tatueringssession med liagiorgi.one.ttt. Traditionell & Old School tatueringskonst med bas i Malmö, med utvalda guest spot-dagar i Köpenhamn. Flash-designer, egendesignat och konsultationer.",
+    "homeDescription": "Boka din tatueringssession med liagiorgi.one.ttt. Traditionell & Old School tatueringskonst med bas i Malmö, med utvalda dagar på Good Morning Tattoo i Köpenhamn. Flash-designer, egendesignat och konsultationer.",
     "portfolioTitle": "Portfolio — Flash-designer & utfört arbete",
     "portfolioDescription": "Utforska traditionella flash-designer och utfört tatueringsarbete av liagiorgi.one.ttt. Old School tatueringskonst — djärva linjer, rika färger, tidlösa mönster.",
     "bookingTitle": "Boka tatuering",
-    "bookingDescription": "Boka din tatueringssession med liagiorgi.one.ttt i Malmö, eller skicka en förfrågan om ett guest spot-besök i Köpenhamn. Välj mellan flash-designer, egendesignat, cover-ups och konsultationer.",
-    "aboutTitle": "Om — Traditional Tattoo Artist",
-    "aboutDescription": "Traditionell tatuerare baserad i Malmö, Sverige. Specialiserad på Old School tatueringar — djärva linjer, rika färger, tidlösa mönster. Resident på Studio Diamant i Malmö, med utvalda guest spot-dagar på Good Morning Tattoo i Köpenhamn.",
+    "bookingDescription": "Boka din tatueringssession med liagiorgi.one.ttt i Malmö, eller skicka en förfrågan om en tid i Köpenhamn på Good Morning Tattoo. Välj mellan flash-designer, egendesignat, cover-ups och konsultationer.",
+    "aboutTitle": "Om — Malmö · Copenhagen based",
+    "aboutDescription": "Traditionell tatuerare baserad i Malmö, Sverige. Specialiserad på Old School tatueringar — djärva linjer, rika färger, tidlösa mönster. Arbetar från Studio Diamant i Malmö, med utvalda dagar på Good Morning Tattoo i Köpenhamn.",
     "aftercareTitle": "Eftervård för tatueringar",
     "aftercareDescription": "Hur du tar hand om din nya tatuering. Steg-för-steg eftervårdsinstruktioner från liagiorgi.one.ttt — tvätt, återfuktning, läkningstips och långtidsvård."
   },
@@ -32,7 +32,7 @@
     "malmoBadge": "Huvudbas",
     "copenhagen": "Good Morning Tattoo",
     "copenhagenMeta": "Köpenhamn, Danmark",
-    "copenhagenBadge": "Guest spot"
+    "copenhagenBadge": "Utvalda dagar"
   },
   "booking": {
     "title": "Boka tatuering",
@@ -75,7 +75,7 @@
       "malmo": "Studio Diamant",
       "copenhagen": "Good Morning Tattoo",
       "malmoNote": "Malmö, Sverige · huvudbas med regelbunden tillgänglighet och live-val av tider.",
-      "copenhagenNote": "Köpenhamn, Danmark · guest spot-dagar efter överenskommelse för utvalda sessioner."
+      "copenhagenNote": "Köpenhamn, Danmark · utvalda dagar som meddelas i förväg för planerade sessioner."
     },
     "contact": {
       "title": "Kontakt",
@@ -108,7 +108,7 @@
       "sessionLength": "Session",
       "noSlots": "Inga lediga tider denna vecka — prova nästa",
       "error": "Kunde inte hämta lediga tider. Försök igen.",
-      "copenhagenNote": "Köpenhamn fungerar som ett guest spot på Good Morning Tattoo. Föreslå dina önskade datum så återkommer jag när jag har nästa Köpenhamnsdagar planerade.",
+      "copenhagenNote": "Sessioner i Köpenhamn planeras i förväg på Good Morning Tattoo. Föreslå dina önskade datum så återkommer jag när nästa Köpenhamnsdatum är bekräftade.",
       "copenhagenPlaceholder": "t.ex. första två veckorna i maj, helger föredragna..."
     },
     "italyNote": "Planerar du något i Italien? Nämn Friuli eller Turin i din förfrågan, eller hör av dig på Instagram så guidar jag dig därifrån."
@@ -126,13 +126,13 @@
   "about": {
     "title": "Om",
     "bio": "Traditionell tatuerare baserad i Malmö, Sverige. Specialiserad på Old School tatueringar — djärva linjer, rika färger, tidlösa mönster.",
-    "studios": "Resident på Studio Diamant i Malmö, med utvalda guest spot-dagar på Good Morning Tattoo i Köpenhamn.",
+    "studios": "Arbetar från Studio Diamant i Malmö, med utvalda dagar på Good Morning Tattoo i Köpenhamn.",
     "approach": "Mitt tillvägagångssätt",
     "approachText": "Varje tatuering börjar med ett samtal. Oavsett om du kommer med en flash-design eller en egen idé ser jag till att designen passar din kropp och håller över tid. Traditionell tatuering handlar om hantverk — rena linjer, solid färgpackning och design som åldras väl.",
     "style": "Stilen",
     "styleText": "Traditionell / Old School tatuering har rötter som sträcker sig över ett sekel. Tänk djärva konturer, en begränsad men slående färgpalett och ikoniska motiv — örnar, rosor, dolkar, pantrar, skepp, hjärtan. Det är tatueringskonst i sin renaste form.",
     "findMe": "Hitta mig på",
-    "travelingNote": "Malmö är min huvudsakliga bas. För guest spot-dagar i Köpenhamn och framtida resdatum, kolla min Instagram.",
+    "travelingNote": "Malmö är min huvudsakliga bas. För datum i Köpenhamn och framtida resplaner, kolla min Instagram.",
     "italyNote": "Om du planerar en tatuering i Italien, nämn Friuli eller Turin i din förfrågan eller skriv till mig på Instagram så planerar vi det rätt."
   },
   "aftercare": {

@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "liagiorgi.one.ttt — Traditional Tattoo Artist";
+export const alt = "liagiorgi.one.ttt — Malmö · Copenhagen based";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -108,11 +108,11 @@ export default function OGImage() {
             style={{
               fontSize: 18,
               color: "#5a5a5a",
-              letterSpacing: "0.25em",
+              letterSpacing: "0.18em",
               textTransform: "uppercase",
             }}
           >
-            Traditional Tattoo Artist
+            Malmö · Copenhagen based
           </div>
           <svg width="14" height="14" viewBox="0 0 12 12">
             <path d="M6 0L7.5 4.5L12 6L7.5 7.5L6 12L4.5 7.5L0 6L4.5 4.5Z" fill="#a02020" />
@@ -139,11 +139,11 @@ export default function OGImage() {
             style={{
               fontSize: 14,
               color: "#7a7a7a",
-              letterSpacing: "0.15em",
+              letterSpacing: "0.12em",
               textTransform: "uppercase",
             }}
           >
-            Malmö · Copenhagen
+            Studio Diamant · Good Morning Tattoo
           </div>
           <div
             style={{

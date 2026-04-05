@@ -16,7 +16,7 @@ export default function Footer() {
               liagiorgi.one.ttt
             </Link>
             <p className="text-xs text-foreground-muted uppercase tracking-[0.3em]">
-              ❋ Traditional Tattoo Artist ❋
+              Malmö · Copenhagen based
             </p>
             {/* Instagram */}
             <a

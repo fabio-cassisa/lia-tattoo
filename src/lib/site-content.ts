@@ -49,14 +49,14 @@ export const SITE_CONTENT_DEFINITIONS: Record<SiteContentKey, SiteContentDefinit
     title: "About studios note",
     description: "Studio context paragraph on the About page.",
     source_en:
-      "Resident at Studio Diamant in Malmö, with selected guest-spot dates at Good Morning Tattoo in Copenhagen.",
+      "Working from Studio Diamant in Malmö, with selected dates at Good Morning Tattoo in Copenhagen.",
     content_kind: "textarea",
   },
   about_travel_note: {
     title: "About travel note",
-    description: "Short travel / guest-spot note on the About page.",
+    description: "Short travel note on the About page.",
     source_en:
-      "Malmö is my main base. For Copenhagen guest-spot dates and future travel announcements, check my Instagram.",
+      "Malmö is my main base. For Copenhagen dates and future travel announcements, check my Instagram.",
     content_kind: "textarea",
   },
   home_hero_title: {
